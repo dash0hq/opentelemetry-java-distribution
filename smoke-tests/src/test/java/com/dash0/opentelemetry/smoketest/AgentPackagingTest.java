@@ -1,0 +1,124 @@
+/*
+ * SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package com.dash0.opentelemetry.smoketest;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Checks the shape of the assembled agent jar.
+ *
+ * <p>These assertions exist because the three-step packaging in {@code
+ * buildSrc/src/main/kotlin/dash0.agent-packaging-conventions.gradle.kts} fails silently when it
+ * fails: a class in the wrong place, or a service file that was not merged, produces an agent that
+ * starts happily and simply never applies the Dash0 customisation. Nothing logs an error. Only
+ * inspecting the artifact catches it.
+ */
+class AgentPackagingTest {
+
+  private static final Path AGENT_JAR = Paths.get(System.getProperty("dash0.agent.jar"));
+
+  @Test
+  void bundlesTheDistroClassesUnderInstAsClassdata() throws IOException {
+    List<String> entries = entryNamesOf(AGENT_JAR);
+
+    assertThat(entries)
+        .contains("inst/com/dash0/opentelemetry/DistroResource.classdata")
+        .contains("inst/com/dash0/opentelemetry/DistroResourceProvider.classdata");
+  }
+
+  @Test
+  void neverShipsDistroClassesAsPlainClassFiles() throws IOException {
+    // A .class under inst/ would be loadable by the application's class loader,
+    // which is exactly the isolation the .classdata rename exists to enforce.
+    assertThat(entryNamesOf(AGENT_JAR))
+        .noneMatch(name -> name.startsWith("inst/com/dash0/") && name.endsWith(".class"));
+  }
+
+  @Test
+  void registersTheResourceProviderInTheMergedServiceFile() throws IOException {
+    String serviceFile =
+        readEntry(
+            AGENT_JAR,
+            "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider");
+
+    assertThat(serviceFile)
+        .as("the Dash0 provider must survive the service-file merge with upstream's own providers")
+        .contains("com.dash0.opentelemetry.DistroResourceProvider");
+  }
+
+  @Test
+  void keepsUpstreamResourceProvidersAlongsideTheDash0One() throws IOException {
+    String serviceFile =
+        readEntry(
+            AGENT_JAR,
+            "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider");
+
+    // DuplicatesStrategy.EXCLUDE on the outer jar would drop upstream's file
+    // entirely and take only ours. That would remove every upstream resource
+    // detector, which is a large regression that no test of our own code sees.
+    assertThat(serviceFile.trim().split("\\R")).hasSizeGreaterThan(1);
+  }
+
+  @Test
+  void bundlesTheGeneratedVersionResource() throws IOException {
+    assertThat(entryNamesOf(AGENT_JAR)).contains("inst/dash0-distro-version.properties");
+  }
+
+  @Test
+  void declaresTheAgentEntryPointsInTheManifest() throws IOException {
+    try (JarFile jar = new JarFile(AGENT_JAR.toFile())) {
+      Manifest manifest = jar.getManifest();
+
+      assertThat(manifest.getMainAttributes().getValue("Premain-Class"))
+          .isEqualTo("io.opentelemetry.javaagent.OpenTelemetryAgent");
+      assertThat(manifest.getMainAttributes().getValue("Implementation-Vendor"))
+          .isEqualTo("Dash0 Inc.");
+      assertThat(manifest.getMainAttributes().getValue("Implementation-Version"))
+          .startsWith("dash0-")
+          .contains("-otel-");
+    }
+  }
+
+  private static List<String> entryNamesOf(Path jarPath) throws IOException {
+    try (JarFile jar = new JarFile(jarPath.toFile())) {
+      List<String> names = new ArrayList<>();
+      Enumeration<JarEntry> entries = jar.entries();
+      while (entries.hasMoreElements()) {
+        names.add(entries.nextElement().getName());
+      }
+      return Collections.unmodifiableList(names);
+    }
+  }
+
+  private static String readEntry(Path jarPath, String entryName) throws IOException {
+    try (JarFile jar = new JarFile(jarPath.toFile())) {
+      JarEntry entry = jar.getJarEntry(entryName);
+      assertThat(entry).as("jar entry %s", entryName).isNotNull();
+      try (InputStream input = jar.getInputStream(entry)) {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = input.read(chunk)) != -1) {
+          buffer.write(chunk, 0, read);
+        }
+        return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+      }
+    }
+  }
+}
