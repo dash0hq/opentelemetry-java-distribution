@@ -31,7 +31,7 @@ jobs:
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Runs spotless, the unit tests, both shadow jars, and the smoke tests.
       # The smoke tests launch a real JVM with the built agent attached, so this
@@ -41,7 +41,7 @@ jobs:
 
       - name: Upload the built artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jars
           path: |
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: "**/build/reports/tests/**"
@@ -78,7 +78,7 @@ jobs:
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Assemble the agent
         run: ./gradlew :agent:shadowJar :smoke-tests:compileJava --stacktrace
@@ -112,7 +112,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
 
