@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Nightly
+
+# Builds against the newest upstream agent release, whatever the repository is
+# currently pinned to. Three of the four vendor distributions (Splunk, Elastic,
+# Amazon) run a job like this, because the failures that matter here are silent:
+# an upstream change can break the packaging or the resource-provider ordering
+# without breaking compilation. The smoke tests are what surface that.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned:
+    name: Build at the pinned upstream version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build --stacktrace
+
+  latest-upstream:
+    name: Build against the latest upstream release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve the latest upstream agent version
+        id: upstream
+        run: |
+          set -euo pipefail
+          metadata="https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/maven-metadata.xml"
+          latest="$(curl -fsSL "$metadata" | grep -oP '(?<=<release>)[^<]+')"
+          echo "Latest upstream agent: $latest"
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Repin to the latest upstream agent
+        run: |
+          set -euo pipefail
+          latest='${{ steps.upstream.outputs.version }}'
+          sed -i -E "s|^opentelemetryJavaagent = \".*\"|opentelemetryJavaagent = \"${latest}\"|" gradle/libs.versions.toml
+          sed -i -E "s|^opentelemetryJavaagentAlpha = \".*\"|opentelemetryJavaagentAlpha = \"${latest}-alpha\"|" gradle/libs.versions.toml
+          git --no-pager diff -- gradle/libs.versions.toml
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-test-reports
+          path: "**/build/reports/tests/**"
+          if-no-files-found: ignore

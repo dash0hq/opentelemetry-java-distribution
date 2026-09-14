@@ -1,0 +1,29 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    ":semanticCommits",
+  ],
+  labels: ["dependencies"],
+  // Changes here are exempt from the changelog check in ci.yml, which keys off
+  // the "chore" prefix.
+  semanticCommitType: "chore",
+  packageRules: [
+    {
+      // The upstream agent is the one dependency whose bump is a product
+      // decision rather than housekeeping: it changes the entire bundled
+      // instrumentation set. Keep it separate and never automerge it.
+      matchPackageNames: [
+        "io.opentelemetry.javaagent:opentelemetry-javaagent",
+        "io.opentelemetry.instrumentation:{/,}**",
+      ],
+      groupName: "upstream OpenTelemetry Java agent",
+      automerge: false,
+      labels: ["dependencies", "upstream-agent"],
+    },
+    {
+      matchManagers: ["github-actions"],
+      groupName: "github actions",
+    },
+  ],
+}
