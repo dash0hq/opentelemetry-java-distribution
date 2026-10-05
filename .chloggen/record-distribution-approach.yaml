@@ -1,0 +1,15 @@
+change_type: enhancement
+component: docs
+note: Record the distribution approach, and decide that the repackaged agent jar is the artifact Dash0 ships
+issues: [41]
+subtext: |
+  ``docs/decisions/0001-distribution-approach.rst`` records the outcome of the
+  vendor analysis in OSS-41: the delivery shape, the rule that every
+  customisation stays in ``:custom``, the decision to stay minimal, the upstream
+  pinning strategy, and why the smoke tests are not optional. The standalone
+  extension jar remains a supported secondary artifact.
+
+  ``RELEASING.rst`` now states a release cadence and records that the upstream
+  agent pin here and the one in the Dash0 operator describe the same agent and
+  have to move together.
+change_logs: [user]
