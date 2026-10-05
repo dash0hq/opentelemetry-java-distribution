@@ -4,6 +4,10 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
 
+# Kotlin Gradle plugin session and error logs, written next to the build script
+# that uses the Kotlin DSL (buildSrc/)
+.kotlin/
+
 # IDE
 .idea/
 *.iml
