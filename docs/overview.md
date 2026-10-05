@@ -3,8 +3,9 @@
 The Dash0 distribution of OpenTelemetry for Java is a thin layer on top of the
 upstream [OpenTelemetry Java agent](https://github.com/open-telemetry/opentelemetry-java-instrumentation).
 
-> **This is scaffolding.** The repository builds and is tested, but the finished
-> product's shape is not decided. See [Open decisions](#open-decisions).
+> **This is scaffolding.** The repository builds and is tested, but it has no
+> feature set yet. The shape is decided; what the distribution is *for* is not.
+> See [Open decisions](#open-decisions).
 
 ## What it does today
 
@@ -30,15 +31,31 @@ buildSrc/         the packaging recipe, copied from upstream on purpose
 
 ## Open decisions
 
-**Delivery shape.** Both are built, from the same `custom/` module:
+The analysis is complete and recorded in
+[docs/decisions/0001-distribution-approach.rst](decisions/0001-distribution-approach.rst).
+
+### Delivery shape: decided
+
+The repackaged agent jar is the product. Both are still built, from the same
+`custom/` module:
 
 - `dash0-opentelemetry-javaagent.jar`, the upstream agent repackaged with the
-  Dash0 code folded in, used as `-javaagent:<jar>`.
+  Dash0 code folded in, used as `-javaagent:<jar>`. **This is what Dash0 ships
+  and supports.** It matches the Dash0 operator's integration point, a single
+  file on a mounted volume referenced from `JAVA_TOOL_OPTIONS`.
 - `dash0-opentelemetry-agentextension.jar`, the same code as an extension loaded
-  by the unmodified upstream agent via `OTEL_JAVAAGENT_EXTENSIONS`.
+  by the unmodified upstream agent via `OTEL_JAVAAGENT_EXTENSIONS`. Kept as a
+  supported secondary artifact, the way Elastic ships both.
 
-**Rationale.** The Dash0 Python distribution exists largely to remove native
-`google.protobuf` and `grpcio` dependencies so it is safe to inject into an
-arbitrary process. That reasoning does not carry over: the Java agent is already
-a single shaded jar in its own class loader with no native code. The
-justification for this distribution is therefore still to be settled.
+### Rationale: still open
+
+The Dash0 Python distribution exists largely to remove native `google.protobuf`
+and `grpcio` dependencies so it is safe to inject into an arbitrary process.
+That reasoning does not carry over: the Java agent is already a single shaded
+jar in its own class loader, and a class's identity in Java is its name together
+with the loader that loaded it, so the agent's libraries and the application's
+cannot collide.
+
+The remaining candidates are Dash0 configuration parity with the Node.js and
+Python distributions, branding, and an independent support and upgrade policy.
+That is a product decision, tracked against OSS-35.

@@ -9,9 +9,9 @@ top of the upstream `OpenTelemetry Java agent
 .. warning::
 
    **This repository is scaffolding.** It builds, it is tested, and it does one
-   real thing (see `What works today`_), but the shape of the finished product
-   has not been decided yet. See `Status and open decisions`_ before building on
-   it.
+   real thing (see `What works today`_), but it has no feature set yet. The
+   shape is now decided (see `Status and open decisions`_); what the
+   distribution is *for* is not.
 
 
 Status and open decisions
@@ -19,35 +19,45 @@ Status and open decisions
 
 The analysis behind this repository is tracked in `OSS-41
 <https://linear.app/dash0/issue/OSS-41/dash0-java-distro-analyse-approaches-to-creating-our-own-distro>`_.
-Two questions are deliberately still open, and the repository is laid out so
-that neither has to be answered yet.
+It is complete, and its outcome is recorded in
+`docs/decisions/0001-distribution-approach.rst
+<docs/decisions/0001-distribution-approach.rst>`_.
 
-**1. How is it delivered?** There are two viable shapes, and this repository
-builds both from the same source:
+**1. How is it delivered? Decided.** The repackaged agent jar is the product.
 
 - ``:agent`` produces ``dash0-opentelemetry-javaagent.jar``, the upstream agent
-  repackaged with the Dash0 code folded in. Used as ``-javaagent:<jar>``. This is
-  what Grafana, Splunk, Elastic and Amazon all ship.
+  repackaged with the Dash0 code folded in, used as ``-javaagent:<jar>``. This is
+  the artifact Dash0 ships and supports. It drops straight into the Dash0
+  operator, whose integration point is a single file on a mounted volume
+  referenced from ``JAVA_TOOL_OPTIONS``. It is also the shape Grafana, Splunk,
+  Elastic, Amazon and Microsoft all ship.
 - ``:agentextension`` produces ``dash0-opentelemetry-agentextension.jar``, the
   same Dash0 code as a standalone extension loaded by the *unmodified* upstream
-  agent via ``OTEL_JAVAAGENT_EXTENSIONS``. Elastic ships this alongside their
-  repackaged agent.
+  agent via ``OTEL_JAVAAGENT_EXTENSIONS``. It remains a supported secondary
+  artifact, for users who would rather keep the stock agent. Elastic ships this
+  same pair.
 
-Every line of Dash0 logic lives in ``:custom`` and is consumed unchanged by both.
-Choosing one, or keeping both, does not require moving any code.
+Keeping both costs almost nothing: every line of Dash0 logic lives in
+``:custom`` and is consumed unchanged by both, and the extension shape needs no
+package relocation, so ``agentextension/build.gradle.kts`` is about twenty
+lines.
 
-**2. Why does it exist?** The Dash0 Python distribution exists largely to remove
-native ``google.protobuf`` and ``grpcio`` dependencies so it is safe to inject
-into an arbitrary process. **That reasoning does not carry over to Java.** The
-upstream Java agent is already a single shaded jar in its own class loader with
-no native code and no interaction with the application classpath.
+**2. Why does it exist? Still open, and it is the question that matters.** The
+Dash0 Python distribution exists largely to remove native ``google.protobuf``
+and ``grpcio`` dependencies so it is safe to inject into an arbitrary process.
+**That reasoning does not carry over to Java.** The upstream Java agent is
+already a single shaded jar loaded by its own class loader, and a class's
+identity in Java is its name *together with* the loader that loaded it, so the
+agent's copy of a library and the application's copy are unrelated types that
+cannot collide.
 
-So the justification for this distribution has to be something else, and that
-has not been settled. The candidates are Dash0 configuration parity with the
-Node.js and Python distributions (a ``DASH0_*`` environment variable surface),
-distribution branding, and an independent support and upgrade policy. Until that
-is decided, this README deliberately does not claim a rationale it cannot back
-up.
+So the justification has to be something else, and that is not settled. The
+candidates are Dash0 configuration parity with the Node.js and Python
+distributions (a ``DASH0_*`` environment variable surface), distribution
+branding, and an independent support and upgrade policy. That is the same value
+proposition Honeycomb had when they archived their Java distribution, so it
+deserves an explicit answer. Until there is one, this README deliberately does
+not claim a rationale it cannot back up.
 
 
 What works today
