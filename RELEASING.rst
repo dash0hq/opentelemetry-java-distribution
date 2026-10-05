@@ -6,10 +6,8 @@ Releasing
 
    Nothing has been released from this repository yet, and the artifacts are not
    published anywhere. Where they should be published, and under which
-   coordinates, is one of the open decisions in `OSS-41
-   <https://linear.app/dash0/issue/OSS-41/dash0-java-distro-analyse-approaches-to-creating-our-own-distro>`_.
-   This document records the intended process so it is not invented under time
-   pressure later.
+   coordinates, is still an open decision. This document records the intended
+   process so it is not invented under time pressure later.
 
 
 Versioning

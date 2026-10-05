@@ -2,7 +2,7 @@
 
 > **Nothing in this repository is wired into the Dash0 operator yet.** This page
 > records how JVM workloads are instrumented today, so the integration point is
-> clear when the OSS-41 decisions are made.
+> clear when this distribution is wired in.
 
 ## How JVM workloads are instrumented today
 

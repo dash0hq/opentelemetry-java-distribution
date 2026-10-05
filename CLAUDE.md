@@ -18,8 +18,10 @@ Two artifacts are produced from the same `custom/` module:
 | `:agent` | `dash0-opentelemetry-javaagent.jar` | `-javaagent:<jar>` |
 | `:agentextension` | `dash0-opentelemetry-agentextension.jar` | the stock upstream agent, via `OTEL_JAVAAGENT_EXTENSIONS` |
 
-Which one ships is an open question (OSS-41). Do not collapse this into one
-until that is decided; keeping both is the whole point of the layout.
+The repackaged agent jar is what Dash0 ships and supports; the extension jar is
+a supported secondary artifact for users who keep the stock upstream agent. Do
+not collapse this into one. Both are built from `:custom` unchanged, which is
+what keeps the choice cheap to revisit.
 
 ## Things that fail silently
 
@@ -90,7 +92,7 @@ should stay accurate rather than being filled in speculatively.
 ## What not to invent
 
 The README deliberately does not claim a rationale for this distribution's
-existence, because OSS-41 has not settled one. The Python distribution's
+existence, because none has been settled. The Python distribution's
 rationale (removing native `protobuf`/`grpcio` dependencies so injection is
 safe) **does not apply to Java**: the upstream agent is already a self-contained
 shaded jar in its own class loader. Do not copy that reasoning across.

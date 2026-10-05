@@ -20,7 +20,7 @@ Project layout
 
 - ``custom/`` — every Dash0-authored SDK customisation. **This is where new code
   goes.** It is consumed unchanged by both ``:agent`` and ``:agentextension``,
-  which is what keeps the delivery decision in OSS-41 open.
+  which is what keeps the delivery choice cheap to revisit.
 - ``bootstrap/`` — classes that must live in the bootstrap class loader, visible
   both to the instrumented application and to the agent. Empty today, and kept
   because putting a class in the wrong class loader fails silently.

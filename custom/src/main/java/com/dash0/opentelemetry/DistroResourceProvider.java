@@ -15,7 +15,7 @@ import io.opentelemetry.sdk.resources.Resource;
  *
  * <p>{@code @AutoService} generates the {@code META-INF/services} entry that makes this
  * discoverable at runtime. This works identically whether the class is packaged into the repackaged
- * agent jar or loaded from the standalone extension jar, which is why the OSS-41 delivery decision
+ * agent jar or loaded from the standalone extension jar, which is why the choice of delivery shape
  * does not affect this code.
  *
  * <p>Note that resource providers are deliberately excluded from package relocation; see {@code

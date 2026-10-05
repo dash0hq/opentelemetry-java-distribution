@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>TODO: assert on exported telemetry, not just startup. That needs an OTLP receiver in the test
  * and protobuf decoding of the export request, which is the natural next increment once the
- * configuration surface is decided in OSS-41.
+ * configuration surface is decided.
  */
 class AgentAttachTest {
 
