@@ -22,7 +22,8 @@ Seven vendor distributions were read at source level: Elastic
 (``honeycombio/honeycomb-opentelemetry-java``) and Sentry
 (``getsentry/sentry-java``), alongside upstream's ``examples/distro`` template.
 
-Three findings drive the decisions below.
+The full findings are in `../vendor-distribution-survey.rst
+<../vendor-distribution-survey.rst>`_. Three of them drive the decisions below.
 
 **Upstream prescribes exactly one way to build a repackaged agent.** The
 template in ``examples/distro`` fixes three Gradle configurations
