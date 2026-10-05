@@ -31,9 +31,6 @@ buildSrc/         the packaging recipe, copied from upstream on purpose
 
 ## Open decisions
 
-The analysis is complete and recorded in
-[docs/decisions/0001-distribution-approach.rst](decisions/0001-distribution-approach.rst).
-
 ### Delivery shape: decided
 
 The repackaged agent jar is the product. Both are still built, from the same

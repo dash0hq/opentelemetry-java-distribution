@@ -17,12 +17,6 @@ top of the upstream `OpenTelemetry Java agent
 Status and open decisions
 =========================
 
-The analysis behind this repository is tracked in `OSS-41
-<https://linear.app/dash0/issue/OSS-41/dash0-java-distro-analyse-approaches-to-creating-our-own-distro>`_.
-It is complete, and its outcome is recorded in
-`docs/decisions/0001-distribution-approach.rst
-<docs/decisions/0001-distribution-approach.rst>`_.
-
 **1. How is it delivered? Decided.** The repackaged agent jar is the product.
 
 - ``:agent`` produces ``dash0-opentelemetry-javaagent.jar``, the upstream agent
