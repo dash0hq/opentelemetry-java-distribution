@@ -43,15 +43,43 @@ Cutting a release
 Cadence
 =======
 
-Not yet decided. The options observed in the vendor distributions are:
+Release whenever the upstream pin moves, and otherwise only when there is
+something to ship.
 
-- **Release whenever the upstream pin moves.** Grafana does this: a scheduled job
-  checks weekly whether the file holding the upstream version changed since the
-  last release, and publishes if it did. No human decides when to ship.
-- **Track upstream releases on a stated commitment.** Splunk publishes within
-  five working days of each upstream instrumentation release.
-- **Pin deliberately behind.** Amazon does this, with a toggle to test against
-  upstream snapshots.
+A distribution has to be re-released for every upstream agent release, whether
+or not anything here changed, or it falls behind and stops being worth using.
+Honeycomb's Java distribution was archived at upstream agent v1.33.1 for
+substantially that reason. The corollary is that cutting a release must stay
+cheap enough to do on upstream's cadence, which is roughly monthly.
 
-The nightly workflow in ``.github/workflows/nightly.yml`` already builds against
-the latest upstream release, which is the prerequisite for any of these.
+Renovate opens the bump as its own pull request, grouped and never automerged,
+because moving the upstream agent changes the entire bundled instrumentation set
+and is a product decision rather than housekeeping. The nightly workflow in
+``.github/workflows/nightly.yml`` already builds against the latest upstream
+release, so a bump that would break the packaging is usually known before the
+pull request exists.
+
+The alternatives, for the record: Splunk commits to publishing within five
+working days of each upstream instrumentation release, and Amazon pins
+deliberately behind with a toggle for testing against upstream snapshots.
+
+
+Keeping the operator in step
+============================
+
+The upstream agent version is pinned in **two** repositories, and they describe
+the same agent:
+
+- ``gradle/libs.versions.toml`` here, as ``opentelemetryJavaagent``.
+- ``images/instrumentation/jvm/pom.xml`` in `dash0hq/dash0-operator
+  <https://github.com/dash0hq/dash0-operator>`_, which the operator's
+  instrumentation image uses to download the agent it injects.
+
+Both are at 2.31.1 today.
+
+Nothing enforces that they agree, and they are bumped by different people on
+different schedules. Once this distribution is what the operator ships, the
+operator's pom stops naming the agent at all and the coupling disappears. Until
+then, moving the pin here is only half the change: check the operator's pin in
+the same breath, and say in the pull request description whether it also needs
+to move.
