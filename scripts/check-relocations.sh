@@ -42,7 +42,22 @@ rules() {
   grep -oE 'shadowJar\.relocate\([^)]*\)|exclude\("[^"]*"\)' "$1" | tr -d ' \t'
 }
 
-if diff -u <(rules "$upstream") <(rules "$OURS"); then
+upstream_rules="$(rules "$upstream" || true)"
+our_rules="$(rules "$OURS" || true)"
+
+# Two empty extractions compare equal, so without this the check would report a
+# match while comparing nothing. That is reachable: if upstream restructures the
+# file so the calls no longer read "shadowJar.relocate(", the diff fails, the
+# obvious repair is to copy upstream's file across, and from then on both sides
+# extract nothing and the check passes forever.
+if [ -z "$upstream_rules" ]; then
+  echo "Extracted no relocation rules from upstream's copy for agent $VERSION:" >&2
+  echo "  $URL" >&2
+  echo "The pattern in rules() no longer matches upstream's file. Update it." >&2
+  exit 1
+fi
+
+if diff -u <(printf '%s\n' "$upstream_rules") <(printf '%s\n' "$our_rules"); then
   echo "Relocations.kt matches upstream at agent $VERSION."
 else
   cat >&2 <<EOF
