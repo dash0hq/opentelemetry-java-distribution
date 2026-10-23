@@ -173,8 +173,12 @@ jobs:
           && !contains(github.event.pull_request.labels.*.name, 'Skip Changelog')
         run: |
           set -euo pipefail
+          # chloggen's own configuration lives under .chloggen/ and matches the
+          # same pattern, so without the second filter a pull request could
+          # satisfy the changelog requirement by editing config.yaml.
           if ! git diff --name-only "origin/${{ github.base_ref }}"...HEAD \
-              | grep -qE '^\.chloggen/.+\.yaml$'; then
+              | grep -E '^\.chloggen/.+\.yaml$' \
+              | grep -vE '^\.chloggen/(config|TEMPLATE)\.yaml$' > /dev/null; then
             echo "No .chloggen entry found on this branch."
             echo "Add one with 'make chlog-new', or mark the pull request as chore/Skip Changelog."
             exit 1
