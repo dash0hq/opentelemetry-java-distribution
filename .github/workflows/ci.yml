@@ -89,18 +89,60 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
 
-      - name: Attach the agent and run a plain application
+      # Exports to the console rather than disabling every exporter, so this
+      # asserts that the Dash0 customisations work on each JVM rather than only
+      # that the agent attaches without crashing. The smoke tests cover the
+      # build JDK; without this, nothing covered the rest of the range.
+      - name: Attach the agent and assert the Dash0 attributes
         run: |
           set -euo pipefail
           agent="$(ls agent/build/libs/dash0-opentelemetry-javaagent-*.jar)"
-          output="$(java -javaagent:"$agent" \
-            -Dotel.traces.exporter=none \
-            -Dotel.metrics.exporter=none \
-            -Dotel.logs.exporter=none \
-            -cp smoke-tests/build/classes/java/main \
-            com.dash0.opentelemetry.smoketest.TestApplication 2>&1)"
+          run_agent() {
+            java -javaagent:"$agent" \
+              -Dotel.traces.exporter=none \
+              -Dotel.logs.exporter=none \
+              -Dotel.metrics.exporter=logging \
+              -Dotel.metric.export.interval=500 \
+              -Dotel.service.name=supported-jvm-check \
+              -cp smoke-tests/build/classes/java/main \
+              com.dash0.opentelemetry.smoketest.TestApplication 3000 2>&1
+          }
+
+          output="$(run_agent)"
           echo "$output"
-          echo "$output" | grep -q "test-application-completed"
+          if grep -q "OpenTelemetry Javaagent failed to start" <<< "$output"; then
+            echo "::error::the agent failed to start on Java ${{ matrix.java }}"
+            exit 1
+          fi
+          grep -q "test-application-completed" <<< "$output"
+          grep -q "LoggingMetricExporter" <<< "$output"
+          grep -q 'telemetry.distro.name="dash0-java"' <<< "$output"
+
+          # DASH0_DISABLE exercises the configuration customizer, the other half
+          # of what this distribution adds. The run above is its control: without
+          # it, this check would also pass on a JVM where nothing ran at all.
+          disabled="$(DASH0_DISABLE=true run_agent)"
+          echo "$disabled"
+          grep -q "test-application-completed" <<< "$disabled"
+          if grep -q "LoggingMetricExporter" <<< "$disabled"; then
+            echo "::error::DASH0_DISABLE did not stop telemetry on Java ${{ matrix.java }}"
+            exit 1
+          fi
+
+  relocations:
+    name: Relocations in sync with upstream
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # The relocation rules are copied from upstream and decide which packages
+      # are rewritten into the agent's shaded namespace. A rule upstream added
+      # and we did not copy produces no error, only instrumentation that never
+      # runs, so nothing but this comparison would notice.
+      - name: Compare against upstream at the pinned agent version
+        run: scripts/check-relocations.sh
 
   changelog:
     name: Changelog entry
