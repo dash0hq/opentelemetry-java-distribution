@@ -121,6 +121,15 @@ tasks {
     exclude("**/module-info.class")
     relocatePackages(this)
 
+    // Upstream's META-INF/licenses/ tree covers the libraries the agent
+    // bundles, not this distribution's own code. Without this the published
+    // jar carries no statement of the licence it is released under. Added
+    // here rather than in relocateJavaagentLibs above, which would move it
+    // into inst/ along with the isolated classes.
+    from(rootProject.file("LICENSE")) {
+      into("META-INF")
+    }
+
     manifest {
       // Premain-Class deliberately stays on upstream's entry point.
       //

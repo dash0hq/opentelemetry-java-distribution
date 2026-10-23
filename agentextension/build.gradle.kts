@@ -34,6 +34,10 @@ tasks {
     archiveClassifier.set("")
     mergeServiceFiles()
 
+    from(rootProject.file("LICENSE")) {
+      into("META-INF")
+    }
+
     // Without these the manifest is the bare "Manifest-Version: 1.0" that
     // shadow writes by default, and a published release asset has no way to
     // report what it is or which upstream agent it was built against other

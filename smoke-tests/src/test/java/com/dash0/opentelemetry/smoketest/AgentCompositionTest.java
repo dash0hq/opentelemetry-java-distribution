@@ -45,6 +45,12 @@ class AgentCompositionTest {
   /** The only files inside the isolated agent tree this build is allowed to rewrite. */
   private static final String MERGED_SERVICE_FILES = "inst/META-INF/services/";
 
+  /**
+   * This distribution's own licence. Upstream ships licences for the libraries it bundles under
+   * {@code META-INF/licenses/} and nothing at this path, so adding it replaces nothing.
+   */
+  private static final String LICENCE = "META-INF/LICENSE";
+
   @Test
   void dropsNothingUpstreamShips() throws IOException {
     Set<String> missing = entryNamesOf("dash0.upstream.agent.jar");
@@ -57,7 +63,11 @@ class AgentCompositionTest {
   void addsNothingBeyondTheDistributionsOwnFiles() throws IOException {
     Set<String> added = entryNamesOf("dash0.agent.jar");
     added.removeAll(entryNamesOf("dash0.upstream.agent.jar"));
-    added.removeIf(name -> name.startsWith(DASH0_CLASSES) || name.equals(VERSION_RESOURCE));
+    added.removeIf(
+        name ->
+            name.startsWith(DASH0_CLASSES)
+                || name.equals(VERSION_RESOURCE)
+                || name.equals(LICENCE));
 
     assertThat(added)
         .as(
@@ -115,6 +125,7 @@ class AgentCompositionTest {
     assertThat(entryNamesOf("dash0.agent.jar"))
         .as("the comparisons above mean nothing if the Dash0 files are not there at all")
         .contains(VERSION_RESOURCE)
+        .contains(LICENCE)
         .anyMatch(name -> name.startsWith(DASH0_CLASSES));
   }
 
