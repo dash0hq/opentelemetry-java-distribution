@@ -52,10 +52,32 @@ does less than it should.
    across the three packaging steps, each deliberately. Get it wrong and either
    the Dash0 provider or all 22 upstream providers disappear from the merged
    `META-INF/services` file.
+6. **`addPropertiesSupplier` instead of `addPropertiesCustomizer`.** Both are on
+   `AutoConfigurationCustomizer` and both compile. A supplier provides defaults
+   that an environment variable overrides; a customizer replaces what the
+   environment set. `Dash0ConfigurationCustomizerProvider` needs the customizer,
+   because `DASH0_OTEL_COLLECTOR_BASE_URL` has to beat
+   `OTEL_EXPORTER_OTLP_ENDPOINT`. With the supplier it silently loses whenever
+   both are set, which is the case that matters.
+7. **The environment-variable name a customizer reads.** `ConfigProperties` sees
+   normalised property names, so `DASH0_DISABLE` arrives as `dash0.disable`.
+   Reading the wrong spelling returns null and the setting is ignored with no
+   diagnostic.
+8. **Locating a file beside the agent jar.** `Dash0PackageResourceProvider`
+   resolves its properties file through the code source of its own class, which
+   the agent loads from `inst/` as a `.classdata` entry rather than as an
+   ordinary class file. When that resolution breaks the agent starts normally
+   and the package attributes are simply absent.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all five. They
-assert on the shape of the built jars and on the attributes a real instrumented
-JVM exports. Treat a smoke-test failure as a real defect, never as a flaky test.
+The smoke tests in `smoke-tests/` exist specifically to catch all eight. They
+assert on the shape of the built jars and on what a real instrumented JVM
+exports. Treat a smoke-test failure as a real defect, never as a flaky test.
+
+Declarative configuration is a ninth hazard, of a different kind: setting
+`OTEL_CONFIG_FILE` disables items 1, 6, 7 and 8 at once, because neither
+`ResourceProvider` nor `AutoConfigurationCustomizerProvider` is consulted in
+that mode. The measurement is in `docs/configuration.md`. Nothing in the test
+suite covers it, because the distribution does not claim to support it yet.
 
 ## Coding conventions
 
