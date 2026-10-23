@@ -35,16 +35,25 @@ import java.util.logging.Logger;
  * -Ddash0.disable=true} works as well. That is how every other setting the agent reads behaves, and
  * it means these can be unit-tested without mutating the environment.
  *
- * <p>Registration uses {@code addPropertiesCustomizer} rather than {@code addPropertiesSupplier},
- * and the difference is load-bearing. A supplier contributes defaults, which an {@code
- * OTEL_}-prefixed environment variable then overrides; a customizer sees the resolved configuration
- * and its return value wins. The {@code DASH0_} name is documented to take precedence, so it has to
- * be the customizer.
+ * <p>The two settings differ in what they beat, matching the Python and Ruby distributions.
  *
- * <p>That precedence matches the Node.js distribution and not the Python or Ruby ones, which treat
- * {@code DASH0_OTEL_COLLECTOR_BASE_URL} as a default a user-set {@code OTEL_EXPORTER_OTLP_ENDPOINT}
- * overrides. Which of the four should move is an open question across all of them; see {@code
- * docs/configuration.md}.
+ * <p>{@code DASH0_DISABLE} overrides. Setting it wins over a {@code OTEL_SDK_DISABLED} that says
+ * otherwise, because it is a kill switch and a kill switch that something else can quietly cancel
+ * is not one. Python assigns {@code OTEL_SDK_DISABLED} unconditionally and Ruby refuses to boot at
+ * all, neither of them consulting the standard name.
+ *
+ * <p>{@code DASH0_OTEL_COLLECTOR_BASE_URL} defaults. A {@code OTEL_EXPORTER_OTLP_ENDPOINT} the
+ * operator set on the workload wins over it, because the Dash0 name is what one {@code
+ * /etc/opentelemetry/injector/default_env.conf} puts on every host, and a host-wide default should
+ * not silently beat a per-workload setting. Python expresses this as {@code environ.setdefault} and
+ * Ruby as {@code Environment.set_default}.
+ *
+ * <p>Registration is {@code addPropertiesCustomizer} for both, and the endpoint gets its default
+ * behaviour by checking whether {@code otel.exporter.otlp.endpoint} is already set rather than by
+ * moving to {@code addPropertiesSupplier}. A supplier would give the right precedence, but its
+ * signature takes no {@link ConfigProperties}, so the Dash0 names would have to be read straight
+ * from {@link System#getenv}. That would drop the dotted system-property spelling and make the
+ * logic untestable without mutating the environment.
  *
  * <p>None of this applies under declarative configuration. When {@code OTEL_CONFIG_FILE} names a
  * file the SDK never consults the autoconfigure SPI, so this class is not invoked at all. See
@@ -94,10 +103,19 @@ public final class Dash0ConfigurationCustomizerProvider
 
     String baseUrl = config.getString(COLLECTOR_BASE_URL);
     if (baseUrl != null && !baseUrl.trim().isEmpty()) {
-      String endpoint = baseUrl.trim().replaceAll("/+$", "");
-      logger.log(
-          Level.FINE, "Using DASH0_OTEL_COLLECTOR_BASE_URL as the OTLP endpoint: {0}", endpoint);
-      overrides.put(OTLP_ENDPOINT, endpoint);
+      String configuredEndpoint = config.getString(OTLP_ENDPOINT);
+      if (configuredEndpoint != null && !configuredEndpoint.trim().isEmpty()) {
+        logger.log(
+            Level.FINE,
+            "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
+                + " unapplied.",
+            configuredEndpoint);
+      } else {
+        String endpoint = baseUrl.trim().replaceAll("/+$", "");
+        logger.log(
+            Level.FINE, "Using DASH0_OTEL_COLLECTOR_BASE_URL as the OTLP endpoint: {0}", endpoint);
+        overrides.put(OTLP_ENDPOINT, endpoint);
+      }
     }
 
     return overrides;

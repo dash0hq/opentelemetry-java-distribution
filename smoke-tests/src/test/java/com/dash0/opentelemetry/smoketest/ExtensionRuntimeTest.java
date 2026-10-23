@@ -56,14 +56,29 @@ class ExtensionRuntimeTest {
 
   @Test
   void honoursTheCollectorBaseUrl() throws Exception {
+    String exported =
+        upstreamAgentWith(extensionJar(), "otlp")
+            .withEnvironmentVariable(
+                "DASH0_OTEL_COLLECTOR_BASE_URL", "http://extension-endpoint.invalid:4318")
+            .run();
+
+    assertThat(exported)
+        .as("the JVM's output was:%n%s", exported)
+        .contains("extension-endpoint.invalid");
+  }
+
+  @Test
+  void letsTheStandardEndpointBeatTheCollectorBaseUrl() throws Exception {
     Map<String, String> environment = new HashMap<>();
-    environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://extension-wins.invalid:4318");
-    environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://extension-loses.invalid:4318");
+    environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://extension-loses.invalid:4318");
+    environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://extension-wins.invalid:4318");
 
     String exported = upstreamAgentWith(extensionJar(), "otlp").withEnvironment(environment).run();
 
     assertThat(exported)
-        .as("the JVM's output was:%n%s", exported)
+        .as(
+            "the precedence has to be the same in both delivery shapes. The output was:%n%s",
+            exported)
         .contains("extension-wins.invalid")
         .doesNotContain("extension-loses.invalid");
   }

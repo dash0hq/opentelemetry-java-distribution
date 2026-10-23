@@ -75,6 +75,41 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void leavesAUserSetOtlpEndpointAlone() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(COLLECTOR_BASE_URL, "https://ingress.dash0.com");
+    properties.put(OTLP_ENDPOINT, "http://collector.internal:4318");
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .as(
+            "DASH0_OTEL_COLLECTOR_BASE_URL is a host-wide default, so a workload's own"
+                + " OTEL_EXPORTER_OTLP_ENDPOINT beats it, as in the Python and Ruby distributions")
+        .doesNotContainKey(OTLP_ENDPOINT);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  void appliesTheCollectorBaseUrlWhenTheOtlpEndpointIsBlank(String value) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(COLLECTOR_BASE_URL, "https://ingress.dash0.com");
+    properties.put(OTLP_ENDPOINT, value);
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .containsEntry(OTLP_ENDPOINT, "https://ingress.dash0.com");
+  }
+
+  @Test
+  void disableStillBeatsAUserSetSdkDisabled() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(DISABLE, "true");
+    properties.put(SDK_DISABLED, "false");
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .as("DASH0_DISABLE is a kill switch; the standard name must not be able to cancel it")
+        .containsEntry(SDK_DISABLED, "true");
+  }
+
+  @Test
   void appliesBothSettingsTogether() {
     Map<String, String> properties = new HashMap<>();
     properties.put(DISABLE, "true");

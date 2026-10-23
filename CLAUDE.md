@@ -54,13 +54,17 @@ does less than it should.
    `META-INF/services` file. `AgentPackagingTest` compares that file against
    upstream's own copy rather than against a count written down here, so the
    expected set stays correct when upstream adds or removes a detector.
-6. **`addPropertiesSupplier` instead of `addPropertiesCustomizer`.** Both are on
-   `AutoConfigurationCustomizer` and both compile. A supplier provides defaults
-   that an environment variable overrides; a customizer replaces what the
-   environment set. `Dash0ConfigurationCustomizerProvider` needs the customizer,
-   because `DASH0_OTEL_COLLECTOR_BASE_URL` has to beat
-   `OTEL_EXPORTER_OTLP_ENDPOINT`. With the supplier it silently loses whenever
-   both are set, which is the case that matters.
+6. **The precedence of each Dash0 setting.** `DASH0_DISABLE` has to beat
+   `OTEL_SDK_DISABLED`, and `DASH0_OTEL_COLLECTOR_BASE_URL` has to lose to
+   `OTEL_EXPORTER_OTLP_ENDPOINT`, matching the Python and Ruby distributions.
+   Both are registered through `addPropertiesCustomizer`, whose return value
+   replaces what the environment set, so the endpoint gets its weaker
+   precedence by checking whether one is already configured rather than by
+   moving to `addPropertiesSupplier`. A supplier takes no `ConfigProperties`,
+   so it could not read the dotted system-property spelling and could not be
+   unit-tested without mutating the environment. Get either precedence wrong
+   and nothing reports it: telemetry simply goes to the wrong endpoint, or a
+   disabled process keeps exporting.
 7. **The environment-variable name a customizer reads.** `ConfigProperties` sees
    normalised property names, so `DASH0_DISABLE` arrives as `dash0.disable`.
    Reading the wrong spelling returns null and the setting is ignored with no

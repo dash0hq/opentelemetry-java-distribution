@@ -28,7 +28,7 @@ class Dash0ConfigurationTest {
   private static final String OTEL_HOST = "otel-exporter-endpoint.invalid";
 
   @Test
-  void collectorBaseUrlTakesPrecedenceOverTheStandardEndpoint() throws Exception {
+  void theStandardEndpointTakesPrecedenceOverTheCollectorBaseUrl() throws Exception {
     Map<String, String> environment = new HashMap<>();
     environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318");
     environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://" + OTEL_HOST + ":4318");
@@ -36,9 +36,30 @@ class Dash0ConfigurationTest {
     String output = exportingMetricsOverOtlp().withEnvironment(environment).run();
 
     assertThat(output)
-        .as("the JVM's output was:%n%s", output)
-        .contains(DASH0_HOST)
-        .doesNotContain(OTEL_HOST);
+        .as(
+            "DASH0_OTEL_COLLECTOR_BASE_URL is the host-wide default that one"
+                + " /etc/opentelemetry/injector/default_env.conf sets, so a workload's own"
+                + " OTEL_EXPORTER_OTLP_ENDPOINT beats it, matching the Python and Ruby"
+                + " distributions. The JVM's output was:%n%s",
+            output)
+        .contains(OTEL_HOST)
+        .doesNotContain(DASH0_HOST);
+  }
+
+  @Test
+  void theCollectorBaseUrlAppliesWhenTheStandardEndpointIsAbsent() throws Exception {
+    String output =
+        exportingMetricsOverOtlp()
+            .withEnvironmentVariable(
+                "DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318")
+            .run();
+
+    assertThat(output)
+        .as(
+            "the control for the test above: without it, that one would also pass if the Dash0"
+                + " setting had stopped working altogether. The JVM's output was:%n%s",
+            output)
+        .contains(DASH0_HOST);
   }
 
   @Test

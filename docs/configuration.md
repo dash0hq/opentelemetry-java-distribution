@@ -4,28 +4,30 @@
 
 | Variable | Effect |
 |---|---|
-| `DASH0_OTEL_COLLECTOR_BASE_URL` | Sets the OTLP endpoint. Overrides `OTEL_EXPORTER_OTLP_ENDPOINT` when both are set. |
+| `DASH0_OTEL_COLLECTOR_BASE_URL` | Sets the OTLP endpoint, unless `OTEL_EXPORTER_OTLP_ENDPOINT` is already set, which wins. |
 | `DASH0_DISABLE` | When set to `true`, turns the SDK into a no-op so the process exports nothing. |
 
 Both are read by `Dash0ConfigurationCustomizerProvider` in `custom/`, an
-`AutoConfigurationCustomizerProvider` registered through
-`addPropertiesCustomizer`. A customizer added that way runs after the
-environment has been read and its return value replaces what was read, which is
-why `DASH0_OTEL_COLLECTOR_BASE_URL` wins over `OTEL_EXPORTER_OTLP_ENDPOINT`.
-`addPropertiesSupplier`, the other half of the same interface, supplies
-defaults that an environment variable overrides.
+`AutoConfigurationCustomizerProvider`.
 
-That precedence is not what every Dash0 distribution does, which is unresolved
-rather than intended. Node.js agrees with Java: it passes the base URL straight
-to the exporter constructor in `src/2.x/init.ts`, which the SDK prefers over
-the environment. Python and Ruby disagree: `distro.py` calls
-`environ.setdefault(OTEL_EXPORTER_OTLP_ENDPOINT, ...)` and
-`sdk_configuration.rb` calls `Environment.set_default`, both of which leave a
-user-set `OTEL_EXPORTER_OTLP_ENDPOINT` in place. So one
-`/etc/opentelemetry/injector/default_env.conf` setting both variables gives one
-answer for the JVMs on a host and the opposite answer for the Python and Ruby
-processes beside them. Settling that means changing one of the four, which is a
-decision across all of them rather than a defect in this one.
+The two differ in what they beat, and the difference is deliberate.
+
+`DASH0_DISABLE` overrides. Setting it to `true` wins even over
+`OTEL_SDK_DISABLED=false`, because it is a kill switch and a kill switch that
+another setting can quietly cancel is not one.
+
+`DASH0_OTEL_COLLECTOR_BASE_URL` is a default. An `OTEL_EXPORTER_OTLP_ENDPOINT`
+set on the workload wins over it. The Dash0 name is what a single
+`/etc/opentelemetry/injector/default_env.conf` puts on a whole host, and a
+host-wide default should not silently beat a setting someone made on one
+workload.
+
+This matches the Python and Ruby distributions in both halves. Python assigns
+`OTEL_SDK_DISABLED` unconditionally but reaches for `environ.setdefault` for
+the endpoint, and Ruby refuses to boot at all on `DASH0_DISABLE` while using
+`Environment.set_default` for the endpoint. The Node.js distribution still
+differs on the endpoint: it passes the base URL to the exporter constructor in
+`src/2.x/init.ts`, which the SDK prefers over the environment.
 
 ### `DASH0_OTEL_COLLECTOR_BASE_URL`
 
