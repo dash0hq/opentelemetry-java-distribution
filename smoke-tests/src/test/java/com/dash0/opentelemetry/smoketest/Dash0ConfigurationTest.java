@@ -133,6 +133,10 @@ class Dash0ConfigurationTest {
       process.destroyForcibly();
       throw new AssertionError("the instrumented JVM did not exit within two minutes");
     }
-    return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+    String output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+    assertThat(output)
+        .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
+        .doesNotContain("OpenTelemetry Javaagent failed to start");
+    return output;
   }
 }
