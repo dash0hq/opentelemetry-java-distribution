@@ -73,5 +73,14 @@ spotless {
   }
   kotlinGradle {
     target("*.gradle.kts")
+    trimTrailingWhitespace()
+    endWithNewline()
+    licenseHeader(
+      """
+      // SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+      // SPDX-License-Identifier: Apache-2.0
+      """.trimIndent() + "\n\n",
+      "(plugins|import|description|base)",
+    )
   }
 }

@@ -44,8 +44,13 @@ Building and testing
     ./gradlew :smoke-tests:test
     ./gradlew spotlessApply  # fix formatting
 
-Formatting is google-java-format, enforced in CI. ``spotlessApply`` fixes every
-violation it reports.
+Java formatting is google-java-format, enforced in CI. The Kotlin build files
+are checked for the SPDX header and for trailing whitespace, at the root and in
+``buildSrc`` as well as in the five subprojects, but no Kotlin formatter is
+imposed on them. ``buildSrc/src/main/kotlin/Relocations.kt`` is exempt from all
+of it, because it is a verbatim copy of upstream's file and
+``scripts/check-relocations.sh`` compares it line by line.
+``spotlessApply`` fixes every violation it reports.
 
 The build compiles with ``-Werror``. Two lint categories are switched off, both
 documented with their reasons in
