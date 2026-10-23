@@ -58,7 +58,7 @@ jobs:
           if-no-files-found: ignore
 
   supported-jvms:
-    name: Agent attaches on Java ${{ matrix.java }}
+    name: Dash0 customisations work on Java ${{ matrix.java }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
