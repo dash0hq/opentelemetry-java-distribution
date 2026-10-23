@@ -1,5 +1,23 @@
 # Getting started
 
+## Supported JVMs
+
+This distribution supports every JVM the upstream agent supports, and commits to
+nothing beyond that. Upstream states Java 8 as the minimum and runs its
+integration tests against OpenJDK and OpenJ9 at versions 8, 11, 17, 21, 25 and
+27 on `ubuntu-latest`:
+https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/docs/supported-libraries.md#jvms-and-operating-systems
+
+The distribution's own classes are compiled with `options.release.set(8)` in
+`buildSrc/src/main/kotlin/dash0.java-conventions.gradle.kts`, so they do not
+raise that floor. Everything this distribution adds is a resource provider and
+an autoconfiguration customizer, neither of which touches bytecode
+manipulation, so there is no mechanism by which it could support fewer JVMs
+than the agent it repackages.
+
+The support floor therefore moves when upstream's does, with the agent version
+bump that moves it, and is not tracked separately here.
+
 ## Build
 
 ```bash
