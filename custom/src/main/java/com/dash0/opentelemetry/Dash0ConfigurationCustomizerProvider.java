@@ -38,8 +38,13 @@ import java.util.logging.Logger;
  * <p>Registration uses {@code addPropertiesCustomizer} rather than {@code addPropertiesSupplier},
  * and the difference is load-bearing. A supplier contributes defaults, which an {@code
  * OTEL_}-prefixed environment variable then overrides; a customizer sees the resolved configuration
- * and its return value wins. The {@code DASH0_} name is documented to take precedence, matching the
- * Node.js, Python and Ruby distributions, so it has to be the customizer.
+ * and its return value wins. The {@code DASH0_} name is documented to take precedence, so it has to
+ * be the customizer.
+ *
+ * <p>That precedence matches the Node.js distribution and not the Python or Ruby ones, which treat
+ * {@code DASH0_OTEL_COLLECTOR_BASE_URL} as a default a user-set {@code OTEL_EXPORTER_OTLP_ENDPOINT}
+ * overrides. Which of the four should move is an open question across all of them; see {@code
+ * docs/configuration.md}.
  *
  * <p>None of this applies under declarative configuration. When {@code OTEL_CONFIG_FILE} names a
  * file the SDK never consults the autoconfigure SPI, so this class is not invoked at all. See

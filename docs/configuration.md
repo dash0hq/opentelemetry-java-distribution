@@ -12,8 +12,20 @@ Both are read by `Dash0ConfigurationCustomizerProvider` in `custom/`, an
 `addPropertiesCustomizer`. A customizer added that way runs after the
 environment has been read and its return value replaces what was read, which is
 why `DASH0_OTEL_COLLECTOR_BASE_URL` wins over `OTEL_EXPORTER_OTLP_ENDPOINT`.
-`addPropertiesSupplier`, the other half of the same interface, supplies defaults
-that an environment variable overrides, and is the wrong one for this.
+`addPropertiesSupplier`, the other half of the same interface, supplies
+defaults that an environment variable overrides.
+
+That precedence is not what every Dash0 distribution does, which is unresolved
+rather than intended. Node.js agrees with Java: it passes the base URL straight
+to the exporter constructor in `src/2.x/init.ts`, which the SDK prefers over
+the environment. Python and Ruby disagree: `distro.py` calls
+`environ.setdefault(OTEL_EXPORTER_OTLP_ENDPOINT, ...)` and
+`sdk_configuration.rb` calls `Environment.set_default`, both of which leave a
+user-set `OTEL_EXPORTER_OTLP_ENDPOINT` in place. So one
+`/etc/opentelemetry/injector/default_env.conf` setting both variables gives one
+answer for the JVMs on a host and the opposite answer for the Python and Ruby
+processes beside them. Settling that means changing one of the four, which is a
+decision across all of them rather than a defect in this one.
 
 ### `DASH0_OTEL_COLLECTOR_BASE_URL`
 
