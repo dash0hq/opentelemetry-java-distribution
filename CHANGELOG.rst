@@ -19,3 +19,13 @@ Removing it makes that command fail with "expected one instance of
 than ordinary prose.
 
 .. <!-- next version -->
+
+0.0.1 - 2026-10-23
+==================
+
+Not a release, and not installable. This tag exists only to run
+``.github/workflows/release.yml`` from end to end once before the first real
+release is cut, so that the workflow is known to work rather than assumed to.
+The jars attached to it are an ordinary build of ``main`` and are unsupported.
+Both the tag and this section are removed once the run has been inspected.
+
