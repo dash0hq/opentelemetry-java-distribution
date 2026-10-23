@@ -48,11 +48,27 @@ docker compose up --detach
 # container's real exit code was, so calling it once per service does not help
 # either. Use it only to wait for the stack to settle, then read each exit code
 # back from `docker compose ps`.
-docker compose wait app app-packaged > /dev/null
+# The `|| true` is required. On a container that has already exited, wait
+# returns 1 and prints "no containers for project", and under `set -e` that
+# ends the script here, skipping the very diagnostics below. Its exit status
+# carries nothing the verdict needs, so it is discarded outright.
+docker compose wait app app-packaged > /dev/null || true
 
 for service in app app-packaged; do
-  exit_code="$(docker compose ps --all --format '{{.ExitCode}}' "$service")"
-  if [ "$exit_code" != "0" ]; then
+  # Both fields matter. A running container reports its exit code as 0, so
+  # reading the code alone would pass a service that never finished.
+  read -r state exit_code \
+    <<< "$(docker compose ps --all --format '{{.State}} {{.ExitCode}}' "$service")" || true
+
+  if [ -z "$state" ]; then
+    docker compose logs
+    echo "$service has no container; it was never created." >&2
+    exit 1
+  elif [ "$state" != "exited" ]; then
+    docker compose logs
+    echo "$service did not finish; it is $state." >&2
+    exit 1
+  elif [ "$exit_code" != "0" ]; then
     docker compose logs
     echo "$service exited with status $exit_code." >&2
     exit 1
