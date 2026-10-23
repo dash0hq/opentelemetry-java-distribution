@@ -32,6 +32,9 @@ chlog-update:
 ifndef VERSION
 	$(error VERSION is required, e.g. make chlog-update VERSION="0.2.0 - 2026-10-01")
 endif
+ifeq ($(shell printf '%s' '$(VERSION)' | cut -c1),v)
+	$(error VERSION must not start with v. The tag to push is prefixed and the CHANGELOG.rst heading is not, and release.yml finds the section by matching the heading, so a v here renders a section the release cannot find. Drop it, e.g. make chlog-update VERSION="0.2.0 - 2026-10-01")
+endif
 	$(CHLOGGEN) update --config $(CHLOGGEN_CONFIG) --version "$(VERSION)"
 
 # Compare the relocation rules against upstream's copy for the pinned agent

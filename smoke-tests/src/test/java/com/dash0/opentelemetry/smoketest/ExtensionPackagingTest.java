@@ -36,9 +36,20 @@ class ExtensionPackagingTest {
   }
 
   @Test
-  void registersTheResourceProviderService() throws IOException {
+  void registersBothServicesTheDistributionImplements() throws IOException {
     assertThat(entryNamesOf(EXTENSION_JAR))
-        .contains("META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider");
+        .contains("META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider")
+        .contains(
+            "META-INF/services/"
+                + "io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider");
+  }
+
+  @Test
+  void carriesTheLicence() throws IOException {
+    // The agent jar's copy is asserted by AgentCompositionTest. This jar is
+    // built by a different convention plugin, so it can lose the licence on its
+    // own.
+    assertThat(entryNamesOf(EXTENSION_JAR)).contains("META-INF/LICENSE");
   }
 
   @Test
