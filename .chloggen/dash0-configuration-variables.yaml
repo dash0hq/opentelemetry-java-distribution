@@ -1,0 +1,11 @@
+change_type: enhancement
+component: config
+note: Honour DASH0_OTEL_COLLECTOR_BASE_URL and DASH0_DISABLE
+issues: [1]
+subtext: |
+  DASH0_OTEL_COLLECTOR_BASE_URL sets the OTLP endpoint and takes precedence over
+  OTEL_EXPORTER_OTLP_ENDPOINT. A signal-specific endpoint such as
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT still wins over both. DASH0_DISABLE=true
+  turns the SDK into a no-op, matching the comparison the Node.js and Ruby
+  distributions make against the exact string "true".
+change_logs: [user]
