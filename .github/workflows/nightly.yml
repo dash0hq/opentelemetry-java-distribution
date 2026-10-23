@@ -66,6 +66,14 @@ jobs:
           sed -i -E "s|^opentelemetryJavaagentAlpha = \".*\"|opentelemetryJavaagentAlpha = \"${latest}-alpha\"|" gradle/libs.versions.toml
           git --no-pager diff -- gradle/libs.versions.toml
 
+      # Reads the pinned version out of gradle/libs.versions.toml, so after the
+      # repin above it compares against the newest upstream copy. Relocation
+      # drift is exactly the kind of upstream change this job exists to find:
+      # it breaks nothing at compile time and silently stops a resource
+      # provider from ever being invoked.
+      - name: Compare the relocation rules against the latest upstream
+        run: scripts/check-relocations.sh
+
       - name: Build
         run: ./gradlew build --stacktrace
 
