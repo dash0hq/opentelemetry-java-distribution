@@ -43,7 +43,6 @@ dependencies {
   // The alpha BOM is required for the javaagent extension APIs; it transitively
   // provides the non-alpha instrumentation BOM.
   implementation(platform(libs.opentelemetryInstrumentationBomAlpha))
-  implementation(platform(libs.opentelemetryBom))
 
   testImplementation(platform(libs.junitBom))
   testImplementation(libs.junitJupiter)
