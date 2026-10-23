@@ -6,19 +6,14 @@ package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -41,7 +36,7 @@ class ExtensionRuntimeTest {
 
   @Test
   void contributesTheDash0DistroAttributes() throws Exception {
-    String exported = runUpstreamAgentWithExtension(extensionJar(), Collections.emptyMap());
+    String exported = upstreamAgentWith(extensionJar(), "logging").run();
 
     assertThat(exported)
         .as("the JVM's output was:%n%s", exported)
@@ -52,8 +47,9 @@ class ExtensionRuntimeTest {
   @Test
   void honoursDash0Disable() throws Exception {
     String exported =
-        runUpstreamAgentWithExtension(
-            extensionJar(), Collections.singletonMap("DASH0_DISABLE", "true"));
+        upstreamAgentWith(extensionJar(), "logging")
+            .withEnvironmentVariable("DASH0_DISABLE", "true")
+            .run();
 
     assertThat(exported).as("the JVM's output was:%n%s", exported).doesNotContain("metric:");
   }
@@ -64,7 +60,7 @@ class ExtensionRuntimeTest {
     environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://extension-wins.invalid:4318");
     environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://extension-loses.invalid:4318");
 
-    String exported = runUpstreamAgentWithExtension(extensionJar(), environment, "otlp");
+    String exported = upstreamAgentWith(extensionJar(), "otlp").withEnvironment(environment).run();
 
     assertThat(exported)
         .as("the JVM's output was:%n%s", exported)
@@ -79,7 +75,7 @@ class ExtensionRuntimeTest {
         extension.resolveSibling("dash0-resource-attributes.properties"),
         "dash0.package.name=beside-the-extension\n".getBytes(StandardCharsets.UTF_8));
 
-    String exported = runUpstreamAgentWithExtension(extension, Collections.emptyMap());
+    String exported = upstreamAgentWith(extension, "logging").run();
 
     assertThat(exported)
         .as(
@@ -101,50 +97,16 @@ class ExtensionRuntimeTest {
     return copy;
   }
 
-  private static String runUpstreamAgentWithExtension(
-      Path extension, Map<String, String> environment) throws IOException, InterruptedException {
-    return runUpstreamAgentWithExtension(extension, environment, "logging");
-  }
-
-  private static String runUpstreamAgentWithExtension(
-      Path extension, Map<String, String> environment, String metricsExporter)
-      throws IOException, InterruptedException {
-    List<String> command = new ArrayList<>();
-    command.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
-    command.add("-javaagent:" + System.getProperty("dash0.upstream.agent.jar"));
-    command.add("-Dotel.javaagent.extensions=" + extension);
-    command.add("-Dotel.traces.exporter=none");
-    command.add("-Dotel.logs.exporter=none");
-    command.add("-Dotel.metrics.exporter=" + metricsExporter);
-    command.add("-Dotel.metric.export.interval=500");
-    command.add("-Dotel.service.name=smoke-test");
-    command.add("-cp");
-    command.add(System.getProperty("dash0.test.app.classes"));
-    command.add(TestApplication.class.getName());
-    command.add("4000");
-
-    ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
-    builder.environment().putAll(environment);
-
-    Process process = builder.start();
-    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    byte[] chunk = new byte[8192];
-    int read;
-    while ((read = process.getInputStream().read(chunk)) != -1) {
-      buffer.write(chunk, 0, read);
-    }
-    if (!process.waitFor(2, TimeUnit.MINUTES)) {
-      process.destroyForcibly();
-      throw new AssertionError("the instrumented JVM did not exit within two minutes");
-    }
-
-    String output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
-    // Checked for every case, because a dead agent produces no telemetry and would therefore
-    // satisfy any assertion phrased as an absence. A resource provider that throws killed the
-    // agent exactly this way, and the disable test passed while it did.
-    assertThat(output)
-        .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
-        .doesNotContain("OpenTelemetry Javaagent failed to start");
-    return output;
+  private static InstrumentedJvm upstreamAgentWith(Path extension, String metricsExporter) {
+    return InstrumentedJvm.runningTheTestApplication()
+        .attaching(Paths.get(System.getProperty("dash0.upstream.agent.jar")))
+        .withJvmArguments(
+            "-Dotel.javaagent.extensions=" + extension,
+            "-Dotel.traces.exporter=none",
+            "-Dotel.logs.exporter=none",
+            "-Dotel.metrics.exporter=" + metricsExporter,
+            "-Dotel.metric.export.interval=500",
+            "-Dotel.service.name=smoke-test")
+        .exitingAfter(4000);
   }
 }

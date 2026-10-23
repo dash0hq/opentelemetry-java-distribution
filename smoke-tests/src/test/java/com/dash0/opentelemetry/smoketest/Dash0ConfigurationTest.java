@@ -6,17 +6,8 @@ package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -42,7 +33,7 @@ class Dash0ConfigurationTest {
     environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318");
     environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://" + OTEL_HOST + ":4318");
 
-    String output = runInstrumentedApplication(environment, exportingMetricsOverOtlp());
+    String output = exportingMetricsOverOtlp().withEnvironment(environment).run();
 
     assertThat(output)
         .as("the JVM's output was:%n%s", output)
@@ -52,11 +43,11 @@ class Dash0ConfigurationTest {
 
   @Test
   void aTrailingSlashOnTheCollectorBaseUrlDoesNotReachTheExporter() throws Exception {
-    Map<String, String> environment =
-        Collections.singletonMap(
-            "DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318/");
-
-    String output = runInstrumentedApplication(environment, exportingMetricsOverOtlp());
+    String output =
+        exportingMetricsOverOtlp()
+            .withEnvironmentVariable(
+                "DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318/")
+            .run();
 
     assertThat(output)
         .as("the JVM's output was:%n%s", output)
@@ -67,8 +58,7 @@ class Dash0ConfigurationTest {
   @Test
   void disableStopsTelemetry() throws Exception {
     String output =
-        runInstrumentedApplication(
-            Collections.singletonMap("DASH0_DISABLE", "true"), exportingMetricsToTheLog());
+        exportingMetricsToTheLog().withEnvironmentVariable("DASH0_DISABLE", "true").run();
 
     assertThat(output)
         .as("the JVM's output was:%n%s", output)
@@ -77,66 +67,33 @@ class Dash0ConfigurationTest {
 
   @Test
   void telemetryFlowsWhenDisableIsAbsent() throws Exception {
-    String output = runInstrumentedApplication(Collections.emptyMap(), exportingMetricsToTheLog());
+    String output = exportingMetricsToTheLog().run();
 
     assertThat(output).as("the JVM's output was:%n%s", output).contains("LoggingMetricExporter");
   }
 
   @Test
   void aDisableValueOtherThanTrueLeavesTelemetryFlowing() throws Exception {
-    String output =
-        runInstrumentedApplication(
-            Collections.singletonMap("DASH0_DISABLE", "1"), exportingMetricsToTheLog());
+    String output = exportingMetricsToTheLog().withEnvironmentVariable("DASH0_DISABLE", "1").run();
 
     assertThat(output).as("the JVM's output was:%n%s", output).contains("LoggingMetricExporter");
   }
 
-  private static List<String> exportingMetricsToTheLog() {
-    return Arrays.asList(
-        "-Dotel.traces.exporter=none",
-        "-Dotel.logs.exporter=none",
-        "-Dotel.metrics.exporter=logging",
-        "-Dotel.metric.export.interval=500");
+  private static InstrumentedJvm exportingMetricsToTheLog() {
+    return instrumentedApplication()
+        .withJvmArguments("-Dotel.metrics.exporter=logging", "-Dotel.metric.export.interval=500");
   }
 
-  private static List<String> exportingMetricsOverOtlp() {
-    return Arrays.asList(
-        "-Dotel.traces.exporter=none",
-        "-Dotel.logs.exporter=none",
-        "-Dotel.metric.export.interval=500");
+  private static InstrumentedJvm exportingMetricsOverOtlp() {
+    return instrumentedApplication().withJvmArguments("-Dotel.metric.export.interval=500");
   }
 
-  private static String runInstrumentedApplication(
-      Map<String, String> environment, List<String> jvmArguments)
-      throws IOException, InterruptedException {
-    List<String> command = new ArrayList<>();
-    command.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
-    command.add("-javaagent:" + System.getProperty("dash0.agent.jar"));
-    command.addAll(jvmArguments);
-    command.add("-Dotel.service.name=smoke-test");
-    command.add("-cp");
-    command.add(System.getProperty("dash0.test.app.classes"));
-    command.add(TestApplication.class.getName());
-    command.add("3000");
-
-    ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
-    builder.environment().putAll(environment);
-
-    Process process = builder.start();
-    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    byte[] chunk = new byte[8192];
-    int read;
-    while ((read = process.getInputStream().read(chunk)) != -1) {
-      buffer.write(chunk, 0, read);
-    }
-    if (!process.waitFor(2, TimeUnit.MINUTES)) {
-      process.destroyForcibly();
-      throw new AssertionError("the instrumented JVM did not exit within two minutes");
-    }
-    String output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
-    assertThat(output)
-        .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
-        .doesNotContain("OpenTelemetry Javaagent failed to start");
-    return output;
+  private static InstrumentedJvm instrumentedApplication() {
+    return InstrumentedJvm.runningTheTestApplication()
+        .withJvmArguments(
+            "-Dotel.traces.exporter=none",
+            "-Dotel.logs.exporter=none",
+            "-Dotel.service.name=smoke-test")
+        .exitingAfter(3000);
   }
 }

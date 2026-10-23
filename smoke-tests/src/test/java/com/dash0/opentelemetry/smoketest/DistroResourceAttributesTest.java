@@ -6,12 +6,6 @@ package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -30,8 +24,8 @@ import org.junit.jupiter.api.Test;
 class DistroResourceAttributesTest {
 
   @Test
-  void exportsTheDash0DistroNameRatherThanUpstreams() throws IOException, InterruptedException {
-    String exported = runInstrumentedApplicationAndCaptureExportedTelemetry();
+  void exportsTheDash0DistroNameRatherThanUpstreams() throws Exception {
+    String exported = exportingTheResourceToTheLog();
 
     assertThat(exported)
         .as("exported resource attributes were:%n%s", exported)
@@ -40,50 +34,29 @@ class DistroResourceAttributesTest {
   }
 
   @Test
-  void exportsTheDistributionVersionRatherThanTheAgentManifestVersion()
-      throws IOException, InterruptedException {
-    String exported = runInstrumentedApplicationAndCaptureExportedTelemetry();
+  void exportsTheDistributionVersionRatherThanTheAgentManifestVersion() throws Exception {
+    String exported = exportingTheResourceToTheLog();
 
     // Upstream's provider reports the jar manifest's Implementation-Version,
     // which is the combined "dash0-<distro>-otel-<upstream>" string. The Dash0
     // provider reports the distribution version on its own.
     assertThat(exported)
         .as("exported resource attributes were:%n%s", exported)
-        .contains("telemetry.distro.version=\"" + expectedDistroVersion() + "\"");
+        .contains(
+            "telemetry.distro.version=\"" + System.getProperty("dash0.distro.version") + "\"");
   }
 
-  private static String expectedDistroVersion() {
-    return System.getProperty("dash0.distro.version");
-  }
-
-  private static String runInstrumentedApplicationAndCaptureExportedTelemetry()
-      throws IOException, InterruptedException {
-    List<String> command = new ArrayList<>();
-    command.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
-    command.add("-javaagent:" + System.getProperty("dash0.agent.jar"));
-    command.add("-Dotel.traces.exporter=none");
-    command.add("-Dotel.logs.exporter=none");
-    // The logging metric exporter prints the resource on every export.
-    command.add("-Dotel.metrics.exporter=logging");
-    command.add("-Dotel.metric.export.interval=500");
-    command.add("-Dotel.service.name=smoke-test");
-    command.add("-cp");
-    command.add(System.getProperty("dash0.test.app.classes"));
-    command.add(TestApplication.class.getName());
-    // Stay alive long enough for at least one periodic export.
-    command.add("4000");
-
-    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-    java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
-    byte[] chunk = new byte[8192];
-    int read;
-    while ((read = process.getInputStream().read(chunk)) != -1) {
-      buffer.write(chunk, 0, read);
-    }
-    if (!process.waitFor(2, TimeUnit.MINUTES)) {
-      process.destroyForcibly();
-      throw new AssertionError("the instrumented JVM did not exit within two minutes");
-    }
-    return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+  private static String exportingTheResourceToTheLog() throws Exception {
+    return InstrumentedJvm.runningTheTestApplication()
+        .withJvmArguments(
+            "-Dotel.traces.exporter=none",
+            "-Dotel.logs.exporter=none",
+            // The logging metric exporter prints the resource on every export.
+            "-Dotel.metrics.exporter=logging",
+            "-Dotel.metric.export.interval=500",
+            "-Dotel.service.name=smoke-test")
+        // Stay alive long enough for at least one periodic export.
+        .exitingAfter(4000)
+        .run();
   }
 }
