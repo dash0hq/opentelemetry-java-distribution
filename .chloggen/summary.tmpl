@@ -1,5 +1,5 @@
 {{- define "entry" -}}
-- ``{{ .Component }}``: {{ .Note }} ({{ range $i, $issue := .Issues }}{{ if $i }}, {{ end }}`#{{ $issue }} <https://github.com/dash0hq/opentelemetry-java-distribution/issues/{{ $issue }}>`__{{ end }})
+- ``{{ .Component }}``: {{ .Note }}
 {{- if .SubText }}
 
 {{ .SubText | indent 2 }}

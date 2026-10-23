@@ -13,8 +13,12 @@ component:
 # needs to start with a backtick (`).
 note:
 
-# One or more tracking issues related to the change. At least one is required.
-issues: []
+# Not rendered into CHANGELOG.rst, and not read by anything else either. The
+# field exists only because chloggen rejects an entry whose list is empty, in
+# an unconditional check with no configuration option to relax it. Put any
+# number here. When this repository starts using pull requests, restore the
+# link in .chloggen/summary.tmpl and give each entry its own number.
+issues: [1]
 
 # (Optional) One or more lines of additional information to render under the
 # primary note. These lines are padded with 2 spaces and inserted directly into
