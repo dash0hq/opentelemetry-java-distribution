@@ -42,11 +42,22 @@ mkdir -p output
 
 docker compose up --detach
 
-if ! docker compose wait app app-packaged; then
-  docker compose logs
-  echo "An application container exited non-zero." >&2
-  exit 1
-fi
+# `docker compose wait` cannot report which application failed. Given several
+# services it returns the exit code of whichever container finished last, and
+# called on a container that has already exited it returns 1 whatever that
+# container's real exit code was, so calling it once per service does not help
+# either. Use it only to wait for the stack to settle, then read each exit code
+# back from `docker compose ps`.
+docker compose wait app app-packaged > /dev/null
+
+for service in app app-packaged; do
+  exit_code="$(docker compose ps --all --format '{{.ExitCode}}' "$service")"
+  if [ "$exit_code" != "0" ]; then
+    docker compose logs
+    echo "$service exited with status $exit_code." >&2
+    exit 1
+  fi
+done
 
 # The collector writes each batch as it arrives; give the last one time to land
 # before the stack goes away.
