@@ -39,15 +39,26 @@ Every key in that file becomes a resource attribute whose value is the property
 value. The file is absent unless a Linux package put it there, and its absence
 is not an error.
 
-A key that something else also sets is the one exception. The provider does not
-implement `Ordered`, so its order is `0`, the same as every upstream detector,
-and it is applied before them and before `OTEL_RESOURCE_ATTRIBUTES`. Writing
-`service.name` into the file alongside `OTEL_SERVICE_NAME=from-env` in the
-environment therefore exports `from-env`. This is deliberate rather than
-inherited: a value the operator set on the workload should beat one the package
-baked in. It costs nothing today because the two keys below are ones nothing
-else sets, and `DistroResourceProvider` takes the opposite choice with an order
-of `100` precisely because its job is to overwrite the agent's own value.
+A key that something else also sets is the one exception. Writing `service.name`
+into the file alongside `OTEL_SERVICE_NAME=from-env` in the environment exports
+`from-env`, and writing `host.name` into it exports the host detector's value
+rather than the file's. This is deliberate rather than inherited: a value the
+operator set on the workload should beat one the package baked in. It costs
+nothing today because the two keys below are ones nothing else sets, and
+`DistroResourceProvider` takes the opposite choice with an order of `100`
+precisely because its job is to overwrite the agent's own value.
+
+Two different mechanisms produce that, and the doc used to credit the wrong one
+for both. Providers are applied in ascending `Ordered.order()` and later ones
+win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
+`EnvironmentResourceProvider`, which declares an order of `2147483646`, so the
+environment is applied last whatever anything else does. The upstream detectors
+declare no order at all, which means `0`; `Dash0PackageResourceProvider`
+declares `Integer.MIN_VALUE`, so it is applied first and every detector
+overwrites it. Leaving the Dash0 provider on the default `0` would tie with the
+detectors, and a tie is settled by position in the merged `META-INF/services`
+file, which is a byproduct of the order `mergeServiceFiles` concatenates in and
+could flip without failing anything.
 
 The Dash0 Linux packages write exactly two keys:
 

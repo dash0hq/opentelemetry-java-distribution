@@ -8,6 +8,7 @@ import com.google.auto.service.AutoService;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
+import io.opentelemetry.sdk.autoconfigure.spi.Ordered;
 import io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider;
 import io.opentelemetry.sdk.resources.Resource;
 import java.io.IOException;
@@ -36,10 +37,10 @@ import java.util.logging.Logger;
  * is the property value, which keeps the set of attributes a property of the package rather than of
  * this code.
  *
- * <p>This class does not implement {@code Ordered}, so its order is {@code 0} and anything else
- * setting the same key wins: an upstream detector, or {@code OTEL_RESOURCE_ATTRIBUTES}. That is
- * deliberate, because a value the operator set on the workload should beat one the package baked
- * in. {@code DistroResourceProvider} makes the opposite choice, and says so.
+ * <p>Anything else setting the same key wins: an upstream detector, or {@code
+ * OTEL_RESOURCE_ATTRIBUTES}. That is deliberate, because a value the operator set on the workload
+ * should beat one the package baked in. {@code DistroResourceProvider} makes the opposite choice,
+ * and says so. {@link #order()} is what makes losing a guarantee.
  *
  * <p>The file is absent in every other way of running the agent, and its absence is not an error.
  *
@@ -49,10 +50,28 @@ import java.util.logging.Logger;
  * attributes are contributed. See {@code docs/resource-detection.md}.
  */
 @AutoService(ResourceProvider.class)
-public final class Dash0PackageResourceProvider implements ResourceProvider {
+public final class Dash0PackageResourceProvider implements ResourceProvider, Ordered {
 
   /** The file this provider reads, resolved against the directory holding the agent jar. */
   static final String PROPERTIES_FILE_NAME = "dash0-resource-attributes.properties";
+
+  /**
+   * Applied before every provider, so that every provider can overwrite what the package declared.
+   *
+   * <p>Not declaring an order at all would give {@code 0}, which upstream's detectors also have,
+   * and the outcome would then be decided by position in the merged {@code META-INF/services} file
+   * rather than by the order. That position is a byproduct of the sequence {@code
+   * mergeServiceFiles} happens to concatenate in, nothing asserts it, and a build change that moved
+   * this line after upstream's would silently invert the precedence this class documents.
+   *
+   * <p>{@code OTEL_SERVICE_NAME} and {@code OTEL_RESOURCE_ATTRIBUTES} win for a different reason
+   * that does not depend on this value: {@code EnvironmentResourceProvider} declares {@code
+   * 2147483646}.
+   */
+  @Override
+  public int order() {
+    return Integer.MIN_VALUE;
+  }
 
   private static final Logger logger =
       Logger.getLogger(Dash0PackageResourceProvider.class.getName());

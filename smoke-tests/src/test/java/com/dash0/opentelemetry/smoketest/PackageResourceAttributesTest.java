@@ -58,6 +58,29 @@ class PackageResourceAttributesTest {
         .doesNotContain("dash0.package.");
   }
 
+  @Test
+  void losesEveryKeyAnUpstreamDetectorAlsoSets() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\nhost.name=from-the-package-file\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported = exportingTheResourceToTheLog(agentJar);
+
+    assertThat(exported)
+        .as(
+            "Dash0PackageResourceProvider declares Integer.MIN_VALUE so that every detector is"
+                + " applied after it and overwrites what the package declared. Dropping that order"
+                + " leaves it tied with the detectors on 0, and the winner is then decided by"
+                + " position in the merged META-INF/services file, which no other test asserts."
+                + " Exported resource attributes were:%n%s",
+            exported)
+        .contains("dash0.package.name=\"dash0-java-autoinstrumentation\"")
+        .contains("host.name=")
+        .doesNotContain("from-the-package-file");
+  }
+
   private Path copyAgentJar() throws IOException {
     Path agentJar = installDirectory.resolve("opentelemetry-javaagent.jar");
     Files.copy(
