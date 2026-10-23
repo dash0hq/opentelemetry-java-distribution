@@ -101,6 +101,7 @@ final class InstrumentedJvm {
     try {
       ProcessBuilder builder =
           new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(outputFile.toFile());
+      builder.environment().keySet().removeIf(InstrumentedJvm::configuresTheSdk);
       builder.environment().putAll(environment);
 
       Process process = builder.start();
@@ -126,6 +127,23 @@ final class InstrumentedJvm {
     } finally {
       Files.deleteIfExists(outputFile);
     }
+  }
+
+  /**
+   * Whether {@code name} is a variable the SDK or this distribution reads.
+   *
+   * <p>{@link ProcessBuilder#environment()} starts from the environment Gradle was launched with,
+   * so without this the child inherits whatever the developer happens to export. A shell carrying
+   * {@code OTEL_EXPORTER_OTLP_ENDPOINT} fails the two tests that assume no endpoint is configured,
+   * and one carrying {@code DASH0_DISABLE} or {@code OTEL_SERVICE_NAME} changes what several others
+   * read back. Exporting these is ordinary for anyone working on OpenTelemetry, and the result is a
+   * red build on a correct tree with nothing to explain it.
+   *
+   * <p>Removal is by prefix rather than by clearing the map, which would also drop {@code PATH} and
+   * {@code JAVA_HOME} and leave nothing able to start.
+   */
+  private static boolean configuresTheSdk(String name) {
+    return name.startsWith("OTEL_") || name.startsWith("DASH0_");
   }
 
   private static String contentOf(Path file) throws IOException {

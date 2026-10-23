@@ -35,6 +35,16 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
+  // Set on purpose, and never read by anything here. ProcessBuilder.environment()
+  // starts from the environment this JVM was launched with, so every JVM the tests
+  // start inherits whatever the developer exported. Anyone working on OpenTelemetry
+  // exports exactly these, and the suite then fails on a correct tree with nothing
+  // to explain it. Making the hostile case the normal one means InstrumentedJvm has
+  // to keep stripping them, and theLaunchedJvmIsNotReachedByTheAmbientEnvironment in
+  // Dash0ConfigurationTest says so out loud.
+  environment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://ambient-environment.invalid:4318")
+  environment("DASH0_DISABLE", "true")
+
   val resolvedAgentJar = agentJar
   val resolvedExtensionJar = extensionJar
   val resolvedUpstreamAgentJar = upstreamAgentJar

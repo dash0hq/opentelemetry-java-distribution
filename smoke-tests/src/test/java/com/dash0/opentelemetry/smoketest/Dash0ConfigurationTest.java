@@ -26,6 +26,7 @@ class Dash0ConfigurationTest {
 
   private static final String DASH0_HOST = "dash0-collector-base-url.invalid";
   private static final String OTEL_HOST = "otel-exporter-endpoint.invalid";
+  private static final String AMBIENT_HOST = "ambient-environment.invalid";
 
   @Test
   void theStandardEndpointTakesPrecedenceOverTheCollectorBaseUrl() throws Exception {
@@ -60,6 +61,33 @@ class Dash0ConfigurationTest {
                 + " setting had stopped working altogether. The JVM's output was:%n%s",
             output)
         .contains(DASH0_HOST);
+  }
+
+  @Test
+  void theLaunchedJvmIsNotReachedByTheAmbientEnvironment() throws Exception {
+    assertThat(System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+        .as(
+            "smoke-tests/build.gradle.kts sets this on the test JVM on purpose, so that the whole"
+                + " suite runs under the environment a developer working on OpenTelemetry has"
+                + " exported. Without it this test proves nothing, so it is checked rather than"
+                + " assumed.")
+        .isEqualTo("http://" + AMBIENT_HOST + ":4318");
+    assertThat(System.getenv("DASH0_DISABLE")).isEqualTo("true");
+
+    String output =
+        exportingMetricsOverOtlp()
+            .withEnvironmentVariable(
+                "DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318")
+            .run();
+
+    assertThat(output)
+        .as(
+            "the inherited OTEL_EXPORTER_OTLP_ENDPOINT would win over the collector base URL, and"
+                + " the inherited DASH0_DISABLE would stop the export entirely. The JVM's output"
+                + " was:%n%s",
+            output)
+        .contains(DASH0_HOST)
+        .doesNotContain(AMBIENT_HOST);
   }
 
   @Test
