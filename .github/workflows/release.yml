@@ -1,0 +1,164 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Builds both jars from a vX.Y.Z tag and publishes them as GitHub release
+# assets. See RELEASING.rst for the process this automates.
+#
+# There is no package registry step. The jars are consumed by the Dash0 Linux
+# packages in dash0hq/dash0-packages, which fetch them from the GitHub Releases
+# API and verify each asset against the digest that API reports, so a release
+# asset is the published artifact rather than a convenience copy of one.
+#
+# Draft-first: the release is created as a draft, the assets are uploaded, and
+# the release is published as the last step. A reader who sees a published
+# release can rely on its asset set being complete.
+#
+# Security posture, following the Python distribution: no workflow-level
+# permissions, per-job least privilege, third-party actions pinned by commit
+# SHA, no dependency cache (a cache is a write channel from any other workflow
+# into the release build), and the tag refused unless it is reachable from
+# origin/main.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and publish (e.g. v0.1.0)"
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require a release tag
+        run: |
+          set -euo pipefail
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag '$TAG' does not match vX.Y.Z"
+            exit 1
+          fi
+
+      # Credentials are deliberately left in place: the reachability check below
+      # runs `git fetch`, which fails on a private repository with
+      # persist-credentials disabled.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Refuse a tag that is not reachable from main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$TAG is not reachable from origin/main; refusing to publish."
+            exit 1
+          fi
+
+      - name: Refuse a tag that disagrees with gradle.properties
+        run: |
+          set -euo pipefail
+          declared="$(sed -n 's/^version *= *//p' gradle.properties)"
+          if [ "v$declared" != "$TAG" ]; then
+            echo "::error::gradle.properties declares $declared but the tag is $TAG"
+            exit 1
+          fi
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+      - name: Collect the release assets
+        run: |
+          set -euo pipefail
+          mkdir dist
+          cp agent/build/libs/dash0-opentelemetry-javaagent-*.jar dist/
+          cp agentextension/build/libs/dash0-opentelemetry-agentextension-*.jar dist/
+          (cd dist && sha256sum -- *.jar > SHA256SUMS)
+          ls -l dist
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/*.jar
+
+      - name: Extract the release notes
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          # chloggen writes an underlined reStructuredText section per release,
+          # headed by the string passed to `make chlog-update`, which starts
+          # with the version. Collect everything up to the next section, then
+          # drop that section's heading, which is the last line collected.
+          awk -v version="$version" '
+            !found && index($0 " ", version " ") == 1 { found = 1; next }
+            found == 1 && /^=+$/ { found = 2; next }
+            found == 2 && /^=+$/ { hit_next = 1; exit }
+            found == 2 { lines[n++] = $0 }
+            END {
+              stop = hit_next ? n - 1 : n
+              for (i = 0; i < stop; i++) print lines[i]
+            }
+          ' CHANGELOG.rst > notes.rst
+
+          if [ ! -s notes.rst ]; then
+            echo "::error::CHANGELOG.rst has no section for $version"
+            exit 1
+          fi
+
+          # GitHub renders release notes as Markdown. Convert the only two
+          # reStructuredText constructs the chloggen template emits: external
+          # links and inline literals. The link target is kept visible rather
+          # than hidden behind Markdown link text.
+          sed -e 's/`\([^`<]*\) <\([^>]*\)>`__/\1: \2/g' \
+              -e 's/``\([^`]*\)``/`\1`/g' \
+              notes.rst > notes.md
+          cat notes.md
+
+      - name: Upload the assets to a draft release and publish it
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --draft --verify-tag \
+              --title "$TAG" --notes-file notes.md
+          fi
+
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+            echo "::error::$TAG is already published; re-running would leave its" \
+              "asset set in an unknown state. Bump the version and re-tag."
+            exit 1
+          fi
+
+          for file in dist/*; do
+            gh release upload "$TAG" "$file" --clobber
+          done
+
+          gh release edit "$TAG" --draft=false --latest
