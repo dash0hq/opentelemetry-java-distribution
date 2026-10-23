@@ -45,8 +45,12 @@ after the endpoint this variable sets, so they still take effect.
 Compared against the exact string `true`, case-insensitively and after trimming
 whitespace. Every other value, including `1`, `yes` and `on`, leaves the
 distribution enabled. Guessing that `1` means true would silence a host whose
-operator meant the opposite, and the Dash0 Node.js and Ruby distributions
-compare the same way.
+operator meant the opposite. The Dash0 Python and Ruby distributions compare
+the same way, with `value.strip().lower() == "true"` in `settings.py` and
+`ENV.fetch(name, '').strip.casecmp('true').zero?` in `environment.rb`. Node.js
+is the exception again: `src/index.ts` lowercases without trimming, so
+`DASH0_DISABLE=" true "` disables Java, Python and Ruby and leaves Node.js
+instrumenting.
 
 Setting it translates to `otel.sdk.disabled=true`. The agent still attaches and
 still instruments the application; the SDK it hands those instrumentations is a
