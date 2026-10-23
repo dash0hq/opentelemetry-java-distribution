@@ -8,79 +8,123 @@ top of the upstream `OpenTelemetry Java agent
 
 .. warning::
 
-   **This repository is scaffolding.** It builds, it is tested, and it does one
-   real thing (see `What works today`_), but it has no feature set yet. The
-   shape is now decided (see `Status and open decisions`_); what the
-   distribution is *for* is not.
+   **Nothing has been released from this repository yet.** No version is
+   tagged and no artifact is published anywhere. Everything described below
+   works and is tested, but it has not shipped.
 
 
-Status and open decisions
-=========================
+Status
+======
 
-**1. How is it delivered? Decided.** The repackaged agent jar is the product.
+Settled
+-------
 
-- ``:agent`` produces ``dash0-opentelemetry-javaagent.jar``, the upstream agent
-  repackaged with the Dash0 code folded in, used as ``-javaagent:<jar>``. This is
-  the artifact Dash0 ships and supports. It drops straight into the Dash0
-  operator, whose integration point is a single file on a mounted volume
-  referenced from ``JAVA_TOOL_OPTIONS``. It is also the shape Grafana, Splunk,
-  Elastic, Amazon and Microsoft all ship.
-- ``:agentextension`` produces ``dash0-opentelemetry-agentextension.jar``, the
-  same Dash0 code as a standalone extension loaded by the *unmodified* upstream
-  agent via ``OTEL_JAVAAGENT_EXTENSIONS``. It remains a supported secondary
-  artifact, for users who would rather keep the stock agent. Elastic ships this
-  same pair.
+Delivery shape
+   The repackaged agent jar is the product. ``:agent`` produces
+   ``dash0-opentelemetry-javaagent.jar``, used as ``-javaagent:<jar>``, which
+   drops straight into the Dash0 operator, whose integration point is a single
+   file on a mounted volume referenced from ``JAVA_TOOL_OPTIONS``. It is also
+   the shape Grafana, Splunk, Elastic, Amazon and Microsoft all ship.
 
-Keeping both costs almost nothing: every line of Dash0 logic lives in
-``:custom`` and is consumed unchanged by both, and the extension shape needs no
-package relocation, so ``agentextension/build.gradle.kts`` is about twenty
-lines.
+   ``:agentextension`` produces ``dash0-opentelemetry-agentextension.jar``, the
+   same Dash0 code as a standalone extension loaded by the *unmodified*
+   upstream agent via ``OTEL_JAVAAGENT_EXTENSIONS``. It is a supported
+   secondary artifact, published alongside the agent jar, for users who would
+   rather keep the stock agent. Elastic ships this same pair.
 
-**2. Why does it exist? Still open, and it is the question that matters.** The
-Dash0 Python distribution exists largely to remove native ``google.protobuf``
-and ``grpcio`` dependencies so it is safe to inject into an arbitrary process.
-**That reasoning does not carry over to Java.** The upstream Java agent is
-already a single shaded jar loaded by its own class loader, and a class's
-identity in Java is its name *together with* the loader that loaded it, so the
-agent's copy of a library and the application's copy are unrelated types that
-cannot collide.
+   Keeping both costs almost nothing: every line of Dash0 logic lives in
+   ``:custom`` and is consumed unchanged by both, and the extension shape needs
+   no package relocation, so ``agentextension/build.gradle.kts`` is about
+   twenty lines.
 
-So the justification has to be something else, and that is not settled. The
-candidates are Dash0 configuration parity with the Node.js and Python
-distributions (a ``DASH0_*`` environment variable surface), distribution
+Dash0 environment variables
+   ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE`` are implemented.
+   ``DASH0_AUTOMATIC_SERVICE_NAME``, ``DASH0_BOOTSTRAP_SPAN`` and
+   ``DASH0_FLUSH_ON_SIGTERM_SIGINT`` are not, because the upstream agent
+   already covers two of them and the third has no Java counterpart. See
+   ``docs/configuration.md``.
+
+Linux package attributes
+   A package installing the agent jar writes
+   ``dash0-resource-attributes.properties`` beside it, and every key in that
+   file becomes a resource attribute. This replaces the entry-point script the
+   Node.js, Python and Ruby packages use, which Java has no equivalent of. See
+   ``docs/resource-detection.md``.
+
+Declarative configuration
+   Not supported. Under ``OTEL_CONFIG_FILE`` neither the Dash0 resource
+   providers nor the Dash0 environment variables take effect, which is measured
+   rather than assumed in ``docs/configuration.md``. Supporting it needs a
+   different pair of SPIs and is planned as a separate release after v0.1.0.
+
+Kubernetes detection
+   No ``k8s.pod.uid`` detector, unlike Node.js and Python. The reasoning, and
+   the case this leaves uncovered, are in ``docs/resource-detection.md``.
+
+Supported JVMs
+   Whatever the upstream agent supports, currently Java 8 and later, and
+   nothing beyond that. See ``docs/getting-started.md``.
+
+Releasing
+   Pushing a ``vX.Y.Z`` tag builds both jars and publishes them as GitHub
+   release assets with a ``SHA256SUMS`` file. See RELEASING.rst.
+
+Open
+----
+
+**Why does it exist?** The Dash0 Python distribution exists largely to remove
+native ``google.protobuf`` and ``grpcio`` dependencies so it is safe to inject
+into an arbitrary process. **That reasoning does not carry over to Java.** The
+upstream Java agent is already a single shaded jar loaded by its own class
+loader, and a class's identity in Java is its name *together with* the loader
+that loaded it, so the agent's copy of a library and the application's copy are
+unrelated types that cannot collide.
+
+The justification has to be something else. The candidates are Dash0
+configuration parity with the Node.js and Python distributions, distribution
 branding, and an independent support and upgrade policy. That is the same value
 proposition Honeycomb had when they archived their Java distribution, so it
-deserves an explicit answer. Until there is one, this README deliberately does
-not claim a rationale it cannot back up.
+deserves an explicit answer. Tracked in `OSS-41
+<https://linear.app/dash0/issue/OSS-41/dash0-java-distro-analyse-approaches-to-creating-our-own-distro>`_.
+Until there is an answer, this README does not claim a rationale it cannot back
+up.
 
 
 What works today
 ================
 
-One customisation is implemented end to end, as a working example of the wiring
-rather than as a feature set:
+Three customisations, all in ``:custom``, all covered by tests that run a real
+instrumented JVM:
 
 .. list-table::
-   :widths: 34 66
+   :widths: 40 60
    :header-rows: 1
 
-   * - Attribute
-     - Value
-   * - ``telemetry.distro.name``
-     - ``dash0-java``
-   * - ``telemetry.distro.version``
-     - the version of this distribution
+   * - Class
+     - What it does
+   * - ``DistroResourceProvider``
+     - Reports ``telemetry.distro.name`` as ``dash0-java`` and
+       ``telemetry.distro.version`` as the version of this distribution, on
+       every span, metric and log record.
+   * - ``Dash0PackageResourceProvider``
+     - Reports the attributes a Linux package writes beside the agent jar,
+       which is how ``dash0.package.name`` and ``dash0.package.version`` reach
+       the resource.
+   * - ``Dash0ConfigurationCustomizerProvider``
+     - Applies ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE``.
 
-Both are emitted on every span, metric and log record. They replace the upstream
-agent's own values, which report ``opentelemetry-java-instrumentation``.
+Everything else is upstream behaviour, unchanged.
 
-That override is less trivial than it looks, and the reason is worth knowing
-before adding anything else: the agent ships its own resource provider setting
-the same attributes, so the Dash0 provider has to sort *after* it. Getting that
-wrong produces no error of any kind, and the only thing that catches it is
-asserting on what a real instrumented JVM exports. See
-``custom/src/main/java/com/dash0/opentelemetry/DistroResourceProvider.java`` and
-``smoke-tests/.../DistroResourceAttributesTest.java``.
+Each of the three fails silently when it is wired up wrongly, which is why the
+smoke tests exist. ``DistroResourceProvider`` has to sort *after* the agent's
+own provider setting the same two attributes, or its values are discarded with
+no error. ``Dash0PackageResourceProvider`` finds its file through the code
+source of a class the agent loads from ``inst/`` as a ``.classdata`` entry, and
+a failure there just leaves the attributes absent.
+``Dash0ConfigurationCustomizerProvider`` depends on an environment variable
+name resolving to the property name it reads, and a mismatch means the setting
+is ignored. In all three cases the unit tests still pass, so the only thing
+that catches the mistake is asserting on what a real JVM exports.
 
 
 Architecture
@@ -139,9 +183,9 @@ The same Dash0 code as an extension on the stock upstream agent:
       -Dotel.service.name=my-service \
       -jar my-application.jar
 
-There are no ``DASH0_*`` environment variables yet; that surface is one of the
-open decisions above. All standard ``OTEL_*`` configuration works, because the
-upstream agent handles it unchanged.
+``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE`` are honoured, and all
+standard ``OTEL_*`` configuration works because the upstream agent handles it
+unchanged. See ``docs/configuration.md``.
 
 
 Relationship to the other Dash0 distributions

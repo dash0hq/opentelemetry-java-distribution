@@ -4,10 +4,32 @@ Releasing
 
 .. note::
 
-   Nothing has been released from this repository yet, and the artifacts are not
-   published anywhere. Where they should be published, and under which
-   coordinates, is still an open decision. This document records the intended
-   process so it is not invented under time pressure later.
+   Nothing has been released from this repository yet. The process below is
+   automated and has been exercised piece by piece, but no tag has been pushed.
+
+
+Where the artifacts go
+======================
+
+GitHub release assets, and nowhere else. There is no Maven Central publication
+and no other registry.
+
+The consumer that decides this is the Dash0 Linux package in `dash0-packages
+<https://github.com/dash0hq/dash0-packages>`_, which fetches the agent jar from
+the GitHub Releases API and verifies it against the digest that API reports for
+the asset. A release asset is therefore the published artifact rather than a
+convenience copy of one.
+
+Each release carries three assets:
+
+- ``dash0-opentelemetry-javaagent-<version>.jar``, the product.
+- ``dash0-opentelemetry-agentextension-<version>.jar``, the same code as an
+  extension for the stock upstream agent.
+- ``SHA256SUMS``, covering both jars. This is for a human checking a manual
+  download. It is not what the package fetcher trusts, which is the API digest.
+
+Build provenance is attested for both jars with
+``actions/attest-build-provenance``.
 
 
 Versioning
@@ -25,7 +47,9 @@ lives in ``gradle/libs.versions.toml``.
 Cutting a release
 =================
 
-1. Compile the pending changelog entries into a new section:
+1. Compile the pending changelog entries into a new section. The heading text
+   is what the release workflow searches CHANGELOG.rst for, so it has to start
+   with the version:
 
    .. code-block:: bash
 
@@ -36,6 +60,41 @@ Cutting a release
 4. Tag the merge commit ``v<version>`` and push the tag.
 5. Set the next development version in ``gradle.properties``, restoring
    ``-SNAPSHOT``.
+
+Pushing the tag in step 4 is what publishes. ``.github/workflows/release.yml``
+then runs, and refuses to continue unless three things hold:
+
+- The tag matches ``vX.Y.Z``.
+- The tagged commit is reachable from ``origin/main``. Without this, tag-push
+  permission alone would be enough to publish an unreviewed commit.
+- ``gradle.properties`` declares exactly the version the tag names, so the jar
+  filenames cannot disagree with the release they hang off.
+
+It then runs the full build, collects the assets, attaches them to a **draft**
+release, and publishes the release as its last action. A published release
+therefore always has its complete asset set. Re-running against an
+already-published tag fails rather than modifying it; burn the version and
+re-tag instead.
+
+The release notes are the CHANGELOG.rst section for the version, converted to
+Markdown. A tag with no matching section fails the workflow.
+
+
+What is not automated
+=====================
+
+The documentation sync. ``.github/workflows/sync-docs.yml`` runs in dry-run
+mode on any pull request touching ``docs/``, which needs no credentials, but a
+real sync needs three repository secrets that do not exist on this repository:
+``DASH0_WEBSITE_SYNC_TOKEN``, ``SYNC_DOCUMENTATION_TARGET_REPOSITORY`` and
+``SYNC_DOCUMENTATION_TARGET_DIRECTORY``. They are repository-level secrets on
+the Ruby distribution, not organisation-level, so someone with administrator
+access has to create them here.
+
+Until they exist, run the sync by hand from the Actions tab with ``dry-run``
+unchecked. Once they exist, chain it off the release the way the Ruby
+distribution does, with a ``workflow_call`` trigger here and a ``needs:`` job
+in ``release.yml``.
 
 
 Cadence

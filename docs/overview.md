@@ -3,20 +3,26 @@
 The Dash0 distribution of OpenTelemetry for Java is a thin layer on top of the
 upstream [OpenTelemetry Java agent](https://github.com/open-telemetry/opentelemetry-java-instrumentation).
 
-> **This is scaffolding.** The repository builds and is tested, but it has no
-> feature set yet. The shape is decided; what the distribution is *for* is not.
-> See [Open decisions](#open-decisions).
+> **Nothing has been released from this repository yet.** No version is tagged
+> and no artifact is published anywhere. Everything described here works and is
+> tested, but it has not shipped.
 
 ## What it does today
 
-| Attribute | Value |
+| Attribute | Where it comes from |
 |---|---|
-| `telemetry.distro.name` | `dash0-java` |
-| `telemetry.distro.version` | the version of this distribution |
+| `telemetry.distro.name`, set to `dash0-java` | `DistroResourceProvider` |
+| `telemetry.distro.version`, the version of this distribution | `DistroResourceProvider` |
+| whatever a Linux package writes beside the agent jar, such as `dash0.package.name` | `Dash0PackageResourceProvider` |
 
-Both replace the upstream agent's own values, which report
-`opentelemetry-java-instrumentation`. Everything else is upstream behaviour,
-unchanged.
+The first two replace the upstream agent's own values, which report
+`opentelemetry-java-instrumentation`.
+
+Two environment variables are read: `DASH0_OTEL_COLLECTOR_BASE_URL` sets the
+OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. See
+[configuration](configuration).
+
+Everything else is upstream behaviour, unchanged.
 
 ## Architecture
 
@@ -55,4 +61,12 @@ cannot collide.
 
 The remaining candidates are Dash0 configuration parity with the Node.js and
 Python distributions, branding, and an independent support and upgrade policy.
-That is a product decision, tracked against OSS-35.
+That is a product decision, tracked in OSS-41
+(https://linear.app/dash0/issue/OSS-41/dash0-java-distro-analyse-approaches-to-creating-our-own-distro).
+
+### Declarative configuration: deferred
+
+`OTEL_CONFIG_FILE` disables every customisation listed above, because
+declarative configuration uses a different pair of SPIs. The measurement and
+the design that would fix it are in [configuration](configuration). It is
+planned as a separate release after v0.1.0.
