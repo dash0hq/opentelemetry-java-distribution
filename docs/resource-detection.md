@@ -53,9 +53,21 @@ script: the OpenTelemetry injector contributes `-javaagent:` and nothing else,
 so there is no process in which the package could set an environment variable.
 Reading a file beside the jar is what replaces that.
 
-The provider locates the file through the code source of its own class, which
-the agent loads from `inst/` as a `.classdata` entry rather than as an ordinary
-class file. That resolution is demonstrated by `PackageResourceAttributesTest`
+This works in the repackaged agent jar only. The provider locates the file
+through the code source of its own class, and that differs between the two
+delivery shapes. In the agent jar the class is loaded from `inst/` as a
+`.classdata` entry and reports a `file:` URL, so a directory can be resolved.
+In the standalone extension jar it reports an `otel:` URL served by the agent's
+own class loader, which no `FileSystemProvider` understands, so no directory
+can be resolved and no package attributes are contributed. That costs nothing
+in practice, because the Dash0 Linux packages install the agent jar.
+
+`createResource` never throws. A resource provider that throws aborts SDK
+autoconfiguration and takes the whole agent down, losing every signal including
+the ones this distribution has nothing to do with. That is not hypothetical: an
+earlier version of this provider called `Paths.get` on the `otel:` URL, and the
+resulting `FileSystemNotFoundException` stopped the agent from starting at all
+whenever the extension was used. That resolution is demonstrated by `PackageResourceAttributesTest`
 in `smoke-tests/`, which copies the agent jar to a fresh directory, writes the
 properties file beside it, and asserts on what the JVM exports. When the
 resolution breaks the agent starts normally and the attributes are simply
