@@ -36,6 +36,11 @@ import java.util.logging.Logger;
  * is the property value, which keeps the set of attributes a property of the package rather than of
  * this code.
  *
+ * <p>This class does not implement {@code Ordered}, so its order is {@code 0} and anything else
+ * setting the same key wins: an upstream detector, or {@code OTEL_RESOURCE_ATTRIBUTES}. That is
+ * deliberate, because a value the operator set on the workload should beat one the package baked
+ * in. {@code DistroResourceProvider} makes the opposite choice, and says so.
+ *
  * <p>The file is absent in every other way of running the agent, and its absence is not an error.
  *
  * <p>This works only in the repackaged agent jar, which is the shape the Linux packages install.

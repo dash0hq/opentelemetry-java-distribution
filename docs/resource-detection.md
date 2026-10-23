@@ -39,6 +39,16 @@ Every key in that file becomes a resource attribute whose value is the property
 value. The file is absent unless a Linux package put it there, and its absence
 is not an error.
 
+A key that something else also sets is the one exception. The provider does not
+implement `Ordered`, so its order is `0`, the same as every upstream detector,
+and it is applied before them and before `OTEL_RESOURCE_ATTRIBUTES`. Writing
+`service.name` into the file alongside `OTEL_SERVICE_NAME=from-env` in the
+environment therefore exports `from-env`. This is deliberate rather than
+inherited: a value the operator set on the workload should beat one the package
+baked in. It costs nothing today because the two keys below are ones nothing
+else sets, and `DistroResourceProvider` takes the opposite choice with an order
+of `100` precisely because its job is to overwrite the agent's own value.
+
 The Dash0 Linux packages write exactly two keys:
 
 | Attribute | Value |
