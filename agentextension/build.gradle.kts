@@ -33,6 +33,17 @@ tasks {
     configurations = listOf(shadowDependencies)
     archiveClassifier.set("")
     mergeServiceFiles()
+
+    // Without these the manifest is the bare "Manifest-Version: 1.0" that
+    // shadow writes by default, and a published release asset has no way to
+    // report what it is or which upstream agent it was built against other
+    // than its own file name. The agent jar declares the same three.
+    manifest {
+      attributes["Implementation-Vendor"] = "Dash0 Inc."
+      attributes["Implementation-Title"] = "dash0-opentelemetry-agentextension"
+      attributes["Implementation-Version"] =
+        "dash0-${project.version}-otel-${rootProject.extra["opentelemetryJavaagentVersion"]}"
+    }
   }
 
   assemble {

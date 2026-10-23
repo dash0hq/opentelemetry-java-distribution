@@ -14,6 +14,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -53,6 +54,22 @@ class ExtensionPackagingTest {
   @Test
   void carriesTheSameGeneratedVersionResourceAsTheAgent() throws IOException {
     assertThat(entryNamesOf(EXTENSION_JAR)).contains("dash0-distro-version.properties");
+  }
+
+  @Test
+  void declaresItsIdentityInTheManifest() throws IOException {
+    try (JarFile jar = new JarFile(EXTENSION_JAR.toFile())) {
+      Manifest manifest = jar.getManifest();
+
+      assertThat(manifest.getMainAttributes().getValue("Implementation-Vendor"))
+          .isEqualTo("Dash0 Inc.");
+      assertThat(manifest.getMainAttributes().getValue("Implementation-Title"))
+          .isEqualTo("dash0-opentelemetry-agentextension");
+      assertThat(manifest.getMainAttributes().getValue("Implementation-Version"))
+          .as("a published release asset has to be able to report its own version")
+          .startsWith("dash0-")
+          .contains("-otel-");
+    }
   }
 
   private static List<String> entryNamesOf(Path jarPath) throws IOException {
