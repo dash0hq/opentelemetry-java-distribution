@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Overlay that forwards the example's telemetry to Dash0 in addition to writing
+# the local JSONL files. Use it together with the base compose file:
+#
+#   export DASH0_ENDPOINT=https://ingress.<your-region>.<cloud>.dash0.com
+#   export DASH0_AUTH_TOKEN=auth_...
+#   export DASH0_DATASET=default
+#   export SCRIPT_UID=$(id -u) SCRIPT_GID=$(id -g)
+#   docker compose -f docker-compose.yml -f docker-compose.dash0.yml up
+#
+# Neither application changes; only the collector is reconfigured.
+
+services:
+  collector:
+    command: ["--config=/etc/otelcol/collector-config-dash0.yaml"]
+    environment:
+      DASH0_ENDPOINT: ${DASH0_ENDPOINT:?export DASH0_ENDPOINT, e.g. https://ingress.europe-west4.gcp.dash0.com}
+      DASH0_AUTH_TOKEN: ${DASH0_AUTH_TOKEN:?export DASH0_AUTH_TOKEN with a Dash0 auth token}
+      DASH0_DATASET: ${DASH0_DATASET:-default}
+    volumes:
+      - ./collector-config-dash0.yaml:/etc/otelcol/collector-config-dash0.yaml:ro
+      - ./output:/output

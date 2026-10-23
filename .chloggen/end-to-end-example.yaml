@@ -1,0 +1,13 @@
+change_type: enhancement
+component: examples
+note: Add an end-to-end example that exports to a real collector
+issues: [1]
+subtext: |
+  Every other test in this repository reads the console exporter, which proves
+  the SDK produced something but not that anything leaves the process. The
+  example runs the agent against an OpenTelemetry Collector over OTLP and
+  asserts on what the collector received: server and client spans from real
+  instrumentation, JVM and HTTP metrics, log records, the telemetry.distro.*
+  attributes, and the dash0.package.* attributes in the layout a Linux package
+  installs.
+change_logs: [user]

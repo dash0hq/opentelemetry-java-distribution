@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Writes telemetry to the local JSONL files AND forwards it to Dash0. Selected
+# by docker-compose.dash0.yml, which supplies these variables from your shell:
+#
+#   DASH0_ENDPOINT    your organisation's OTLP/HTTP ingress URL, copied from
+#                     Dash0 -> Settings -> Endpoints -> OTLP via HTTP, for
+#                     example https://ingress.europe-west4.gcp.dash0.com
+#   DASH0_AUTH_TOKEN  a Dash0 auth token (Settings -> Auth Tokens), starts auth_
+#   DASH0_DATASET     the dataset to route into, for example default
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  file/traces:
+    path: /output/traces.jsonl
+  file/metrics:
+    path: /output/metrics.jsonl
+  file/logs:
+    path: /output/logs.jsonl
+  otlphttp/dash0:
+    endpoint: ${env:DASH0_ENDPOINT}
+    headers:
+      Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
+      Dash0-Dataset: "${env:DASH0_DATASET}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/traces, otlphttp/dash0]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/metrics, otlphttp/dash0]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/logs, otlphttp/dash0]
