@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Runs the Dockerized end-to-end example: the agent exporting over OTLP to a
+# real collector, with assertions on what the collector received. Kept out of
+# ci.yml so its Docker and network cost does not slow the unit and smoke
+# suites, following the Ruby distribution's injection-smoke workflow.
+
+name: End-to-end
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'custom/**'
+      - 'agent/**'
+      - 'buildSrc/**'
+      - 'examples/**'
+      - 'gradle/libs.versions.toml'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  example:
+    name: Export to a collector and assert
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Assemble the agent
+        run: ./gradlew :agent:shadowJar --stacktrace
+
+      - name: Run the example end to end
+        run: examples/dash0-distro-java/verify.sh
+
+      - name: Upload the captured telemetry
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: telemetry
+          path: examples/dash0-distro-java/output/
+          if-no-files-found: ignore
