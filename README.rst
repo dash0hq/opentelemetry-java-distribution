@@ -193,6 +193,8 @@ Relationship to the other Dash0 distributions
 
 - Node.js: https://github.com/dash0hq/opentelemetry-js-distribution
 - Python: https://github.com/dash0hq/opentelemetry-python-distribution
+- Ruby: https://github.com/dash0hq/opentelemetry-ruby-distribution
+- .NET: https://github.com/dash0hq/opentelemetry-dotnet-distribution
 
 The Dash0 operator currently instruments JVM workloads with the **stock upstream
 agent**, pinned in ``images/instrumentation/jvm/pom.xml`` in
