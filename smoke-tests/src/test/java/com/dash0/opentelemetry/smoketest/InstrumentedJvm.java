@@ -6,9 +6,9 @@ package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -28,6 +28,13 @@ import java.util.concurrent.TimeUnit;
  * <p>{@link #run()} therefore refuses to return output from a run that did not complete. Every
  * assertion a caller then makes is about a JVM that reached the end of {@code main}, which is what
  * makes an assertion phrased as an absence mean anything at all.
+ *
+ * <p>The child's output is redirected to a file rather than read from a pipe. Reading the pipe to
+ * end of file first and calling {@code waitFor} afterwards puts the timeout out of reach, because
+ * end of file arrives when the child exits: a child that hangs blocks the read forever and the
+ * timeout is never consulted. The agent is attached with {@code -javaagent:}, so a deadlock in its
+ * premain is a realistic way for that to happen, and the cost is a CI job that runs until GitHub
+ * kills it six hours later.
  */
 final class InstrumentedJvm {
 
@@ -90,31 +97,38 @@ final class InstrumentedJvm {
       command.add(String.valueOf(millisecondsBeforeExit));
     }
 
-    ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
-    builder.environment().putAll(environment);
+    Path outputFile = Files.createTempFile("dash0-smoke-test", ".log");
+    try {
+      ProcessBuilder builder =
+          new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(outputFile.toFile());
+      builder.environment().putAll(environment);
 
-    Process process = builder.start();
-    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    byte[] chunk = new byte[8192];
-    int read;
-    while ((read = process.getInputStream().read(chunk)) != -1) {
-      buffer.write(chunk, 0, read);
+      Process process = builder.start();
+      if (!process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+        process.destroyForcibly();
+        throw new AssertionError(
+            "the instrumented JVM did not exit within "
+                + TIMEOUT_MINUTES
+                + " minutes; it had printed:\n"
+                + contentOf(outputFile));
+      }
+      String output = contentOf(outputFile);
+      assertThat(output)
+          .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
+          .doesNotContain("OpenTelemetry Javaagent failed to start");
+      assertThat(process.exitValue())
+          .as("the instrumented JVM exited non-zero, so its output was:%n%s", output)
+          .isZero();
+      assertThat(output)
+          .as("the application never reached the end of main, so its output was:%n%s", output)
+          .contains(TestApplication.COMPLETION_MARKER);
+      return output;
+    } finally {
+      Files.deleteIfExists(outputFile);
     }
-    if (!process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
-      process.destroyForcibly();
-      throw new AssertionError("the instrumented JVM did not exit within two minutes");
-    }
+  }
 
-    String output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
-    assertThat(output)
-        .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
-        .doesNotContain("OpenTelemetry Javaagent failed to start");
-    assertThat(process.exitValue())
-        .as("the instrumented JVM exited non-zero, so its output was:%n%s", output)
-        .isZero();
-    assertThat(output)
-        .as("the application never reached the end of main, so its output was:%n%s", output)
-        .contains(TestApplication.COMPLETION_MARKER);
-    return output;
+  private static String contentOf(Path file) throws IOException {
+    return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
   }
 }
