@@ -8,6 +8,14 @@ pluginManagement {
   }
 }
 
+// The toolchain below is declared as exactly Java 21, which Gradle cannot
+// satisfy on a machine where no JDK 21 is installed, however new the JDK it is
+// running on. This resolver lets it provision one, so the prerequisite in
+// CONTRIBUTING.rst ("a JDK 21 or later") is true rather than aspirational.
+plugins {
+  id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 dependencyResolutionManagement {
   repositories {
     mavenCentral()

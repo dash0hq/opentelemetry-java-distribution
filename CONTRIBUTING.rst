@@ -8,8 +8,10 @@ All commands below are run from the repository root.
 Prerequisites
 =============
 
-- A JDK 21 or later. The build targets Java 8 bytecode via ``--release 8``, but
-  it compiles with a modern toolchain.
+- A JDK, version 21 through 24. Gradle 8.14.4 refuses to run on JDK 25 or
+  later, and the build compiles with a Java 21 toolchain, which Gradle
+  provisions itself when the machine has no JDK 21 installed. The bytecode
+  floor is Java 8, held by ``--release 8`` rather than by the toolchain.
 - Go, only for the changelog helpers in the ``Makefile``.
 
 Gradle itself does not need to be installed; use the wrapper (``./gradlew``).
