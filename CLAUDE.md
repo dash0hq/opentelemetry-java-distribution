@@ -50,8 +50,10 @@ does less than it should.
    `compileOnly` for this reason.
 5. **Service-file merging.** `DuplicatesStrategy` is set three different ways
    across the three packaging steps, each deliberately. Get it wrong and either
-   the Dash0 provider or all 22 upstream providers disappear from the merged
-   `META-INF/services` file.
+   the Dash0 providers or every upstream provider disappears from the merged
+   `META-INF/services` file. `AgentPackagingTest` compares that file against
+   upstream's own copy rather than against a count written down here, so the
+   expected set stays correct when upstream adds or removes a detector.
 6. **`addPropertiesSupplier` instead of `addPropertiesCustomizer`.** Both are on
    `AutoConfigurationCustomizer` and both compile. A supplier provides defaults
    that an environment variable overrides; a customizer replaces what the

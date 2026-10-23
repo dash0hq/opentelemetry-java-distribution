@@ -33,6 +33,12 @@ class AgentPackagingTest {
 
   private static final Path AGENT_JAR = Paths.get(System.getProperty("dash0.agent.jar"));
 
+  private static final Path UPSTREAM_AGENT_JAR =
+      Paths.get(System.getProperty("dash0.upstream.agent.jar"));
+
+  private static final String RESOURCE_PROVIDER_SERVICE_FILE =
+      "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider";
+
   @Test
   void bundlesTheDistroClassesUnderInstAsClassdata() throws IOException {
     List<String> entries = entryNamesOf(AGENT_JAR);
@@ -51,28 +57,36 @@ class AgentPackagingTest {
   }
 
   @Test
-  void registersTheResourceProviderInTheMergedServiceFile() throws IOException {
-    String serviceFile =
-        readEntry(
-            AGENT_JAR,
-            "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider");
-
-    assertThat(serviceFile)
-        .as("the Dash0 provider must survive the service-file merge with upstream's own providers")
-        .contains("com.dash0.opentelemetry.DistroResourceProvider");
+  void registersBothDash0ProvidersInTheMergedServiceFile() throws IOException {
+    assertThat(providersRegisteredIn(AGENT_JAR))
+        .as("the Dash0 providers must survive the service-file merge with upstream's own")
+        .contains(
+            "com.dash0.opentelemetry.DistroResourceProvider",
+            "com.dash0.opentelemetry.Dash0PackageResourceProvider");
   }
 
   @Test
-  void keepsUpstreamResourceProvidersAlongsideTheDash0One() throws IOException {
-    String serviceFile =
-        readEntry(
-            AGENT_JAR,
-            "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider");
-
+  void keepsEveryUpstreamResourceProviderAlongsideTheDash0Ones() throws IOException {
     // DuplicatesStrategy.EXCLUDE on the outer jar would drop upstream's file
     // entirely and take only ours. That would remove every upstream resource
     // detector, which is a large regression that no test of our own code sees.
-    assertThat(serviceFile.trim().split("\\R")).hasSizeGreaterThan(1);
+    assertThat(providersRegisteredIn(AGENT_JAR))
+        .as(
+            "every provider upstream registers has to survive the merge. Comparing against"
+                + " upstream's own copy keeps the expected set correct when upstream adds or"
+                + " removes a detector, which a count written down here would not.")
+        .containsAll(providersRegisteredIn(UPSTREAM_AGENT_JAR));
+  }
+
+  private static List<String> providersRegisteredIn(Path jarPath) throws IOException {
+    List<String> providers = new ArrayList<>();
+    for (String line : readEntry(jarPath, RESOURCE_PROVIDER_SERVICE_FILE).split("\\R")) {
+      String name = line.trim();
+      if (!name.isEmpty() && !name.startsWith("#")) {
+        providers.add(name);
+      }
+    }
+    return providers;
   }
 
   @Test
