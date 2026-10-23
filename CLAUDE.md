@@ -73,6 +73,26 @@ The smoke tests in `smoke-tests/` exist specifically to catch all eight. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
+What guards what:
+
+| Hazard | Check |
+|---|---|
+| 1, resource-provider ordering | `DistroResourceAttributesTest` |
+| 2, relocation drift | `scripts/check-relocations.sh`, run by the `relocations` CI job |
+| 2, 3 and 4, anything added to, dropped from or rewritten in the jar | `AgentCompositionTest` |
+| 5, service-file merging | `AgentPackagingTest` |
+| 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 25 |
+| 8, locating a file beside the jar | `PackageResourceAttributesTest` |
+| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest` |
+| Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
+
+Two habits these tests encode, both learned the hard way. Assert a presence
+alongside every absence: a dead agent produces no telemetry and so satisfies
+any assertion phrased as "does not contain", which is exactly how a provider
+that stopped the agent from starting went unnoticed while its test passed.
+And never let a resource provider throw, because SDK autoconfiguration aborts
+and takes the whole agent with it.
+
 Declarative configuration is a ninth hazard, of a different kind: setting
 `OTEL_CONFIG_FILE` disables items 1, 6, 7 and 8 at once, because neither
 `ResourceProvider` nor `AutoConfigurationCustomizerProvider` is consulted in
