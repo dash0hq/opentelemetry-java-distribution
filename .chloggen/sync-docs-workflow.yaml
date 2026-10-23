@@ -1,0 +1,10 @@
+change_type: enhancement
+component: ci
+note: Mirror docs/ to the Dash0 website
+issues: [1]
+subtext: |
+  A pull request touching docs/ runs the sync in dry-run mode, which needs no
+  secrets and fails when a file under docs/ is missing from
+  transformations.yaml. A real run is workflow_dispatch only, because the three
+  repository secrets it needs do not exist on this repository yet.
+change_logs: [user]

@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Mirrors docs/*.md into the Dash0 website repository.
+#
+# There is no workflow_call trigger, so release.yml does not run this. The
+# three secrets below are repository-level on the Ruby distribution and do not
+# exist on this repository yet; until an administrator creates them, a real run
+# would fail. A pull request touching docs/ still runs the action in dry-run
+# mode, which needs no secrets and checks that every file under docs/ is listed
+# in transformations.yaml.
+#
+# Wire this into release.yml once the secrets exist, by adding a workflow_call
+# trigger here and a job there, the way the Ruby distribution does.
+
+name: Synchronize docs to the Dash0 website
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only verify transformations and coverage; do not open a pull request.
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/sync-docs/**'
+      - '.github/workflows/sync-docs.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sync-docs:
+    name: Sync docs to the Dash0 website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Sync docs to the Dash0 website
+        uses: dash0hq/sync-docs-action@1dc3817bec558ec22265a321177e58fb64a9324c # v0.5.0
+        with:
+          dry-run: ${{ github.event_name == 'pull_request' || inputs.dry-run }}
+          target-repository: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}
+          target-directory: ${{ secrets.SYNC_DOCUMENTATION_TARGET_DIRECTORY }}
+          target-github-token: ${{ secrets.DASH0_WEBSITE_SYNC_TOKEN }}
+          pr-branch: sync/opentelemetry-java-distribution-docs
+          pr-title: "docs: synchronize Java distribution documentation"
+          pr-body: |
+            Synchronizes the OpenTelemetry Java distribution documentation
+            from https://github.com/dash0hq/opentelemetry-java-distribution
+          pr-reviewers: mmanciop

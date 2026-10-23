@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Configuration for dash0hq/sync-docs-action: how docs/*.md is transformed and
+# where each file lands in dash0hq/dash0-website.
+
+common:
+  - description: Strip the leading H1 heading (the frontmatter title replaces it on the website).
+    type: replace-regex
+    find: '^# [^\n]*\n'
+    replace: ""
+
+  - description: Rewrite relative cross-references between distribution docs to absolute website paths.
+    type: replace-regex
+    find: '\]\(([a-z][a-z0-9-]*)\)'
+    replace: '](/docs/dash0/opentelemetry/distributions/java/\1)'
+    required: false
+
+  - description: Mark pages as auto-generated from the source repository.
+    type: prepend
+    content: |
+      > **Note:** This page is auto-generated from the [opentelemetry-java-distribution](https://github.com/dash0hq/opentelemetry-java-distribution) repository.
+
+files:
+  - source: docs/overview.md
+    target: dash0/opentelemetry/distributions/java/overview.md
+    title: About the Dash0 OpenTelemetry Java Distribution
+    description: Overview of the Dash0 OpenTelemetry distribution for Java: the upstream Java agent repackaged with Dash0 resource attributes and configuration, shipped as a single -javaagent jar.
+
+  - source: docs/getting-started.md
+    target: dash0/opentelemetry/distributions/java/getting-started.md
+    title: Getting Started
+    description: Attach the Dash0 OpenTelemetry Java agent to a JVM and send your first traces, metrics, and logs, including which JVM versions are supported.
+
+  - source: docs/configuration.md
+    target: dash0/opentelemetry/distributions/java/configuration.md
+    title: Configuration
+    description: The Dash0-specific environment variables for the Java distribution, how they interact with the standard OTEL_ variables, and what declarative configuration currently does.
+
+  - source: docs/auto-instrumentation.md
+    target: dash0/opentelemetry/distributions/java/auto-instrumentation.md
+    title: Auto-instrumentation
+    description: The Java libraries and frameworks instrumented automatically, which come unchanged from the pinned upstream OpenTelemetry Java agent.
+
+  - source: docs/resource-detection.md
+    target: dash0/opentelemetry/distributions/java/resource-detection.md
+    title: Resource Detection
+    description: The resource attributes the Java distribution contributes, how they are ordered against the upstream agent's own, and which detectors it deliberately does not ship.
+
+  - source: docs/kubernetes-injection.md
+    target: dash0/opentelemetry/distributions/java/kubernetes-injection.md
+    title: Kubernetes Injection
+    description: How JVM workloads are instrumented under the Dash0 operator through the OpenTelemetry injector and JAVA_TOOL_OPTIONS, and what wiring this distribution in would involve.
+
+# Fail if any docs/*.md file is not listed above, to catch forgotten entries.
+coverage:
+  include:
+    - "docs/*.md"
+
+nav:
+  target: dash0/opentelemetry/distributions/java/nav.json
+  order: 68
+  id: opentelemetry-java-distribution
+  parentPath: Dash0 Distributions
+  title: Java
