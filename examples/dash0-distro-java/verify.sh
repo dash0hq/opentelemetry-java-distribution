@@ -86,6 +86,24 @@ NAMED_METRIC='
     | select(.name == $name) ] | length > 0
 '
 
+# The client span must be the parent of the server span it provoked. That only
+# holds if the W3C traceparent header was written by one instrumentation and
+# read by the other, through the propagator. Propagators are among the classes
+# deliberately excluded from package relocation, so a relocation mistake shows
+# up here as two unrelated traces rather than as any kind of error.
+PROPAGATION='
+  [ .[] | .resourceSpans[]
+    | select(any(.resource.attributes[];
+        .key == "service.name" and .value.stringValue == $svc))
+    | .scopeSpans[].spans[] ] as $spans
+  | [ $spans[] | select(.kind == 2) ] as $servers
+  | [ $spans[] | select(.kind == 3) ] as $clients
+  | ($servers | length) > 0
+    and any($servers[]; . as $server
+        | any($clients[]; .spanId == $server.parentSpanId
+            and .traceId == $server.traceId))
+'
+
 LOG_BODY='
   [ .[] | .resourceLogs[]
     | select(any(.resource.attributes[];
@@ -123,6 +141,8 @@ assert "the server span is named after the route" \
 assert "spans carry telemetry.distro.name=dash0-java" \
   output/traces.jsonl --arg svc "$SERVICE" \
   --arg key telemetry.distro.name --arg value dash0-java "$RESOURCE_ATTRIBUTE"
+assert "trace context propagated, so the client span is the server span's parent" \
+  output/traces.jsonl --arg svc "$SERVICE" "$PROPAGATION"
 assert "spans do not carry the upstream distro name" \
   output/traces.jsonl --arg svc "$SERVICE" \
   --arg key telemetry.distro.name --arg value opentelemetry-java-instrumentation \
