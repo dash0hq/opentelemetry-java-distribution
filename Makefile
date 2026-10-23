@@ -11,7 +11,7 @@ CHLOGGEN_VERSION = v0.30.0
 CHLOGGEN = go run go.opentelemetry.io/build-tools/chloggen@$(CHLOGGEN_VERSION)
 CHLOGGEN_CONFIG = .chloggen/config.yaml
 
-.PHONY: chlog-new chlog-validate chlog-preview chlog-update
+.PHONY: chlog-new chlog-validate chlog-preview chlog-update check-relocations
 
 # Create a new entry file named after the current branch.
 chlog-new:
@@ -33,3 +33,9 @@ ifndef VERSION
 	$(error VERSION is required, e.g. make chlog-update VERSION="0.2.0 - 2026-10-01")
 endif
 	$(CHLOGGEN) update --config $(CHLOGGEN_CONFIG) --version "$(VERSION)"
+
+# Compare the relocation rules against upstream's copy for the pinned agent
+# version. A rule upstream added and we did not copy produces no error at
+# runtime, only instrumentation that never runs.
+check-relocations:
+	scripts/check-relocations.sh
