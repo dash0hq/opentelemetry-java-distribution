@@ -83,7 +83,7 @@ What guards what:
 | 2, relocation drift | `scripts/check-relocations.sh`, run by the `relocations` CI job |
 | 2, 3 and 4, anything added to, dropped from or rewritten in the jar | `AgentCompositionTest` |
 | 5, service-file merging | `AgentPackagingTest` |
-| 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 25 |
+| 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 27 |
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
 | Any of them, through the extension rather than the agent | `ExtensionRuntimeTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |

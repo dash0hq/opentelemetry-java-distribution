@@ -67,7 +67,7 @@ jobs:
       matrix:
         # The upstream agent supports Java 8 and later, so the distribution has
         # to attach cleanly across that range, not just on the build JDK.
-        java: [8, 11, 17, 21, 25]
+        java: [8, 11, 17, 21, 25, 27]
     steps:
       - uses: actions/checkout@v5
         with:
