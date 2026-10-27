@@ -1,9 +1,0 @@
-change_type: enhancement
-component: ci
-note: Fail when the relocation rules drift from upstream's
-issues: [1]
-subtext: |
-  scripts/check-relocations.sh compares buildSrc/src/main/kotlin/Relocations.kt
-  against upstream's copy at the pinned agent version, ignoring comments and
-  the licence header. A rule upstream adds and this repository does not copy
-  produces no error, only instrumentation that never runs.
