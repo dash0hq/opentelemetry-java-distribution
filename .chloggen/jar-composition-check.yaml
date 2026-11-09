@@ -1,0 +1,12 @@
+change_type: enhancement
+component: ci
+note: Compare the repackaged agent against the upstream jar it was built from
+issues: [1]
+subtext: |
+  Three of the silent failures listed in CLAUDE.md are properties of what ends
+  up in the jar. AgentCompositionTest asserts that nothing upstream ships is
+  dropped, that the only additions are the distribution's own files, and that
+  no file inside the isolated agent tree has been rewritten. The last one is
+  what catches a bundled library replaced by another version, which is the
+  shape of the ASM problem that silently disabled every instrumentation for
+  Amazon.

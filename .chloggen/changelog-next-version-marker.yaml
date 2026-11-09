@@ -1,0 +1,10 @@
+change_type: bug_fix
+component: changelog
+note: Add the marker chloggen inserts new sections at
+issues: [1]
+subtext: |
+  CHANGELOG.rst had no "<!-- next version -->" comment, so the
+  "make chlog-update" step that RELEASING.rst opens with failed with
+  "expected one instance of <!-- next version -->". The first release would
+  have hit this.
+change_logs: [user]

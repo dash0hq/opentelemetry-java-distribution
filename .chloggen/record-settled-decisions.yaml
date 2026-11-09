@@ -1,0 +1,10 @@
+change_type: enhancement
+component: docs
+note: Record what is settled and what is still open
+issues: [1]
+subtext: |
+  The README and the overview described the repository as scaffolding with no
+  feature set, which stopped being true. The rationale question stays open and
+  now cites OSS-41, the ticket that tracks it, rather than OSS-35, which is the
+  setup ticket.
+change_logs: [user]

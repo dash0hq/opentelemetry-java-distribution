@@ -1,0 +1,11 @@
+change_type: enhancement
+component: ci
+note: Assert the Dash0 customisations on every supported JVM
+issues: [1]
+subtext: |
+  The supported-jvms matrix disabled every exporter and checked only that the
+  application completed, so it proved the agent attached without crashing and
+  nothing more. It now exports to the console and asserts the distro
+  attributes, then runs again with DASH0_DISABLE=true and asserts telemetry
+  stops, covering both halves of what this distribution adds across every JVM
+  upstream supports rather than only on the build JDK.

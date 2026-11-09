@@ -1,0 +1,9 @@
+change_type: enhancement
+component: deps
+note: Build on the upstream OpenTelemetry Java agent 2.32.0
+issues: [1]
+subtext: |
+  The agent version determines the entire bundled instrumentation set. The Dash0
+  operator's instrumentation image already pinned 2.32.0 while this distribution
+  was still on 2.31.1, so the two name the same agent again.
+change_logs: [user]
