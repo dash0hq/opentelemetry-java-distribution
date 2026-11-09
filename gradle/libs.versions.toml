@@ -5,8 +5,8 @@
 # The "-alpha" coordinates are not optional. The javaagent extension APIs are
 # published only in opentelemetry-instrumentation-bom-alpha, so every vendor
 # distribution depends on artifacts upstream marks as unstable. See CLAUDE.md.
-opentelemetryJavaagent = "2.32.0"
-opentelemetryJavaagentAlpha = "2.32.0-alpha"
+opentelemetryJavaagent = "2.33.1"
+opentelemetryJavaagentAlpha = "2.33.1-alpha"
 
 autoService = "1.1.1"
 junit = "5.11.4"

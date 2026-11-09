@@ -1,0 +1,11 @@
+change_type: enhancement
+component: deps
+note: Build on the upstream OpenTelemetry Java agent 2.33.1
+issues: [1]
+subtext: |
+  The agent version determines the entire bundled instrumentation set. The Dash0
+  operator's instrumentation image pins 2.32.0 in
+  images/instrumentation/jvm/pom.xml and downloads the stock agent from Maven,
+  so the two no longer name the same version. Nothing depends on them agreeing
+  while the operator does not consume this distribution.
+change_logs: [user]
