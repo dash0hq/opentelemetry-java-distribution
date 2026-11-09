@@ -83,21 +83,22 @@ https://opentelemetry.io/docs/zero-code/java/agent/configuration/
 `OTEL_CONFIG_FILE` points the agent at a YAML file that replaces environment
 configuration entirely. This distribution does not ship one, and does not yet
 work correctly when one is supplied. The variable is named `OTEL_CONFIG_FILE`;
-`OTEL_EXPERIMENTAL_CONFIG_FILE` is read by nothing in agent 2.32.0.
+`OTEL_EXPERIMENTAL_CONFIG_FILE` is read by nothing in agent 2.33.1.
 
-Measured on agent 2.32.0 with a file declaring only `service.name` and a console
+Observed on agent 2.33.1 with a file declaring only `service.name` and a console
 metric exporter, the exported resource is:
 
 ```
 service.name="declarative-probe"
 telemetry.distro.name="opentelemetry-javaagent"
-telemetry.distro.version="dash0-0.1.0-SNAPSHOT-otel-2.32.0"
+telemetry.distro.version="dash0-0.1.0-SNAPSHOT-otel-2.33.1"
 telemetry.sdk.language="java"
 telemetry.sdk.name="opentelemetry"
-telemetry.sdk.version="1.66.0"
+telemetry.sdk.version="1.67.0"
 ```
 
-The same application configured through the environment exports:
+The same application configured through the environment exports, among other
+attributes:
 
 ```
 service.name="env-probe"
@@ -105,10 +106,10 @@ telemetry.distro.name="dash0-java"
 telemetry.distro.version="0.1.0-SNAPSHOT"
 telemetry.sdk.language="java"
 telemetry.sdk.name="opentelemetry"
-telemetry.sdk.version="1.66.0"
+telemetry.sdk.version="1.67.0"
 host.name="demoman"
 os.type="linux"
-process.pid=583734
+process.pid=343529
 ```
 
 Three things differ. `DistroResourceProvider` does not run, so
