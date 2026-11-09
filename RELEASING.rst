@@ -4,18 +4,15 @@ Releasing
 
 .. note::
 
-   Nothing has been released from this repository yet, and no release exists.
-
-   The workflow itself has been run from end to end once, on 2026-10-23,
-   against a throwaway ``v0.0.1``. It completed in 5m24s and every step
-   succeeded, including the build provenance attestation. The three assets
+   The workflow was run from end to end once before any real release, on
+   2026-10-23, against a throwaway ``v0.0.1``. It completed in 5m24s and every
+   step succeeded, including the build provenance attestation. The three assets
    were published, their SHA256SUMS verified, their digests matched what the
    Releases API reported, ``gh attestation verify`` accepted the agent jar and
    bound it to ``release.yml@refs/tags/v0.0.1``, and the published jar was run
    under ``-javaagent:`` and reported ``telemetry.distro.name="dash0-java"``
-   and ``telemetry.distro.version="0.0.1"``. The release and the tag were then
-   deleted and the commit reverted, so the repository has no tags and no
-   releases.
+   and ``telemetry.distro.version="0.0.1"``. That release and that tag were
+   then deleted and the commit reverted.
 
    What that run did not establish is how the three refusals below behave when
    they fire. Each of them executed and took its accept path; none has been
