@@ -6,11 +6,9 @@ The Dash0 distribution of OpenTelemetry for Java: a thin, opinionated layer on
 top of the upstream `OpenTelemetry Java agent
 <https://github.com/open-telemetry/opentelemetry-java-instrumentation>`_.
 
-.. warning::
-
-   **Nothing has been released from this repository yet.** No version is
-   tagged and no artifact is published anywhere. Everything described below
-   works and is tested, but it has not shipped.
+Releases carry the repackaged agent jar and the extension jar as assets, and
+are published at https://github.com/dash0hq/opentelemetry-java-distribution/releases.
+RELEASING.rst describes how one is cut and CHANGELOG.rst what each contains.
 
 
 Status
