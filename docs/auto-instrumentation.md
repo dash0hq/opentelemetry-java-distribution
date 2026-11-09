@@ -7,7 +7,7 @@ The version that determines that set is pinned in one place,
 `gradle/libs.versions.toml`:
 
 ```toml
-opentelemetryJavaagent = "2.32.0"
+opentelemetryJavaagent = "2.33.1"
 ```
 
 The library list for that version is upstream's:

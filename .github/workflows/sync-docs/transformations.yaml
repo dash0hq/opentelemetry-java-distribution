@@ -25,7 +25,7 @@ files:
   - source: docs/overview.md
     target: dash0/opentelemetry/distributions/java/overview.md
     title: About the Dash0 OpenTelemetry Java Distribution
-    description: Overview of the Dash0 OpenTelemetry distribution for Java: the upstream Java agent repackaged with Dash0 resource attributes and configuration, shipped as a single -javaagent jar.
+    description: 'Overview of the Dash0 OpenTelemetry distribution for Java: the upstream Java agent repackaged with Dash0 resource attributes and configuration, shipped as a single -javaagent jar.'
 
   - source: docs/getting-started.md
     target: dash0/opentelemetry/distributions/java/getting-started.md

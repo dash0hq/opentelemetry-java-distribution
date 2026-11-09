@@ -1,0 +1,12 @@
+change_type: enhancement
+component: resource
+note: Report the resource attributes a Linux package writes beside the agent jar
+issues: [1]
+subtext: |
+  Dash0PackageResourceProvider reads dash0-resource-attributes.properties from
+  the directory holding the agent jar and turns every key in it into a resource
+  attribute. The Dash0 Linux packages use it for dash0.package.name and
+  dash0.package.version, which the Node.js, Python and Ruby packages set from
+  their entry-point script. Java has no entry-point script to set them in,
+  because the OpenTelemetry injector contributes only -javaagent:.
+change_logs: [user]
