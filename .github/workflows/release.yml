@@ -163,3 +163,13 @@ jobs:
           done
 
           gh release edit "$TAG" --draft=false --latest
+
+  sync-docs:
+    name: Synchronize the docs
+    needs: release
+    uses: ./.github/workflows/sync-docs.yml
+    secrets: inherit
+    permissions:
+      contents: read
+    with:
+      dry-run: false
