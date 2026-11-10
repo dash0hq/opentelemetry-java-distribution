@@ -144,9 +144,7 @@ the same agent:
   <https://github.com/dash0hq/dash0-operator>`_, which the operator's
   instrumentation image uses to download the agent it injects.
 
-This repository is at 2.33.1 and the operator at 2.32.0, so they disagree
-today. Nothing depends on them agreeing while the operator downloads the
-stock agent from Maven rather than consuming this distribution.
+Both are at 2.33.1 today.
 
 Nothing enforces that they agree, and they are bumped by different people on
 different schedules. Once this distribution is what the operator ships, the
