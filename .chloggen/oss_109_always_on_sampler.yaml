@@ -1,0 +1,38 @@
+change_type: enhancement
+
+component: custom
+
+note: Default otel.traces.sampler to always_on, so an incoming trace context can no longer decide whether this process is traced
+
+issues: [9]
+
+subtext: |
+  The distribution set no sampler and inherited the OpenTelemetry default,
+  ``parentbased_always_on``. ``ParentBased`` holds five sub-samplers, and the
+  ``root`` one applies only to a span with no parent. A span whose parent
+  arrived in a ``traceparent`` header is decided by ``remote_parent_sampled``
+  or ``remote_parent_not_sampled`` instead, which default to ``AlwaysOn`` and
+  ``AlwaysOff``.
+  A caller that sends a ``traceparent`` with the sampled flag off therefore
+  silenced every span in the service receiving the request, and in every
+  service that one called. That caller is often outside the organization
+  operating the service, so the clients of an API decided whether its owner
+  got to trace it.
+  ``always_on`` takes the incoming trace context out of the decision. Dash0
+  samples traces after ingestion with Signal Control, which evaluates a whole
+  trace at once, and a span dropped by a sampler inside the process never
+  reaches that evaluation.
+  Nothing stops working and no setting becomes invalid, but an existing
+  deployment is affected without changing its configuration. Expect more spans
+  to leave the application, costing CPU in the process and bandwidth to the
+  collector, and reduce the volume with Signal Control or a collector-side
+  processor rather than in the SDK. Set ``OTEL_TRACES_SAMPLER`` or
+  ``-Dotel.traces.sampler`` on the workload to keep the previous behaviour; the
+  value is registered through ``addPropertiesSupplier``, which both of those
+  beat.
+  Declarative configuration is unaffected and remains unsupported. Under
+  ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so this
+  default does not apply there any more than ``DASH0_DISABLE`` and
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` do; see ``docs/configuration.md``.
+
+change_logs: [user]
