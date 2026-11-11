@@ -4,21 +4,33 @@
  */
 package com.dash0.opentelemetry;
 
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.ALWAYS_ON;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.COLLECTOR_BASE_URL;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.DISABLE;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.OTLP_ENDPOINT;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.SDK_DISABLED;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.TRACES_SAMPLER;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.dash0Defaults;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.dash0Overrides;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.opentelemetry.context.propagation.TextMapPropagator;
+import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -110,6 +122,55 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void defaultsTheSamplerToAlwaysOn() {
+    assertThat(dash0Defaults()).containsEntry(TRACES_SAMPLER, ALWAYS_ON);
+  }
+
+  @Test
+  void neverReturnsTheSamplerAsAnOverride() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(TRACES_SAMPLER, "parentbased_traceidratio");
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .as(
+            "the sampler is registered through addPropertiesSupplier, which system properties and"
+                + " environment variables beat. Returning it here would make it an override and"
+                + " silently discard the workload's own OTEL_TRACES_SAMPLER")
+        .doesNotContainKey(TRACES_SAMPLER);
+  }
+
+  @Test
+  void registersTheSamplerThroughTheSupplierAndNotThroughTheCustomizer() {
+    RecordingCustomizer recording = new RecordingCustomizer();
+
+    new Dash0ConfigurationCustomizerProvider().customize(recording);
+
+    Map<String, String> supplied = new HashMap<>();
+    for (Supplier<Map<String, String>> supplier : recording.suppliers) {
+      supplied.putAll(supplier.get());
+    }
+
+    Map<String, String> overridden = new HashMap<>();
+    ConfigProperties config =
+        configOf(Collections.singletonMap(TRACES_SAMPLER, "parentbased_traceidratio"));
+    for (Function<ConfigProperties, Map<String, String>> customizer : recording.customizers) {
+      overridden.putAll(customizer.apply(config));
+    }
+
+    assertThat(supplied)
+        .as(
+            "addPropertiesSupplier loses to both system properties and environment variables, which"
+                + " is what makes always_on a default rather than a decision taken away from the"
+                + " workload")
+        .containsEntry(TRACES_SAMPLER, ALWAYS_ON);
+    assertThat(overridden)
+        .as(
+            "addPropertiesCustomizer beats both, so registering the sampler there would silently"
+                + " discard the workload's own OTEL_TRACES_SAMPLER")
+        .doesNotContainKey(TRACES_SAMPLER);
+  }
+
+  @Test
   void appliesBothSettingsTogether() {
     Map<String, String> properties = new HashMap<>();
     properties.put(DISABLE, "true");
@@ -118,6 +179,59 @@ class Dash0ConfigurationCustomizerProviderTest {
     assertThat(dash0Overrides(configOf(properties)))
         .containsEntry(SDK_DISABLED, "true")
         .containsEntry(OTLP_ENDPOINT, "https://ingress.dash0.com");
+  }
+
+  /**
+   * An {@link AutoConfigurationCustomizer} that keeps what was registered with it instead of
+   * configuring anything.
+   *
+   * <p>The two property hooks record what is registered with them. The four hooks this distribution
+   * does not use throw, so a change that starts customizing a sampler or a resource fails here
+   * rather than going unnoticed.
+   */
+  private static final class RecordingCustomizer implements AutoConfigurationCustomizer {
+
+    final List<Supplier<Map<String, String>>> suppliers = new ArrayList<>();
+    final List<Function<ConfigProperties, Map<String, String>>> customizers = new ArrayList<>();
+
+    @Override
+    public AutoConfigurationCustomizer addPropertiesSupplier(
+        Supplier<Map<String, String>> supplier) {
+      suppliers.add(supplier);
+      return this;
+    }
+
+    @Override
+    public AutoConfigurationCustomizer addPropertiesCustomizer(
+        Function<ConfigProperties, Map<String, String>> customizer) {
+      customizers.add(customizer);
+      return this;
+    }
+
+    @Override
+    public AutoConfigurationCustomizer addPropagatorCustomizer(
+        BiFunction<? super TextMapPropagator, ConfigProperties, ? extends TextMapPropagator>
+            customizer) {
+      throw new UnsupportedOperationException("addPropagatorCustomizer");
+    }
+
+    @Override
+    public AutoConfigurationCustomizer addResourceCustomizer(
+        BiFunction<? super Resource, ConfigProperties, ? extends Resource> customizer) {
+      throw new UnsupportedOperationException("addResourceCustomizer");
+    }
+
+    @Override
+    public AutoConfigurationCustomizer addSamplerCustomizer(
+        BiFunction<? super Sampler, ConfigProperties, ? extends Sampler> customizer) {
+      throw new UnsupportedOperationException("addSamplerCustomizer");
+    }
+
+    @Override
+    public AutoConfigurationCustomizer addSpanExporterCustomizer(
+        BiFunction<? super SpanExporter, ConfigProperties, ? extends SpanExporter> customizer) {
+      throw new UnsupportedOperationException("addSpanExporterCustomizer");
+    }
   }
 
   /**

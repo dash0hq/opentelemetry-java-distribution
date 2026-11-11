@@ -8,6 +8,7 @@ import com.google.auto.service.AutoService;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -15,9 +16,10 @@ import java.util.logging.Logger;
 
 /**
  * Translates the Dash0 settings this distribution honours into the standard OpenTelemetry settings
- * the upstream agent already understands.
+ * the upstream agent already understands, and supplies the one standard default it changes on its
+ * own, {@code otel.traces.sampler}.
  *
- * <p>Two settings are translated, and only two. Both exist so that one {@code
+ * <p>Two Dash0 settings are translated, and only two. Both exist so that one {@code
  * /etc/opentelemetry/injector/default_env.conf} on a host configures every Dash0 language
  * distribution the same way: without them a host that sets only the {@code DASH0_}-prefixed names
  * instruments its Node.js, Python and Ruby processes and silently does nothing useful for its JVMs.
@@ -55,6 +57,10 @@ import java.util.logging.Logger;
  * from {@link System#getenv}. That would drop the dotted system-property spelling and make the
  * logic untestable without mutating the environment.
  *
+ * <p>{@code otel.traces.sampler} registers through {@code addPropertiesSupplier} instead, which
+ * both system properties and environment variables beat. {@code docs/configuration.md} covers the
+ * value and the choice of hook.
+ *
  * <p>None of this applies under declarative configuration. When {@code OTEL_CONFIG_FILE} names a
  * file the SDK never consults the autoconfigure SPI, so this class is not invoked at all. See
  * {@code docs/configuration.md}.
@@ -71,13 +77,26 @@ public final class Dash0ConfigurationCustomizerProvider
 
   static final String SDK_DISABLED = "otel.sdk.disabled";
   static final String OTLP_ENDPOINT = "otel.exporter.otlp.endpoint";
+  static final String TRACES_SAMPLER = "otel.traces.sampler";
+
+  /** Records and exports every span, whatever an incoming trace context says. */
+  static final String ALWAYS_ON = "always_on";
 
   private static final Logger logger =
       Logger.getLogger(Dash0ConfigurationCustomizerProvider.class.getName());
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
+    autoConfiguration.addPropertiesSupplier(Dash0ConfigurationCustomizerProvider::dash0Defaults);
     autoConfiguration.addPropertiesCustomizer(Dash0ConfigurationCustomizerProvider::dash0Overrides);
+  }
+
+  /**
+   * Returns the standard settings this distribution supplies as defaults, which anything set on the
+   * workload beats.
+   */
+  static Map<String, String> dash0Defaults() {
+    return Collections.singletonMap(TRACES_SAMPLER, ALWAYS_ON);
   }
 
   /**
