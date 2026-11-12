@@ -67,10 +67,12 @@ class MdcAttributeCaptureTest {
         .doesNotContain(MdcEntries.CREDENTIAL_VALUE);
     assertThat(output)
         .as(
-            "without this the assertion above would also pass against a JVM that never logged. The"
-                + " JVM's output was:%n%s",
+            "without this the assertion above would also pass against a JVM whose log pipeline went"
+                + " silent, which is the failure the other cases exist to catch. Logback prints the"
+                + " message to the console whether or not a record was exported, so the assertion"
+                + " is on the exported record's own marker instead. The JVM's output was:%n%s",
             output)
-        .contains(MdcEntries.MESSAGE);
+        .contains(exportedRecordMarkerFor(LogbackMdcApplication.class));
   }
 
   @Test
@@ -110,6 +112,11 @@ class MdcAttributeCaptureTest {
                 + " the same run. The JVM's output was:%n%s",
             MdcEntries.LOWER_CASE_KEY, MdcEntries.CAMEL_CASE_KEY, MdcEntries.UPPER_CASE_KEY, output)
         .doesNotContain(MdcEntries.CREDENTIAL_VALUE);
+  }
+
+  /** What the console log exporter prints for a record whose scope is named after {@code type}. */
+  private static String exportedRecordMarkerFor(Class<?> type) {
+    return "[scopeInfo: " + type.getName();
   }
 
   private static InstrumentedJvm exportingLogsToTheConsole(InstrumentedJvm jvm) {
