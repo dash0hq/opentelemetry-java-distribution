@@ -139,7 +139,7 @@ at 2.33.1, which matters to anything naming it in
 | `JarServiceNameDetector` | `1000` | `service.name` | yes |
 | `HostIdResourceProvider` | `2147483646` | `host.id` | no, group `host-id` |
 | `EnvironmentResourceProvider` | `2147483646` | whatever `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` carry | yes |
-| `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider` | `0` | Azure attributes | no, group `azure` |
+| `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider` | `0` | Azure attributes, and `service.name` from `WEBSITE_SITE_NAME` | no, group `azure` |
 | `AzureVmResourceProvider` | `100` | Azure attributes | no, group `azure` |
 | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` | `0` | AWS attributes | no, group `aws` |
 | `GCPResourceProvider` | `0` | Google Cloud attributes | no, group `gcp` |
@@ -179,7 +179,7 @@ Use `otel.resource.providers.<group>.enabled` to switch a disabled group on, and
 
 ### `service.name`
 
-Five providers can set `service.name`. Three of them are
+Five providers can set `service.name` with the shipped defaults. Three of them are
 `ConditionalResourceProvider`s guarded on the value still being
 `unknown_service:java`, so the first one to find a name in ascending `order()`
 is the one that wins:
@@ -199,6 +199,14 @@ The other two are plain `ResourceProvider`s and write whatever they have.
 `Integer.MIN_VALUE`, so nothing has named the service yet when it writes, and
 `EnvironmentResourceProvider` runs at `2147483646` and replaces whatever a
 detector found rather than deferring to it.
+
+Switching the `azure` group on adds two more. `AzureAppServiceResourceProvider`
+and `AzureFunctionsResourceProvider` both set `service.name` from
+`WEBSITE_SITE_NAME`, declare no order and so run at `0`, and gate on
+`cloud.provider` being absent rather than on `service.name` still being
+`unknown_service:java`. Both therefore run ahead of every detector in the table
+except `Dash0PackageResourceProvider`, and a `spring.application.name` set on an
+Azure App Service workload loses to `WEBSITE_SITE_NAME`.
 
 These are the values a real instrumented JVM exported for each launch shape, all
 reproduced on agent 2.33.1 and all covered by `ServiceNameDetectionTest` in
