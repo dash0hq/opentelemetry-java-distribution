@@ -227,13 +227,18 @@ names against the appender READMEs of the new version whenever
 no longer exists is read by nothing and reports nothing: logs simply arrive
 without MDC attributes.
 
-Between agent 2.32.0 and 2.33.1 that happened to the setting this feature was
-first specified against. At 2.32.0,
-`otel.instrumentation.logback-appender.experimental.capture-mdc-attributes` was
-a boolean defaulting to `false`. At 2.33.1 it is a deprecated comma-separated
-list of literal MDC keys, so setting it to `true` captures an MDC key named
-`true` and nothing else, with no warning. The `mdc-attributes.included` and
-`mdc-attributes.excluded` pair replaced it, and is what this distribution sets.
+This namespace already churned once in the window this distribution covers. The
+`mdc-attributes.included` and `mdc-attributes.excluded` pair arrived in agent
+2.31.0 and deprecated `capture-mdc-attributes`, which was the only MDC setting
+before that. The pair is what this distribution sets.
+
+`capture-mdc-attributes` is a comma-separated list of literal MDC keys, and has
+been one throughout the agent's 2.x line, as far back as 2.14.0. It is not a
+boolean and never was. Setting it to `true` therefore asks for one MDC key
+named `true`, which no application has, so the log record carries no attributes
+at all. Verified on 2.33.1: the exported record is `{}`. The agent does warn
+that the setting is deprecated and names the pair that replaces it, but nothing
+reports that the value is not a key any application uses.
 
 Declarative configuration does not apply these defaults either, for the reason
 the next section gives.

@@ -40,10 +40,10 @@ subtext: |
   decides what is captured rather than being widened to everything not denied,
   and an existing included list is not silently narrowed.
   The property names are marked experimental by upstream and may be renamed
-  or removed in any minor release. Between agent 2.32.0 and 2.33.1
-  ``capture-mdc-attributes`` changed from a boolean to a comma-separated list
-  of literal MDC keys; ``docs/configuration.md`` records that and says what to
-  recheck on an agent bump.
+  or removed in any minor release. The included and excluded pair itself
+  arrived in agent 2.31.0 and deprecated ``capture-mdc-attributes``, which was
+  the only MDC setting before that; ``docs/configuration.md`` records that and
+  says what to recheck on an agent bump.
   Declarative configuration is unaffected and remains unsupported. Under
   ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so these
   defaults do not apply there any more than ``DASH0_DISABLE`` and the
