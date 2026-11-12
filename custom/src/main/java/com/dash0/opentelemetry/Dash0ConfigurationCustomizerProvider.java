@@ -8,16 +8,17 @@ import com.google.auto.service.AutoService;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Translates the Dash0 settings this distribution honours into the standard OpenTelemetry settings
- * the upstream agent already understands, and supplies the one standard default it changes on its
- * own, {@code otel.traces.sampler}.
+ * the upstream agent already understands, and supplies the standard defaults it changes on its own.
  *
  * <p>Two Dash0 settings are translated, and only two. Both exist so that one {@code
  * /etc/opentelemetry/injector/default_env.conf} on a host configures every Dash0 language
@@ -58,8 +59,11 @@ import java.util.logging.Logger;
  * logic untestable without mutating the environment.
  *
  * <p>{@code otel.traces.sampler} registers through {@code addPropertiesSupplier} instead, which
- * both system properties and environment variables beat. {@code docs/configuration.md} covers the
- * value and the choice of hook.
+ * both system properties and environment variables beat. The {@code mdc-attributes.excluded}
+ * defaults register through {@code addPropertiesCustomizer} and are omitted for an appender whose
+ * {@code mdc-attributes.included}, {@code mdc-attributes.excluded} or {@code
+ * capture-mdc-attributes} setting the operator has configured. {@code docs/configuration.md} covers
+ * the values and both choices of hook.
  *
  * <p>None of this applies under declarative configuration. When {@code OTEL_CONFIG_FILE} names a
  * file the SDK never consults the autoconfigure SPI, so this class is not invoked at all. See
@@ -80,6 +84,29 @@ public final class Dash0ConfigurationCustomizerProvider
   static final String TRACES_SAMPLER = "otel.traces.sampler";
   static final String ALWAYS_ON = "always_on";
 
+  static final String LOGBACK_APPENDER = "otel.instrumentation.logback-appender.experimental.";
+  static final String LOG4J_APPENDER = "otel.instrumentation.log4j-appender.experimental.";
+  static final String JBOSS_LOGMANAGER = "otel.instrumentation.jboss-logmanager.experimental.";
+
+  static final String MDC_ATTRIBUTES_INCLUDED = "mdc-attributes.included";
+  static final String MDC_ATTRIBUTES_EXCLUDED = "mdc-attributes.excluded";
+  static final String CAPTURE_MDC_ATTRIBUTES = "capture-mdc-attributes";
+
+  /**
+   * The MDC keys this distribution never captures, as case-sensitive glob patterns in the order
+   * lowercase, capitalised, uppercase.
+   */
+  static final String CREDENTIAL_MDC_KEYS =
+      "*token*,*Token*,*TOKEN*,"
+          + "*secret*,*Secret*,*SECRET*,"
+          + "*password*,*Password*,*PASSWORD*,"
+          + "*authorization*,*Authorization*,*AUTHORIZATION*";
+
+  /** The appender instrumentations that read an {@code mdc-attributes} selector. */
+  static final List<String> MDC_CAPTURING_INSTRUMENTATIONS =
+      Collections.unmodifiableList(
+          Arrays.asList(LOGBACK_APPENDER, LOG4J_APPENDER, JBOSS_LOGMANAGER));
+
   private static final Logger logger =
       Logger.getLogger(Dash0ConfigurationCustomizerProvider.class.getName());
 
@@ -94,10 +121,10 @@ public final class Dash0ConfigurationCustomizerProvider
   }
 
   /**
-   * Returns the standard settings the Dash0 settings imply, and nothing else.
+   * Returns the standard settings the Dash0 settings imply, together with the MDC capture defaults.
    *
-   * <p>A setting that is absent, empty or blank contributes no entry, so an operator who sets none
-   * of them gets exactly the upstream agent's behaviour.
+   * <p>A Dash0 setting that is absent, empty or blank contributes no entry, and an appender whose
+   * MDC settings the operator has configured contributes none either.
    *
    * @param config the resolved configuration, which carries {@code DASH0_} names in dotted form
    */
@@ -128,6 +155,14 @@ public final class Dash0ConfigurationCustomizerProvider
         logger.log(
             Level.FINE, "Using DASH0_OTEL_COLLECTOR_BASE_URL as the OTLP endpoint: {0}", endpoint);
         overrides.put(OTLP_ENDPOINT, endpoint);
+      }
+    }
+
+    for (String instrumentation : MDC_CAPTURING_INSTRUMENTATIONS) {
+      if (isBlank(config.getString(instrumentation + MDC_ATTRIBUTES_INCLUDED))
+          && isBlank(config.getString(instrumentation + MDC_ATTRIBUTES_EXCLUDED))
+          && isBlank(config.getString(instrumentation + CAPTURE_MDC_ATTRIBUTES))) {
+        overrides.put(instrumentation + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS);
       }
     }
 
