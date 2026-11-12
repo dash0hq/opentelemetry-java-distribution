@@ -334,10 +334,11 @@ Three instrumentations differ from the table:
 
 Append `/dup` to a domain to emit both sets at once, as in
 `database/dup,code,rpc,messaging`. That doubles the attributes on every affected
-span and is a migration aid rather than a resting state. It applies to
-attributes only: the connection pool instruments are not dual-emitted, so
-`database/dup` still renames them and still moves the three histograms to
-seconds.
+span and is a migration aid rather than a resting state. `messaging/dup` covers
+metrics too: it keeps Pulsar's three pre-1.43 instruments alongside the new
+ones. The connection pool instruments are the exception, because the agent picks
+one name for each of them rather than recording both, so `database/dup` still
+renames them and still moves the three histograms to seconds.
 
 To keep the superseded names everywhere, set the variable to a value that names
 no domain:
