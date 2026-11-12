@@ -245,6 +245,11 @@ class Dash0ConfigurationCustomizerProviderTest {
       supplied.putAll(supplier.get());
     }
 
+    Map<String, String> customized = new HashMap<>();
+    for (Function<ConfigProperties, Map<String, String>> customizer : recording.customizers) {
+      customized.putAll(customizer.apply(configOf(Collections.emptyMap())));
+    }
+
     assertThat(supplied)
         .as(
             "addPropertiesSupplier loses only to the same property name, so an MDC default"
@@ -253,6 +258,15 @@ class Dash0ConfigurationCustomizerProviderTest {
         .doesNotContainKey(LOGBACK_APPENDER + MDC_ATTRIBUTES_EXCLUDED)
         .doesNotContainKey(LOG4J_APPENDER + MDC_ATTRIBUTES_EXCLUDED)
         .doesNotContainKey(JBOSS_LOGMANAGER + MDC_ATTRIBUTES_EXCLUDED);
+    assertThat(customized)
+        .as(
+            "the other half of the name. Asserting only the absence above would hold against a"
+                + " provider that registered no customizer at all, which would switch off"
+                + " DASH0_DISABLE, DASH0_OTEL_COLLECTOR_BASE_URL and all three MDC defaults"
+                + " together")
+        .containsEntry(LOGBACK_APPENDER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS)
+        .containsEntry(LOG4J_APPENDER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS)
+        .containsEntry(JBOSS_LOGMANAGER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS);
   }
 
   @Test
