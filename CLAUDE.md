@@ -88,6 +88,7 @@ What guards what:
 | 2, 3 and 4, anything added to, dropped from or rewritten in the jar | `AgentCompositionTest` |
 | 5, service-file merging | `AgentPackagingTest` |
 | 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 27 |
+| 6, the MDC capture defaults | `MdcAttributeCaptureTest` |
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
 | Any of them, through the extension rather than the agent | `ExtensionRuntimeTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
@@ -129,6 +130,7 @@ two distributions document the same topics in the same order.
 | `docs/overview.md` | `README.rst` | Description, architecture, the open decisions |
 | `docs/getting-started.md` | `README.rst` (Trying it) | The runnable commands |
 | `docs/configuration.md` | `custom/src/main/java/**` | Every `DASH0_*` variable and `OTEL_*` default the distro sets |
+| `docs/configuration.md` | `gradle/libs.versions.toml` | On every agent bump, that each `otel.instrumentation.*.experimental.*` name the distro sets still exists upstream |
 | `docs/resource-detection.md` | `custom/src/main/java/com/dash0/opentelemetry/DistroResource.java` | Attributes emitted and ordering behaviour |
 | `docs/auto-instrumentation.md` | `gradle/libs.versions.toml` | The upstream agent version, which determines the instrumentation set |
 | `docs/kubernetes-injection.md` | the Dash0 operator's `images/instrumentation/jvm` | How the agent is delivered and activated |

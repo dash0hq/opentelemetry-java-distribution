@@ -1,0 +1,62 @@
+change_type: enhancement
+
+component: custom
+
+note: Capture MDC attributes on exported log records by default, except keys whose names look like credentials
+
+issues: [2]
+
+subtext: |
+  MDC is where an application puts the identifiers people filter logs by:
+  request id, tenant, customer, user, job id. The upstream agent captures
+  none of them, so those values reached Dash0 only as a substring of the
+  message body, if the log pattern included them at all.
+  The distribution now sets ``mdc-attributes.excluded`` on all three appender
+  instrumentations that read an MDC selector, Logback, Log4j and JBoss Log
+  Manager, and sets no ``mdc-attributes.included``. An excluded selector with
+  no included selector captures every key that does not match it, so one
+  value both turns capture on and keeps the credential-shaped keys out.
+  The value is twelve case-sensitive glob patterns, four stems in three
+  spellings: ``*token*``, ``*Token*``, ``*TOKEN*``, ``*secret*``,
+  ``*Secret*``, ``*SECRET*``, ``*password*``, ``*Password*``, ``*PASSWORD*``,
+  ``*authorization*``, ``*Authorization*`` and ``*AUTHORIZATION*``. Matching
+  is case-sensitive upstream, so the spellings are not redundant: ``*token*``
+  alone matches ``session-token`` and misses both ``authToken`` and
+  ``AUTH_TOKEN``.
+  This is a privacy tradeoff and the deny list is a mitigation rather than a
+  guarantee. It matches four stems, so an MDC key named ``jwt``, ``bearer``,
+  ``pwd``, ``apiKey``, ``sessionId``, ``email`` or ``ssn`` is captured and
+  exported like any other, and nothing inspects values. Review what the
+  application puts in MDC before upgrading.
+  A large MDC also costs attributes. Every exported record now carries every
+  captured MDC entry, and ``OTEL_ATTRIBUTE_COUNT_LIMIT`` caps a record at 128
+  attributes and drops the excess with no warning. On Logback, JBoss Log
+  Manager and Log4j 1.2 the MDC entries are what get dropped. On Log4j 2.17
+  the thread context is recorded before the exception, so a thread context at
+  or over the limit displaces ``exception.type``, ``exception.message`` and
+  ``exception.stacktrace`` instead, and an error record arrives with no stack
+  trace at all. Review the size of the MDC before upgrading as well as its
+  contents, and bound it with an included list naming the keys you want;
+  ``docs/configuration.md`` has the measurements.
+  Setting any of an appender's three MDC properties on the workload replaces
+  the default for that appender and leaves the other two appenders alone.
+  ``OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*'``
+  restores the previous behaviour of capturing nothing. The included and
+  excluded properties are applied together, with the excluded patterns winning
+  over the included ones, while ``CAPTURE_MDC_ATTRIBUTES`` is their deprecated
+  predecessor and the agent ignores it as soon as either of the other two is
+  configured. The distribution contributes its value only when all three are
+  absent or blank, so an existing ``CAPTURE_MDC_ATTRIBUTES`` allow list still
+  decides what is captured rather than being widened to everything not denied,
+  and an existing included list is not silently narrowed.
+  The property names are marked experimental by upstream and may be renamed
+  or removed in any minor release. The included and excluded pair itself
+  arrived in agent 2.31.0 and deprecated ``capture-mdc-attributes``, which was
+  the only MDC setting before that; ``docs/configuration.md`` records that and
+  says what to recheck on an agent bump.
+  Declarative configuration is unaffected and remains unsupported. Under
+  ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so these
+  defaults do not apply there any more than ``DASH0_DISABLE`` and the
+  ``always_on`` sampler do; see ``docs/configuration.md``.
+
+change_logs: [user]

@@ -5,8 +5,16 @@
 package com.dash0.opentelemetry;
 
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.ALWAYS_ON;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.CAPTURE_MDC_ATTRIBUTES;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.COLLECTOR_BASE_URL;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.CREDENTIAL_MDC_KEYS;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.DISABLE;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.JBOSS_LOGMANAGER;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.LOG4J_APPENDER;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.LOGBACK_APPENDER;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.MDC_ATTRIBUTES_EXCLUDED;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.MDC_ATTRIBUTES_INCLUDED;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.MDC_CAPTURING_INSTRUMENTATIONS;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.OTLP_ENDPOINT;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.SDK_DISABLED;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.TRACES_SAMPLER;
@@ -23,6 +31,7 @@ import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -31,8 +40,11 @@ import java.util.ServiceLoader;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class Dash0ConfigurationCustomizerProviderTest {
@@ -44,8 +56,10 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
-  void overridesNothingWhenNoDash0SettingIsPresent() {
-    assertThat(dash0Overrides(configOf(Collections.emptyMap()))).isEmpty();
+  void translatesNoDash0SettingWhenNoneIsPresent() {
+    assertThat(dash0Overrides(configOf(Collections.emptyMap())))
+        .doesNotContainKey(SDK_DISABLED)
+        .doesNotContainKey(OTLP_ENDPOINT);
   }
 
   @ParameterizedTest
@@ -170,6 +184,91 @@ class Dash0ConfigurationCustomizerProviderTest {
         .doesNotContainKey(TRACES_SAMPLER);
   }
 
+  @ParameterizedTest
+  @MethodSource("mdcCapturingInstrumentations")
+  void capturesMdcAttributesExceptCredentialShapedKeys(String instrumentation) {
+    assertThat(dash0Overrides(configOf(Collections.emptyMap())))
+        .as(
+            "an excluded selector and nothing else captures every MDC key that does not match it,"
+                + " so this one value both turns capture on and keeps the credential-shaped keys"
+                + " out")
+        .containsEntry(instrumentation + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS);
+  }
+
+  @ParameterizedTest
+  @MethodSource("mdcSettingsAnOperatorCanSet")
+  void leavesAnAppendersMdcDefaultOutWhenTheOperatorConfiguredIt(
+      String instrumentation, String setting) {
+    Map<String, String> properties =
+        Collections.singletonMap(instrumentation + setting, "request-id");
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .as(
+            "upstream ignores capture-mdc-attributes as soon as an included or excluded pattern is"
+                + " configured, so a default excluded list would discard an operator's"
+                + " capture-mdc-attributes allow list and capture everything not denied instead."
+                + " On an operator's included list it would do the opposite and narrow a selection"
+                + " they chose")
+        .doesNotContainKey(instrumentation + MDC_ATTRIBUTES_EXCLUDED);
+  }
+
+  @ParameterizedTest
+  @MethodSource("mdcSettingsAnOperatorCanSet")
+  void appliesAnAppendersMdcDefaultWhenTheOperatorsValueIsBlank(
+      String instrumentation, String setting) {
+    Map<String, String> properties = Collections.singletonMap(instrumentation + setting, "   ");
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .as("an exported but empty variable configures nothing upstream, and nothing here either")
+        .containsEntry(instrumentation + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS);
+  }
+
+  @Test
+  void configuringOneAppenderLeavesTheOtherAppendersDefaultsInPlace() {
+    Map<String, String> properties =
+        Collections.singletonMap(LOGBACK_APPENDER + MDC_ATTRIBUTES_INCLUDED, "request-id");
+
+    assertThat(dash0Overrides(configOf(properties)))
+        .doesNotContainKey(LOGBACK_APPENDER + MDC_ATTRIBUTES_EXCLUDED)
+        .containsEntry(LOG4J_APPENDER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS)
+        .containsEntry(JBOSS_LOGMANAGER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS);
+  }
+
+  @Test
+  void registersTheMdcDefaultsThroughTheCustomizerAndNotThroughTheSupplier() {
+    RecordingCustomizer recording = new RecordingCustomizer();
+
+    new Dash0ConfigurationCustomizerProvider().customize(recording);
+
+    Map<String, String> supplied = new HashMap<>();
+    for (Supplier<Map<String, String>> supplier : recording.suppliers) {
+      supplied.putAll(supplier.get());
+    }
+
+    Map<String, String> customized = new HashMap<>();
+    for (Function<ConfigProperties, Map<String, String>> customizer : recording.customizers) {
+      customized.putAll(customizer.apply(configOf(Collections.emptyMap())));
+    }
+
+    assertThat(supplied)
+        .as(
+            "addPropertiesSupplier loses only to the same property name, so an MDC default"
+                + " registered there would survive an operator's capture-mdc-attributes and widen"
+                + " what that operator chose to capture")
+        .doesNotContainKey(LOGBACK_APPENDER + MDC_ATTRIBUTES_EXCLUDED)
+        .doesNotContainKey(LOG4J_APPENDER + MDC_ATTRIBUTES_EXCLUDED)
+        .doesNotContainKey(JBOSS_LOGMANAGER + MDC_ATTRIBUTES_EXCLUDED);
+    assertThat(customized)
+        .as(
+            "the other half of the name. Asserting only the absence above would hold against a"
+                + " provider that registered no customizer at all, which would switch off"
+                + " DASH0_DISABLE, DASH0_OTEL_COLLECTOR_BASE_URL and all three MDC defaults"
+                + " together")
+        .containsEntry(LOGBACK_APPENDER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS)
+        .containsEntry(LOG4J_APPENDER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS)
+        .containsEntry(JBOSS_LOGMANAGER + MDC_ATTRIBUTES_EXCLUDED, CREDENTIAL_MDC_KEYS);
+  }
+
   @Test
   void appliesBothSettingsTogether() {
     Map<String, String> properties = new HashMap<>();
@@ -179,6 +278,20 @@ class Dash0ConfigurationCustomizerProviderTest {
     assertThat(dash0Overrides(configOf(properties)))
         .containsEntry(SDK_DISABLED, "true")
         .containsEntry(OTLP_ENDPOINT, "https://ingress.dash0.com");
+  }
+
+  private static Stream<String> mdcCapturingInstrumentations() {
+    return MDC_CAPTURING_INSTRUMENTATIONS.stream();
+  }
+
+  /** Every appender setting an operator can configure, as an instrumentation and a suffix. */
+  private static Stream<Arguments> mdcSettingsAnOperatorCanSet() {
+    List<String> settings =
+        Arrays.asList(MDC_ATTRIBUTES_INCLUDED, MDC_ATTRIBUTES_EXCLUDED, CAPTURE_MDC_ATTRIBUTES);
+    return MDC_CAPTURING_INSTRUMENTATIONS.stream()
+        .flatMap(
+            instrumentation ->
+                settings.stream().map(setting -> Arguments.of(instrumentation, setting)));
   }
 
   /**

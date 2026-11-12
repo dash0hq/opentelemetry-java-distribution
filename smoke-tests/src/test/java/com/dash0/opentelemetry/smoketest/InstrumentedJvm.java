@@ -19,7 +19,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Runs {@link TestApplication} in a real JVM with an agent attached, and returns what it printed.
+ * Runs one of this module's applications in a real JVM with an agent attached, and returns what it
+ * printed.
  *
  * <p>Six test classes launch a JVM and each used to carry its own copy of this code. The copies
  * drifted: one checked the child's exit code and five did not, so a test could assert that
@@ -41,14 +42,22 @@ final class InstrumentedJvm {
   private static final int TIMEOUT_MINUTES = 2;
 
   private String agentJar = System.getProperty("dash0.agent.jar");
+  private final String mainClass;
   private final List<String> jvmArguments = new ArrayList<>();
   private final Map<String, String> environment = new LinkedHashMap<>();
   private Integer millisecondsBeforeExit;
 
-  private InstrumentedJvm() {}
+  private InstrumentedJvm(Class<?> mainClass) {
+    this.mainClass = mainClass.getName();
+  }
 
   static InstrumentedJvm runningTheTestApplication() {
-    return new InstrumentedJvm();
+    return new InstrumentedJvm(TestApplication.class);
+  }
+
+  /** Runs {@code mainClass} instead of {@link TestApplication}. */
+  static InstrumentedJvm runningTheApplication(Class<?> mainClass) {
+    return new InstrumentedJvm(mainClass);
   }
 
   /** Attaches {@code agent} instead of the agent jar this build produced. */
@@ -91,8 +100,8 @@ final class InstrumentedJvm {
     command.add("-javaagent:" + agentJar);
     command.addAll(jvmArguments);
     command.add("-cp");
-    command.add(System.getProperty("dash0.test.app.classes"));
-    command.add(TestApplication.class.getName());
+    command.add(System.getProperty("dash0.test.app.classpath"));
+    command.add(mainClass);
     if (millisecondsBeforeExit != null) {
       command.add(String.valueOf(millisecondsBeforeExit));
     }
