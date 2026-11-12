@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Runs {@link TestApplication} in a real JVM with an agent attached, and returns what it printed.
  *
- * <p>Six test classes launch a JVM and each used to carry its own copy of this code. The copies
+ * <p>Each test class that launches a JVM used to carry its own copy of this code. The copies
  * drifted: one checked the child's exit code and five did not, so a test could assert that
  * telemetry was absent and pass against a JVM that had died before producing any.
  *

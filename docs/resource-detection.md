@@ -98,8 +98,10 @@ absent, so the unit tests cannot catch it.
 
 ## Upstream detectors
 
-Every resource provider the upstream agent registers is active here and
-unmodified. This distribution adds to that set rather than replacing it, and
+Every resource provider the upstream agent registers is registered here and
+unmodified, with the same group defaults upstream applies, so the eleven the
+table below marks as off are off here too. This distribution adds to that set
+rather than replacing it, and
 `AgentPackagingTest` asserts that every provider in the upstream agent's own
 service file survived the merge into ours.
 

@@ -123,7 +123,7 @@ start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
 Declarative configuration does not apply this default either, for the reason the
-next section gives.
+`Declarative configuration` section below gives.
 
 ### Resource-provider toggles
 
