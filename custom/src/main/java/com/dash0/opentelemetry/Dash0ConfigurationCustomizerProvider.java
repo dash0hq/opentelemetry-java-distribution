@@ -10,6 +10,7 @@ import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvide
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,12 +33,16 @@ public final class Dash0ConfigurationCustomizerProvider
   static final String ALWAYS_ON = "always_on";
   static final String PROPAGATORS = "otel.propagators";
   static final String TRACECONTEXT_BAGGAGE_XRAY = "tracecontext,baggage,xray";
+  static final String SEMCONV_STABILITY_OPT_IN = "otel.semconv-stability.opt-in";
+  static final String SEMCONV_STABILITY_OPT_IN_VARIABLE = "OTEL_SEMCONV_STABILITY_OPT_IN";
+  static final String NEWER_SEMCONV_DOMAINS = "database,code,rpc,messaging";
 
   private static final Logger logger =
       Logger.getLogger(Dash0ConfigurationCustomizerProvider.class.getName());
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
+    setSemconvStabilityOptInUnlessConfigured(System::getenv);
     autoConfiguration.addPropertiesSupplier(Dash0ConfigurationCustomizerProvider::dash0Defaults);
     autoConfiguration.addPropertiesCustomizer(Dash0ConfigurationCustomizerProvider::dash0Overrides);
   }
@@ -49,6 +54,23 @@ public final class Dash0ConfigurationCustomizerProvider
     // extracted baggage rather than having the baggage propagator replace it.
     defaults.put(PROPAGATORS, TRACECONTEXT_BAGGAGE_XRAY);
     return defaults;
+  }
+
+  /**
+   * Sets the system property {@code otel.semconv-stability.opt-in} to {@link
+   * #NEWER_SEMCONV_DOMAINS} when neither that system property nor {@code
+   * OTEL_SEMCONV_STABILITY_OPT_IN} already carries a value.
+   *
+   * @param environment reads an environment variable by name
+   */
+  static void setSemconvStabilityOptInUnlessConfigured(Function<String, String> environment) {
+    if (!isBlank(System.getProperty(SEMCONV_STABILITY_OPT_IN))
+        || !isBlank(environment.apply(SEMCONV_STABILITY_OPT_IN_VARIABLE))) {
+      return;
+    }
+    logger.log(
+        Level.FINE, "Opting in to the newer semantic conventions for {0}.", NEWER_SEMCONV_DOMAINS);
+    System.setProperty(SEMCONV_STABILITY_OPT_IN, NEWER_SEMCONV_DOMAINS);
   }
 
   /**
@@ -88,5 +110,9 @@ public final class Dash0ConfigurationCustomizerProvider
     }
 
     return overrides;
+  }
+
+  private static boolean isBlank(String value) {
+    return value == null || value.trim().isEmpty();
   }
 }
