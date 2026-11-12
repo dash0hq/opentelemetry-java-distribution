@@ -21,6 +21,14 @@ Two environment variables are read: `DASH0_OTEL_COLLECTOR_BASE_URL` sets the
 OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. See
 [configuration](configuration).
 
+Two standard OpenTelemetry defaults are changed. The trace sampler is
+`always_on` rather than `parentbased_always_on`, so an incoming trace context
+cannot decide whether this process is traced. And MDC entries are captured on
+exported log records, except where the key looks like a credential, so the
+identifiers an application puts in MDC become attributes you can filter and
+group by. Both are set out in [configuration](configuration), including how to
+turn either off and what capturing MDC exposes.
+
 Everything else is upstream behaviour, unchanged.
 
 ## Architecture

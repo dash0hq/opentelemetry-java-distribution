@@ -217,6 +217,23 @@ Treat the deny list as the floor and raise it where the application warrants
 it, with an included list naming the keys you want, with Dash0's Signal Control
 transformations, or by keeping the value out of MDC in the first place.
 
+#### What a large MDC costs
+
+Every exported log record now carries every captured MDC entry, so a record
+costs more CPU to build and more bandwidth to send than it did before. An
+application that keeps a handful of identifiers in MDC will not notice; one
+that keeps dozens will.
+
+Past a point the entries stop arriving. `OTEL_ATTRIBUTE_COUNT_LIMIT` caps the
+attributes on one record at 128 by default, and the excess is dropped with no
+warning. Observed on agent 2.33.1 with 200 MDC entries and the console log
+exporter: 128 attributes on the record, the other 72 gone, nothing logged about
+it. Raising `OTEL_ATTRIBUTE_COUNT_LIMIT` to 256 exported all 200.
+
+MDC entries draw on the same budget as `exception.*` and anything else the
+appender records, so a large MDC displaces those too. Bound it with an included
+list naming the keys you want, as above, rather than by raising the limit.
+
 #### These are experimental property names
 
 Every property on this page under `otel.instrumentation.*.experimental.*` is

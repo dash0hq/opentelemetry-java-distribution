@@ -109,7 +109,10 @@ instrumented JVM:
        which is how ``dash0.package.name`` and ``dash0.package.version`` reach
        the resource.
    * - ``Dash0ConfigurationCustomizerProvider``
-     - Applies ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE``.
+     - Applies ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE``, and
+       changes two standard defaults: the trace sampler is ``always_on``, and
+       MDC entries are captured on exported log records unless the key looks
+       like a credential. Both are documented in ``docs/configuration.md``.
 
 Everything else is upstream behaviour, unchanged.
 
