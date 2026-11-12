@@ -15,8 +15,8 @@ subtext: |
   ``mergeServiceFiles`` concatenates in. The keys are disjoint today, so
   nothing observable changes; what the tie costs is the guarantee, because a
   provider added at ``100`` later that does set ``telemetry.distro.name``
-  would overwrite the Dash0 value with no error at all. ``200`` is unused by
-  all 25 providers in the built jar, and still beats upstream's own
+  would overwrite the Dash0 value with no error at all. No other provider in
+  the built jar uses ``200``, and it still beats upstream's own
   ``DistroResourceProvider``, which declares no order and so gets ``0``.
   ``docs/resource-detection.md`` now lists all 23 upstream providers with their
   ``order()`` values and what each contributes, says which eleven are off by
