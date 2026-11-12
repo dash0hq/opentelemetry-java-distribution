@@ -230,9 +230,24 @@ warning. Observed on agent 2.33.1 with 200 MDC entries and the console log
 exporter: 128 attributes on the record, the other 72 gone, nothing logged about
 it. Raising `OTEL_ATTRIBUTE_COUNT_LIMIT` to 256 exported all 200.
 
-MDC entries draw on the same budget as `exception.*` and anything else the
-appender records, so a large MDC displaces those too. Bound it with an included
-list naming the keys you want, as above, rather than by raising the limit.
+Which attributes survive depends on the appender, because the limit keeps
+whatever reached the record first and the appenders write in different orders.
+
+Logback, JBoss Log Manager and Log4j 1.2 record the exception before the MDC,
+so `exception.type`, `exception.message` and `exception.stacktrace` are kept
+and MDC entries are what get dropped. Observed on Logback with 200 MDC entries
+and a thrown exception: three exception attributes and 125 MDC entries.
+
+Log4j 2.17 records the thread context first. A thread context at or over the
+limit therefore fills the record and the exception attributes never land.
+Observed with 200 thread-context entries and the same thrown exception: 128
+context entries and no `exception.type`, `exception.message` or
+`exception.stacktrace` at all. An error record loses its stack trace, and
+nothing reports it.
+
+Bound the MDC with an included list naming the keys you want, as above, rather
+than by raising the limit. On Log4j 2.17 treat that as the fix rather than a
+preference.
 
 #### These are experimental property names
 
