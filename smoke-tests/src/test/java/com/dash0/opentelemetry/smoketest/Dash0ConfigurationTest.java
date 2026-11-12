@@ -11,7 +11,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts that the Dash0 settings reach a real instrumented JVM and change what it does.
+ * Asserts that what this distribution configures reaches a real instrumented JVM and changes what
+ * it does.
  *
  * <p>The unit tests in {@code :custom} prove that the customizer returns the right map. They cannot
  * prove that the agent ever invokes it, that the environment variable name resolves to the property
@@ -126,6 +127,26 @@ class Dash0ConfigurationTest {
     String output = exportingMetricsToTheLog().withEnvironmentVariable("DASH0_DISABLE", "1").run();
 
     assertThat(output).as("the JVM's output was:%n%s", output).contains("LoggingMetricExporter");
+  }
+
+  @Test
+  void theSuppliedSamplerIsAValueTheAgentAccepts() throws Exception {
+    String output =
+        InstrumentedJvm.runningTheTestApplication()
+            .withJvmArguments(
+                "-Dotel.traces.exporter=none",
+                "-Dotel.metrics.exporter=none",
+                "-Dotel.logs.exporter=none",
+                "-Dotel.service.name=smoke-test")
+            .run();
+
+    assertThat(output)
+        .as(
+            "the distribution supplies otel.traces.sampler itself, and the agent answers a value it"
+                + " does not know by failing autoconfiguration, which leaves the process running"
+                + " and reporting nothing. The JVM's output was:%n%s",
+            output)
+        .doesNotContain("Unrecognized value for otel.traces.sampler");
   }
 
   private static InstrumentedJvm exportingMetricsToTheLog() {

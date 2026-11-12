@@ -73,10 +73,57 @@ three and the third has no Java counterpart:
 ## Standard OpenTelemetry variables
 
 All standard `OTEL_*` configuration works as it does with the upstream agent.
-The two variables above are the only defaults this distribution changes.
+One standard default is changed: `OTEL_TRACES_SAMPLER` is `always_on` here and
+`parentbased_always_on` upstream.
 
 Upstream's configuration reference:
 https://opentelemetry.io/docs/zero-code/java/agent/configuration/
+
+### `OTEL_TRACES_SAMPLER`
+
+The distribution supplies `otel.traces.sampler=always_on`, so the SDK records
+and exports every span the application starts. Setting `OTEL_TRACES_SAMPLER` or
+`-Dotel.traces.sampler` on the workload replaces it: the value is registered
+through `addPropertiesSupplier`, which both of those beat.
+
+The specification's default is `parentbased_always_on`. `ParentBased` holds five
+sub-samplers, and the `root` one covers only a span with no parent. When a
+parent arrives in a `traceparent` header, `remote_parent_sampled` or
+`remote_parent_not_sampled` makes the decision instead, and those two default to
+`AlwaysOn` and `AlwaysOff`. A caller that sends a `traceparent` with the sampled
+flag off therefore silences every span in the service handling that request, and
+in every service it calls.
+
+That caller is often outside your organization, which means your clients decide
+whether you get to trace your own API. Resetting the trace context at your
+network boundary fixes it. Getting that right at every entry point is harder
+than it sounds, so the usual result is missing traces and no obvious cause.
+
+`always_on` takes the incoming trace context out of the decision. Dash0 samples
+traces after ingestion rather than inside your process, using Signal Control,
+which evaluates a whole trace at once:
+https://dash0.com/docs/dash0/telemetry/signal-control/sample-traces
+A sampler in your process drops a span before it ever reaches that evaluation.
+
+Set the sampler yourself to override the default:
+
+```bash
+export OTEL_TRACES_SAMPLER=parentbased_traceidratio
+export OTEL_TRACES_SAMPLER_ARG=0.1
+```
+
+Your application exports more spans than it would under
+`parentbased_always_on`, which costs CPU in the process and bandwidth to your
+collector. Cut the volume with Signal Control, or with a sampling processor in a
+collector you run, rather than in the SDK.
+
+Outgoing requests now carry a `traceparent` with the sampled flag set. A
+downstream service still on `parentbased_always_on` will sample the traces you
+start. That is `ParentBased` deferring to an incoming flag again, this time in
+someone else's process rather than yours.
+
+Declarative configuration does not apply this default either, for the reason the
+next section gives.
 
 ## Declarative configuration
 
@@ -117,9 +164,11 @@ Three things differ. `DistroResourceProvider` does not run, so
 version string survives only because upstream's own
 `io.opentelemetry.javaagent.tooling.resources.ResourceCustomizerProvider` reads
 it from the agent jar manifest, which this build writes. No
-`AutoConfigurationCustomizerProvider` runs at all, so `DASH0_DISABLE` and
-`DASH0_OTEL_COLLECTOR_BASE_URL` are silently ignored. Every upstream host,
-process and OS detector disappears as well.
+`AutoConfigurationCustomizerProvider` runs at all, so `DASH0_DISABLE`,
+`DASH0_OTEL_COLLECTOR_BASE_URL` and the `always_on` sampler default are silently
+ignored; a file that omits `sampler` gets the specification's
+`parentbased_always_on`. Every upstream host, process and OS detector disappears
+as well.
 
 The cause is that declarative configuration uses two different SPIs.
 `AutoConfigurationCustomizerProvider` and `ResourceProvider` are not consulted;
