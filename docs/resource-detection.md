@@ -158,9 +158,10 @@ open a socket: `Ec2ResourceProvider`, `AzureVmResourceProvider` and
 and not free in a pod.
 
 Both free Azure detectors set `cloud.provider` themselves, which the guard below
-reads, so on an actual Azure App Service or Azure Functions host
-`AzureVmResourceProvider` is skipped and the `azure` group costs nothing. The
-5 s is paid by every host that is not one of those three.
+reads, so on an Azure App Service or Azure Functions host
+`AzureVmResourceProvider` is skipped and the `azure` group costs nothing. On an
+Azure VM it runs and answers at once. Anywhere else it runs and waits, and how
+long it waits is the subject of the next two sections.
 
 Whatever a detector costs is added to startup rather than paid in the
 background. The SDK is autoconfigured from the agent's `premain`, and the
@@ -308,8 +309,16 @@ list it builds itself, so nothing else is lost by setting it.
 
 `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` is the opposite and is a trap here. It is
 an allowlist over every resource provider rather than over the cloud ones, so
-setting it to a cloud detector turns off the container, host, OS, process, jar
-service name and Spring Boot detectors, and both Dash0 providers with them.
+setting it to a cloud detector turns off every other entry in the merged service
+file: the container, host, OS, process, jar service name and Spring Boot
+detectors, both Dash0 providers, and `EnvironmentResourceProvider`.
+
+Losing that last one is the expensive part, since it is what reads
+`OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Running this agent with
+`OTEL_SERVICE_NAME=checkout` exports `service.name="checkout"`. Adding
+`OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS=io.opentelemetry.contrib.cloudfoundry.resources.CloudFoundryResourceProvider`
+exports `service.name="unknown_service:java"` and no `telemetry.distro.name` at
+all, with nothing logged about either.
 
 ## Not implemented
 
