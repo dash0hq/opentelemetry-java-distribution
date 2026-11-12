@@ -32,6 +32,9 @@ dependencies {
   agentJar(project(path = ":agent", configuration = "shadow"))
   extensionJar(project(path = ":agentextension", configuration = "shadow"))
   upstreamAgentJar(libs.opentelemetryJavaagent)
+
+  implementation(libs.slf4jApi)
+  runtimeOnly(libs.logbackClassic)
 }
 
 tasks.withType<Test>().configureEach {
@@ -48,13 +51,13 @@ tasks.withType<Test>().configureEach {
   val resolvedAgentJar = agentJar
   val resolvedExtensionJar = extensionJar
   val resolvedUpstreamAgentJar = upstreamAgentJar
-  val testApplicationClasses = sourceSets.main.get().output.classesDirs
+  val testApplicationClasspath = sourceSets.main.get().runtimeClasspath
 
   inputs.files(
     resolvedAgentJar,
     resolvedExtensionJar,
     resolvedUpstreamAgentJar,
-    testApplicationClasses,
+    testApplicationClasspath,
   )
 
   // Resolved through an argument provider so the jars are built before the tests
@@ -65,7 +68,7 @@ tasks.withType<Test>().configureEach {
         "-Ddash0.agent.jar=${resolvedAgentJar.singleFile.absolutePath}",
         "-Ddash0.extension.jar=${resolvedExtensionJar.singleFile.absolutePath}",
         "-Ddash0.upstream.agent.jar=${resolvedUpstreamAgentJar.singleFile.absolutePath}",
-        "-Ddash0.test.app.classes=${testApplicationClasses.asPath}",
+        "-Ddash0.test.app.classpath=${testApplicationClasspath.asPath}",
         "-Ddash0.distro.version=$version",
       )
     },

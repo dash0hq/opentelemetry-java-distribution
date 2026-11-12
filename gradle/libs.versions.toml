@@ -9,6 +9,8 @@ opentelemetryJavaagent = "2.33.1"
 opentelemetryJavaagentAlpha = "2.33.1-alpha"
 
 autoService = "1.1.1"
+slf4j = "2.0.17"
+logback = "1.5.18"
 junit = "5.11.4"
 assertj = "3.27.3"
 shadow = "8.3.6"
@@ -25,6 +27,9 @@ opentelemetryInstrumentationApi = { group = "io.opentelemetry.instrumentation", 
 opentelemetrySdk = { group = "io.opentelemetry", name = "opentelemetry-sdk" }
 opentelemetrySdkAutoconfigureSpi = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-autoconfigure-spi" }
 opentelemetrySdkTesting = { group = "io.opentelemetry", name = "opentelemetry-sdk-testing" }
+
+slf4jApi = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+logbackClassic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
 autoServiceAnnotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "autoService" }
 autoServiceProcessor = { group = "com.google.auto.service", name = "auto-service", version.ref = "autoService" }
