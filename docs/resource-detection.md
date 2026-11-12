@@ -52,16 +52,17 @@ Two different mechanisms produce that, and the doc used to credit the wrong one
 for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
 `EnvironmentResourceProvider`, which declares an order of `2147483646`, so the
-environment is applied last whatever anything else does. Four other upstream
-detectors declare an order of their own, `100` on the Spring Boot service-name
-detector, `300` on `ManifestResourceProvider`, `1000` on
-`JarServiceNameDetector` and `2147483646` on `HostIdResourceProvider`, while
-the container, host, OS, process and process-runtime detectors leave it at the
-default `0`. `Dash0PackageResourceProvider` declares `Integer.MIN_VALUE`, which
-sorts below every one of them, so it is applied first and every detector
-overwrites it. Leaving the Dash0 provider on the default `0` would tie with the
-five that sit there, and a tie is settled by position in the merged
-`META-INF/services`
+environment is applied last whatever anything else does. Orders vary among the
+rest: `100` on the Spring Boot service-name detector, `300` on
+`ManifestResourceProvider`, `1000` on `JarServiceNameDetector`, `2147483646` on
+`HostIdResourceProvider`, and the default `0` on the container, host, OS,
+process and process-runtime detectors among others. `Dash0PackageResourceProvider`
+declares `Integer.MIN_VALUE`, so it is applied first and every detector
+overwrites it. `ServiceInstanceIdResourceProvider` declares the same value, and
+the tie between the two changes nothing, since the only key it writes is
+`service.instance.id`. Leaving the Dash0 provider on the default `0` instead
+would tie it with every detector that is also there, and a tie is settled by
+position in the merged `META-INF/services`
 file, which is a byproduct of the order `mergeServiceFiles` concatenates in and
 could flip without failing anything.
 
@@ -211,11 +212,14 @@ bound on how long.
 The run reported in issue 4 of this repository, on a macOS 14.6 host, costs
 almost nothing. Reduced the same way, fastest run against fastest baseline run,
 `aws` adds 0.13 s there, `azure` 0.09 s and `gcp` 0.03 s. Both sets of figures
-are right. What decides the cost is what the network does with a packet
-addressed to a metadata endpoint it has no route for: a host that answers with
-an ICMP error or a TCP reset pays almost nothing, and a host that drops the
-packet pays the full timeout. An operator shipping this distribution cannot know
-in advance which kind of host it lands on.
+are right. What decides the cost is what happens to a connection opened to a
+metadata endpoint that is not there. A host with no route to the address fails
+the connect in its own kernel and pays nothing, which is the case the macOS run
+reports. A host that routes the packet to something answering with an ICMP
+error or a TCP reset pays almost nothing either. A host that routes it to
+something which silently drops it pays the full timeout, which is the Linux
+case above. An operator shipping this distribution cannot know in advance which
+of the three it lands on.
 
 ### Why they stay off
 
