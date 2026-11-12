@@ -143,8 +143,8 @@ that does not exist.
 
 Three of the detectors open a socket to a metadata endpoint, so a group is not
 free to enable on a host that is somewhere else. On a Linux host where traffic
-to `169.254.169.254` is dropped rather than refused, `aws` adds 4.3 s and
-`azure` adds 5.2 s to JVM startup. `docs/resource-detection.md` has the full
+to `169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and
+`azure` adds 5.18 s to JVM startup. `docs/resource-detection.md` has the full
 table, the experiment behind those two figures, the attributes each detector
 contributes, and the reason this distribution leaves them off.
 

@@ -148,14 +148,19 @@ of leaving this table wrong.
 | `EcsResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `cloud.resource_id`, `aws.ecs.*`, `aws.log.*`, `container.id`, `container.name`, `container.image.name`, `container.image.tags` | free, gated on `ECS_CONTAINER_METADATA_URI_V4` or `ECS_CONTAINER_METADATA_URI` |
 | `BeanstalkResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `service.instance.id`, `service.version`, `service.namespace` | free, gated on `/var/elasticbeanstalk/xray/environment.conf` |
 | `LambdaResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.region`, `faas.name`, `faas.version` | free, gated on `AWS_LAMBDA_FUNCTION_NAME` or `AWS_LAMBDA_FUNCTION_VERSION` |
-| `AzureAppServiceResourceProvider` | `azure` | **`service.name`**, `cloud.region`, `cloud.account.id`, `cloud.resource_id`, `deployment.environment.name`, `host.id`, `service.instance.id`, `azure.app.service.stamp`, `azure.resource_group.name` | free, gated on `WEBSITE_SITE_NAME` |
-| `AzureFunctionsResourceProvider` | `azure` | **`service.name`**, `faas.*`, `cloud.region`, `cloud.account.id` | free, gated on `WEBSITE_SITE_NAME` together with `FUNCTIONS_EXTENSION_VERSION` |
+| `AzureAppServiceResourceProvider` | `azure` | `cloud.provider`, `cloud.platform`, **`service.name`**, `cloud.region`, `cloud.account.id`, `cloud.resource_id`, `deployment.environment.name`, `host.id`, `service.instance.id`, `azure.app.service.stamp`, `azure.resource_group.name` | free, gated on `WEBSITE_SITE_NAME` |
+| `AzureFunctionsResourceProvider` | `azure` | `cloud.provider`, `cloud.platform`, **`service.name`**, `faas.name`, `faas.version`, `faas.instance`, `faas.max_memory`, `cloud.region`, `cloud.account.id`, `deployment.environment.name`, `azure.resource_group.name` | free, gated on `WEBSITE_SITE_NAME` together with `FUNCTIONS_EXTENSION_VERSION` |
 | `CloudFoundryResourceProvider` | `cloudfoundry` | `cloudfoundry.app.*`, `cloudfoundry.org.*`, `cloudfoundry.space.*`, `cloudfoundry.process.*` | free, gated on `VCAP_APPLICATION` |
 
 Seven of the ten read an environment variable or a local file and stop. Three
 open a socket: `Ec2ResourceProvider`, `AzureVmResourceProvider` and
 `GCPResourceProvider`. `EksResourceProvider` is the awkward one, free on a host
 and not free in a pod.
+
+Both free Azure detectors set `cloud.provider` themselves, which the guard below
+reads, so on an actual Azure App Service or Azure Functions host
+`AzureVmResourceProvider` is skipped and the `azure` group costs nothing. The
+5 s is paid by every host that is not one of those three.
 
 Whatever a detector costs is added to startup rather than paid in the
 background. The SDK is autoconfigured from the agent's `premain`, and the
@@ -180,12 +185,15 @@ silently, and `metadata.google.internal` does not resolve.
 | `azure` | 7.32 | 7.55 | 7.69 |
 | all five groups | 11.42 | 11.61 | 11.78 |
 
-The two large figures match the declared timeouts exactly. `aws` adds 4.3 s,
-which is `Ec2ResourceProvider` making its token and identity-document calls at
-2 s each; naming `io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider` in
-`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS` returns the configuration to the
-baseline. `azure` adds 5.2 s, all of it `AzureVmResourceProvider`, and removing
-that one provider the same way returns it to the baseline too.
+Compare the fastest run of each configuration against the fastest baseline run,
+which is the statistic least affected by what else the machine was doing. `aws`
+adds 4.35 s and `azure` adds 5.18 s, against declared timeouts of 2 s twice and
+5 s once; the remainder is the class loading and the connection setup that
+precede each wait. Naming
+`io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider` in
+`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS` returns `aws` to the baseline, and
+naming `io.opentelemetry.contrib.azure.resource.AzureVmResourceProvider`
+returns `azure` to it, which is how each figure is attributed to one provider.
 
 `gcp` is cheap here only because the name does not resolve. Nothing guarantees
 that elsewhere: `GcpMetadataConfig.fetchAttribute` opens an `HttpURLConnection`
@@ -252,14 +260,22 @@ absent with the group off and present with it on.
 
 The group toggles do not offer a "free detectors only" position. `aws` covers
 `Ec2ResourceProvider` together with four free ones, and `azure` covers
-`AzureVmResourceProvider` together with two. An operator can still reach that
-split, by pairing the group toggle with
-`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`, and it is shown below. This
-distribution cannot ship it as a default, because a default supplied through
-`addPropertiesSupplier` is the thing an environment variable of the same name
-overrides: a workload that sets `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS` for a
-reason of its own erases the Dash0 value, and the probing detector comes back
-with nothing reporting that it did.
+`AzureVmResourceProvider` together with two. An operator reaches that split by
+pairing the group toggle with `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`, which is
+shown below.
+
+Shipping it as a distribution default is harder than it looks. An
+`addPropertiesSupplier` value is the thing an environment variable of the same
+name overrides, so a workload that sets `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`
+for a reason of its own would silently bring the probing detector back. An
+`addPropertiesCustomizer` avoids that, by reading the workload's value and
+returning the union, which is the shape `Dash0ConfigurationCustomizerProvider`
+already uses for the OTLP endpoint. What it cannot do is tell apart a workload
+that enabled `aws` without thinking about EC2 from one that enabled it wanting
+EC2 detection, so the union would take `Ec2ResourceProvider` away from the
+second of those, leaving `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` and its own
+trap as the only way back. That is machinery to maintain for a group this
+distribution has decided not to enable.
 
 Leaving them off also keeps one sentence true, that the resource this
 distribution exports is the resource the upstream agent exports plus two Dash0
