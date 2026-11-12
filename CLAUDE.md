@@ -74,8 +74,17 @@ does less than it should.
    the agent loads from `inst/` as a `.classdata` entry rather than as an
    ordinary class file. When that resolution breaks the agent starts normally
    and the package attributes are simply absent.
+9. **A setting the agent does not read through `ConfigProperties`.**
+   `otel.semconv-stability.opt-in` is resolved by `SemconvSelectionResolver`
+   through `SystemProperty.getString`, which reads `System.getProperty` and then
+   `System.getenv` and nothing else. Returning it from `addPropertiesSupplier`
+   or `addPropertiesCustomizer` puts it in `ConfigProperties`, where the agent
+   never looks: every span keeps the superseded attribute names and no log line
+   mentions it. The default is therefore applied with `System.setProperty`
+   during startup. Check how a setting is read before defaulting it; upstream
+   documents the same restriction for `otel.semconv-stability.preview`.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all eight. They
+The smoke tests in `smoke-tests/` exist specifically to catch all nine. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
@@ -89,6 +98,7 @@ What guards what:
 | 5, service-file merging | `AgentPackagingTest` |
 | 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 27 |
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
+| 9, a setting read outside `ConfigProperties` | `Dash0ConfigurationTest` |
 | Any of them, through the extension rather than the agent | `ExtensionRuntimeTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
 
@@ -99,8 +109,8 @@ that stopped the agent from starting went unnoticed while its test passed.
 And never let a resource provider throw, because SDK autoconfiguration aborts
 and takes the whole agent with it.
 
-Declarative configuration is a ninth hazard, of a different kind: setting
-`OTEL_CONFIG_FILE` disables items 1, 6, 7 and 8 at once, because neither
+Declarative configuration is a tenth hazard, of a different kind: setting
+`OTEL_CONFIG_FILE` disables items 1, 6, 7, 8 and 9 at once, because neither
 `ResourceProvider` nor `AutoConfigurationCustomizerProvider` is consulted in
 that mode. The measurement is in `docs/configuration.md`. Nothing in the test
 suite covers it, because the distribution does not claim to support it yet.
