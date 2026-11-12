@@ -25,7 +25,7 @@ class DistroResourceAttributesTest {
 
   @Test
   void exportsTheDash0DistroNameRatherThanUpstreams() throws Exception {
-    String exported = exportingTheResourceToTheLog();
+    String exported = exportingTheResourceToTheLog("-Dotel.service.name=smoke-test");
 
     assertThat(exported)
         .as("exported resource attributes were:%n%s", exported)
@@ -35,7 +35,7 @@ class DistroResourceAttributesTest {
 
   @Test
   void exportsTheDistributionVersionRatherThanTheAgentManifestVersion() throws Exception {
-    String exported = exportingTheResourceToTheLog();
+    String exported = exportingTheResourceToTheLog("-Dotel.service.name=smoke-test");
 
     // Upstream's provider reports the jar manifest's Implementation-Version,
     // which is the combined "dash0-<distro>-otel-<upstream>" string. The Dash0
@@ -46,15 +46,26 @@ class DistroResourceAttributesTest {
             "telemetry.distro.version=\"" + System.getProperty("dash0.distro.version") + "\"");
   }
 
-  private static String exportingTheResourceToTheLog() throws Exception {
+  @Test
+  void keepsTheDistroAttributesWhileTheSpringBootNameDetectorAlsoContributes() throws Exception {
+    String exported = exportingTheResourceToTheLog("-Dspring.application.name=my-spring-app");
+
+    assertThat(exported)
+        .as("exported resource attributes were:%n%s", exported)
+        .contains("service.name=\"my-spring-app\"")
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .doesNotContain("telemetry.distro.name=\"opentelemetry-java-instrumentation\"");
+  }
+
+  private static String exportingTheResourceToTheLog(String... extraJvmArguments) throws Exception {
     return InstrumentedJvm.runningTheTestApplication()
         .withJvmArguments(
             "-Dotel.traces.exporter=none",
             "-Dotel.logs.exporter=none",
             // The logging metric exporter prints the resource on every export.
             "-Dotel.metrics.exporter=logging",
-            "-Dotel.metric.export.interval=500",
-            "-Dotel.service.name=smoke-test")
+            "-Dotel.metric.export.interval=500")
+        .withJvmArguments(extraJvmArguments)
         // Stay alive long enough for at least one periodic export.
         .exitingAfter(4000)
         .run();

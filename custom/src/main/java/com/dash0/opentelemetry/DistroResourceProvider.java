@@ -39,7 +39,7 @@ public final class DistroResourceProvider implements ResourceProvider, Ordered {
    */
   @Override
   public int order() {
-    return 100;
+    return 200;
   }
 
   @Override
