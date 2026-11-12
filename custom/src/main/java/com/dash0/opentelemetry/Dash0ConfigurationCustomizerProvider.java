@@ -78,8 +78,6 @@ public final class Dash0ConfigurationCustomizerProvider
   static final String SDK_DISABLED = "otel.sdk.disabled";
   static final String OTLP_ENDPOINT = "otel.exporter.otlp.endpoint";
   static final String TRACES_SAMPLER = "otel.traces.sampler";
-
-  /** Records and exports every span, whatever an incoming trace context says. */
   static final String ALWAYS_ON = "always_on";
 
   private static final Logger logger =
@@ -91,10 +89,6 @@ public final class Dash0ConfigurationCustomizerProvider
     autoConfiguration.addPropertiesCustomizer(Dash0ConfigurationCustomizerProvider::dash0Overrides);
   }
 
-  /**
-   * Returns the standard settings this distribution supplies as defaults, which anything set on the
-   * workload beats.
-   */
   static Map<String, String> dash0Defaults() {
     return Collections.singletonMap(TRACES_SAMPLER, ALWAYS_ON);
   }
