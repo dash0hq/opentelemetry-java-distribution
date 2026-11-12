@@ -204,10 +204,11 @@ class Dash0ConfigurationCustomizerProviderTest {
 
     assertThat(dash0Overrides(configOf(properties)))
         .as(
-            "all three settings feed one selector upstream, and configuring any of them makes the"
-                + " agent ignore the other two. A default excluded list would therefore discard an"
-                + " operator's capture-mdc-attributes allow list and capture more than it asked"
-                + " for")
+            "upstream ignores capture-mdc-attributes as soon as an included or excluded pattern is"
+                + " configured, so a default excluded list would discard an operator's"
+                + " capture-mdc-attributes allow list and capture everything not denied instead."
+                + " On an operator's included list it would do the opposite and narrow a selection"
+                + " they chose")
         .doesNotContainKey(instrumentation + MDC_ATTRIBUTES_EXCLUDED);
   }
 

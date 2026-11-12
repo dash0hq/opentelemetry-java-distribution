@@ -142,7 +142,7 @@ credential, on all three appender instrumentations that read an MDC selector:
 | Property | Appender |
 |---|---|
 | `otel.instrumentation.logback-appender.experimental.mdc-attributes.excluded` | Logback 1.0 and later |
-| `otel.instrumentation.log4j-appender.experimental.mdc-attributes.excluded` | Log4j 2.17 and later, where MDC is called context data |
+| `otel.instrumentation.log4j-appender.experimental.mdc-attributes.excluded` | Log4j 1.2, and Log4j 2.17 and later, where MDC is called the thread context. Both instrumentations read this one name. |
 | `otel.instrumentation.jboss-logmanager.experimental.mdc-attributes.excluded` | JBoss Log Manager 1.1 and later, used by WildFly and JBoss EAP |
 
 Each is set to the same twelve patterns:
@@ -171,12 +171,19 @@ OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED
 OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES
 ```
 
-All three feed one selector in the agent, and configuring any of them makes the
-agent ignore the other two. A default excluded list that applied anyway would
-turn an existing `CAPTURE_MDC_ATTRIBUTES` allow list into everything-not-denied
-and capture more than its author asked for, so the distribution contributes its
-value only when all three are absent or blank. An exported but empty variable
-counts as absent, matching what the agent does with one.
+`MDC_ATTRIBUTES_INCLUDED` and `MDC_ATTRIBUTES_EXCLUDED` are applied together,
+with the excluded patterns winning over the included ones, so narrowing with an
+included list and denying with an excluded list at the same time works.
+`CAPTURE_MDC_ATTRIBUTES` is the deprecated predecessor of both, and the agent
+ignores it as soon as either of the other two is configured.
+
+The distribution contributes its value only when all three are absent or blank.
+A default excluded list that applied anyway would make the agent ignore an
+existing `CAPTURE_MDC_ATTRIBUTES` allow list and capture everything not denied
+instead, which is more than its author asked for. On an existing
+`MDC_ATTRIBUTES_INCLUDED` it would do the opposite and silently narrow a
+selection the operator chose. An exported but empty variable counts as absent,
+matching what the agent does with one.
 
 Capture everything, including the credential-shaped keys:
 

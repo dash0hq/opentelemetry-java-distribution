@@ -31,12 +31,14 @@ subtext: |
   Setting any of an appender's three MDC properties on the workload replaces
   the default for that appender and leaves the other two appenders alone.
   ``OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*'``
-  restores the previous behaviour of capturing nothing. All three properties
-  feed one selector in the agent, and configuring any of them makes the agent
-  ignore the other two, so the distribution contributes its value only when
-  all three are absent or blank; an existing
-  ``CAPTURE_MDC_ATTRIBUTES`` allow list therefore still decides what is
-  captured rather than being widened to everything not denied.
+  restores the previous behaviour of capturing nothing. The included and
+  excluded properties are applied together, with the excluded patterns winning
+  over the included ones, while ``CAPTURE_MDC_ATTRIBUTES`` is their deprecated
+  predecessor and the agent ignores it as soon as either of the other two is
+  configured. The distribution contributes its value only when all three are
+  absent or blank, so an existing ``CAPTURE_MDC_ATTRIBUTES`` allow list still
+  decides what is captured rather than being widened to everything not denied,
+  and an existing included list is not silently narrowed.
   The property names are marked experimental by upstream and may be renamed
   or removed in any minor release. Between agent 2.32.0 and 2.33.1
   ``capture-mdc-attributes`` changed from a boolean to a comma-separated list
