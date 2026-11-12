@@ -55,9 +55,9 @@ final class InstrumentedJvm {
     return new InstrumentedJvm(TestApplication.class);
   }
 
-  /** Runs the application that logs through Logback with MDC entries set. */
-  static InstrumentedJvm runningTheMdcLoggingApplication() {
-    return new InstrumentedJvm(MdcLoggingApplication.class);
+  /** Runs {@code mainClass} instead of {@link TestApplication}. */
+  static InstrumentedJvm runningTheApplication(Class<?> mainClass) {
+    return new InstrumentedJvm(mainClass);
   }
 
   /** Attaches {@code agent} instead of the agent jar this build produced. */

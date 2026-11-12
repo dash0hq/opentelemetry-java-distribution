@@ -35,6 +35,9 @@ dependencies {
 
   implementation(libs.slf4jApi)
   runtimeOnly(libs.logbackClassic)
+  implementation(libs.log4jApi)
+  runtimeOnly(libs.log4jCore)
+  implementation(libs.jbossLogmanager)
 }
 
 tasks.withType<Test>().configureEach {
