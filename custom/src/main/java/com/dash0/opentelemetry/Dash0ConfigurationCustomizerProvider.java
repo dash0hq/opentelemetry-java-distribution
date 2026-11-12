@@ -115,9 +115,9 @@ public final class Dash0ConfigurationCustomizerProvider
     }
 
     String baseUrl = config.getString(COLLECTOR_BASE_URL);
-    if (baseUrl != null && !baseUrl.trim().isEmpty()) {
+    if (!isBlank(baseUrl)) {
       String configuredEndpoint = config.getString(OTLP_ENDPOINT);
-      if (configuredEndpoint != null && !configuredEndpoint.trim().isEmpty()) {
+      if (!isBlank(configuredEndpoint)) {
         logger.log(
             Level.FINE,
             "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
@@ -132,5 +132,10 @@ public final class Dash0ConfigurationCustomizerProvider
     }
 
     return overrides;
+  }
+
+  /** Whether {@code value} is null, empty, or made only of whitespace. */
+  private static boolean isBlank(String value) {
+    return value == null || value.trim().isEmpty();
   }
 }
