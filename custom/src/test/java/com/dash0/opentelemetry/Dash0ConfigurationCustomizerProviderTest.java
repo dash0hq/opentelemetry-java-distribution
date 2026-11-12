@@ -7,11 +7,15 @@ package com.dash0.opentelemetry;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.ALWAYS_ON;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.COLLECTOR_BASE_URL;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.DISABLE;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.NEWER_SEMCONV_DOMAINS;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.OTLP_ENDPOINT;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.SDK_DISABLED;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.SEMCONV_STABILITY_OPT_IN;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.SEMCONV_STABILITY_OPT_IN_VARIABLE;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.TRACES_SAMPLER;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.dash0Defaults;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.dash0Overrides;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.setSemconvStabilityOptInUnlessConfigured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.opentelemetry.context.propagation.TextMapPropagator;
@@ -31,11 +35,30 @@ import java.util.ServiceLoader;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class Dash0ConfigurationCustomizerProviderTest {
+
+  private String inheritedSemconvStabilityOptIn;
+
+  @BeforeEach
+  void clearTheSemconvStabilityOptInSystemProperty() {
+    inheritedSemconvStabilityOptIn = System.getProperty(SEMCONV_STABILITY_OPT_IN);
+    System.clearProperty(SEMCONV_STABILITY_OPT_IN);
+  }
+
+  @AfterEach
+  void restoreTheSemconvStabilityOptInSystemProperty() {
+    if (inheritedSemconvStabilityOptIn == null) {
+      System.clearProperty(SEMCONV_STABILITY_OPT_IN);
+    } else {
+      System.setProperty(SEMCONV_STABILITY_OPT_IN, inheritedSemconvStabilityOptIn);
+    }
+  }
 
   @Test
   void isRegisteredAsAnAutoConfigurationCustomizerProviderService() {
@@ -171,6 +194,79 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void defaultsTheSemconvStabilityOptInWhenNothingConfiguresIt() {
+    setSemconvStabilityOptInUnlessConfigured(anEmptyEnvironment());
+
+    assertThat(System.getProperty(SEMCONV_STABILITY_OPT_IN)).isEqualTo(NEWER_SEMCONV_DOMAINS);
+  }
+
+  @Test
+  void leavesASystemPropertySemconvStabilityOptInAlone() {
+    System.setProperty(SEMCONV_STABILITY_OPT_IN, "database");
+
+    setSemconvStabilityOptInUnlessConfigured(anEmptyEnvironment());
+
+    assertThat(System.getProperty(SEMCONV_STABILITY_OPT_IN)).isEqualTo("database");
+  }
+
+  @Test
+  void leavesAnEnvironmentVariableSemconvStabilityOptInAlone() {
+    setSemconvStabilityOptInUnlessConfigured(
+        name -> SEMCONV_STABILITY_OPT_IN_VARIABLE.equals(name) ? "database" : null);
+
+    assertThat(System.getProperty(SEMCONV_STABILITY_OPT_IN))
+        .as(
+            "the agent reads the environment variable itself, so setting the system property here"
+                + " would shadow it and discard the operator's own value")
+        .isNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  void defaultsTheSemconvStabilityOptInOverABlankSystemProperty(String value) {
+    System.setProperty(SEMCONV_STABILITY_OPT_IN, value);
+
+    setSemconvStabilityOptInUnlessConfigured(anEmptyEnvironment());
+
+    assertThat(System.getProperty(SEMCONV_STABILITY_OPT_IN)).isEqualTo(NEWER_SEMCONV_DOMAINS);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  void defaultsTheSemconvStabilityOptInOverABlankEnvironmentVariable(String value) {
+    setSemconvStabilityOptInUnlessConfigured(
+        name -> SEMCONV_STABILITY_OPT_IN_VARIABLE.equals(name) ? value : null);
+
+    assertThat(System.getProperty(SEMCONV_STABILITY_OPT_IN)).isEqualTo(NEWER_SEMCONV_DOMAINS);
+  }
+
+  @Test
+  void neverReturnsTheSemconvStabilityOptInThroughEitherPropertyHook() {
+    RecordingCustomizer recording = new RecordingCustomizer();
+
+    new Dash0ConfigurationCustomizerProvider().customize(recording);
+
+    Map<String, String> supplied = new HashMap<>();
+    for (Supplier<Map<String, String>> supplier : recording.suppliers) {
+      supplied.putAll(supplier.get());
+    }
+    Map<String, String> overridden = new HashMap<>();
+    for (Function<ConfigProperties, Map<String, String>> customizer : recording.customizers) {
+      overridden.putAll(customizer.apply(configOf(Collections.emptyMap())));
+    }
+
+    assertThat(supplied)
+        .as(
+            "the agent resolves otel.semconv-stability.opt-in through"
+                + " SemconvSelectionResolver, which reads it with SystemProperty.getString and so"
+                + " consults only System.getProperty and System.getenv. A value returned from"
+                + " either property hook reaches ConfigProperties and nothing else, so it changes"
+                + " no attribute and reports nothing.")
+        .doesNotContainKey(SEMCONV_STABILITY_OPT_IN);
+    assertThat(overridden).doesNotContainKey(SEMCONV_STABILITY_OPT_IN);
+  }
+
+  @Test
   void appliesBothSettingsTogether() {
     Map<String, String> properties = new HashMap<>();
     properties.put(DISABLE, "true");
@@ -232,6 +328,11 @@ class Dash0ConfigurationCustomizerProviderTest {
         BiFunction<? super SpanExporter, ConfigProperties, ? extends SpanExporter> customizer) {
       throw new UnsupportedOperationException("addSpanExporterCustomizer");
     }
+  }
+
+  /** An environment in which no variable is set. */
+  private static Function<String, String> anEmptyEnvironment() {
+    return name -> null;
   }
 
   /**

@@ -11,13 +11,14 @@ import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Translates the Dash0 settings this distribution honours into the standard OpenTelemetry settings
- * the upstream agent already understands, and supplies the one standard default it changes on its
- * own, {@code otel.traces.sampler}.
+ * the upstream agent already understands, and supplies the two standard defaults it changes on its
+ * own, {@code otel.traces.sampler} and {@code otel.semconv-stability.opt-in}.
  *
  * <p>Two Dash0 settings are translated, and only two. Both exist so that one {@code
  * /etc/opentelemetry/injector/default_env.conf} on a host configures every Dash0 language
@@ -58,8 +59,9 @@ import java.util.logging.Logger;
  * logic untestable without mutating the environment.
  *
  * <p>{@code otel.traces.sampler} registers through {@code addPropertiesSupplier} instead, which
- * both system properties and environment variables beat. {@code docs/configuration.md} covers the
- * value and the choice of hook.
+ * both system properties and environment variables beat. {@code otel.semconv-stability.opt-in} uses
+ * neither hook and is set as a system property during startup. {@code docs/configuration.md} covers
+ * both values and both choices of hook.
  *
  * <p>None of this applies under declarative configuration. When {@code OTEL_CONFIG_FILE} names a
  * file the SDK never consults the autoconfigure SPI, so this class is not invoked at all. See
@@ -79,18 +81,39 @@ public final class Dash0ConfigurationCustomizerProvider
   static final String OTLP_ENDPOINT = "otel.exporter.otlp.endpoint";
   static final String TRACES_SAMPLER = "otel.traces.sampler";
   static final String ALWAYS_ON = "always_on";
+  static final String SEMCONV_STABILITY_OPT_IN = "otel.semconv-stability.opt-in";
+  static final String SEMCONV_STABILITY_OPT_IN_VARIABLE = "OTEL_SEMCONV_STABILITY_OPT_IN";
+  static final String NEWER_SEMCONV_DOMAINS = "database,code,rpc,messaging";
 
   private static final Logger logger =
       Logger.getLogger(Dash0ConfigurationCustomizerProvider.class.getName());
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
+    setSemconvStabilityOptInUnlessConfigured(System::getenv);
     autoConfiguration.addPropertiesSupplier(Dash0ConfigurationCustomizerProvider::dash0Defaults);
     autoConfiguration.addPropertiesCustomizer(Dash0ConfigurationCustomizerProvider::dash0Overrides);
   }
 
   static Map<String, String> dash0Defaults() {
     return Collections.singletonMap(TRACES_SAMPLER, ALWAYS_ON);
+  }
+
+  /**
+   * Sets the system property {@code otel.semconv-stability.opt-in} to {@link
+   * #NEWER_SEMCONV_DOMAINS} when neither that system property nor {@code
+   * OTEL_SEMCONV_STABILITY_OPT_IN} already carries a value.
+   *
+   * @param environment reads an environment variable by name
+   */
+  static void setSemconvStabilityOptInUnlessConfigured(Function<String, String> environment) {
+    if (!isBlank(System.getProperty(SEMCONV_STABILITY_OPT_IN))
+        || !isBlank(environment.apply(SEMCONV_STABILITY_OPT_IN_VARIABLE))) {
+      return;
+    }
+    logger.log(
+        Level.FINE, "Opting in to the newer semantic conventions for {0}.", NEWER_SEMCONV_DOMAINS);
+    System.setProperty(SEMCONV_STABILITY_OPT_IN, NEWER_SEMCONV_DOMAINS);
   }
 
   /**
@@ -132,5 +155,9 @@ public final class Dash0ConfigurationCustomizerProvider
     }
 
     return overrides;
+  }
+
+  private static boolean isBlank(String value) {
+    return value == null || value.trim().isEmpty();
   }
 }
