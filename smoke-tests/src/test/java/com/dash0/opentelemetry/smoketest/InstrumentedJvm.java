@@ -44,6 +44,8 @@ final class InstrumentedJvm {
   private final List<String> jvmArguments = new ArrayList<>();
   private final Map<String, String> environment = new LinkedHashMap<>();
   private Integer millisecondsBeforeExit;
+  private Path executableJar;
+  private Path workingDirectory;
 
   private InstrumentedJvm() {}
 
@@ -54,6 +56,20 @@ final class InstrumentedJvm {
   /** Attaches {@code agent} instead of the agent jar this build produced. */
   InstrumentedJvm attaching(Path agent) {
     agentJar = agent.toString();
+    return this;
+  }
+
+  /**
+   * Launches {@code jar} with {@code -jar} instead of launching the class path with {@code -cp}.
+   */
+  InstrumentedJvm launchedFromTheExecutableJar(Path jar) {
+    executableJar = jar;
+    return this;
+  }
+
+  /** Starts the JVM in {@code directory} instead of in the directory Gradle runs the tests in. */
+  InstrumentedJvm inWorkingDirectory(Path directory) {
+    workingDirectory = directory;
     return this;
   }
 
@@ -90,9 +106,14 @@ final class InstrumentedJvm {
     command.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
     command.add("-javaagent:" + agentJar);
     command.addAll(jvmArguments);
-    command.add("-cp");
-    command.add(System.getProperty("dash0.test.app.classes"));
-    command.add(TestApplication.class.getName());
+    if (executableJar == null) {
+      command.add("-cp");
+      command.add(System.getProperty("dash0.test.app.classes"));
+      command.add(TestApplication.class.getName());
+    } else {
+      command.add("-jar");
+      command.add(executableJar.toString());
+    }
     if (millisecondsBeforeExit != null) {
       command.add(String.valueOf(millisecondsBeforeExit));
     }
@@ -101,6 +122,9 @@ final class InstrumentedJvm {
     try {
       ProcessBuilder builder =
           new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(outputFile.toFile());
+      if (workingDirectory != null) {
+        builder.directory(workingDirectory.toFile());
+      }
       builder.environment().keySet().removeIf(InstrumentedJvm::configuresTheSdk);
       builder.environment().putAll(environment);
 
@@ -130,7 +154,8 @@ final class InstrumentedJvm {
   }
 
   /**
-   * Whether {@code name} is a variable the SDK or this distribution reads.
+   * Whether {@code name} is a variable the SDK, one of its resource detectors, or this distribution
+   * reads.
    *
    * <p>{@link ProcessBuilder#environment()} starts from the environment Gradle was launched with,
    * so without this the child inherits whatever the developer happens to export. A shell carrying
@@ -139,11 +164,13 @@ final class InstrumentedJvm {
    * read back. Exporting these is ordinary for anyone working on OpenTelemetry, and the result is a
    * red build on a correct tree with nothing to explain it.
    *
-   * <p>Removal is by prefix rather than by clearing the map, which would also drop {@code PATH} and
+   * <p>Removal is selective rather than by clearing the map, which would also drop {@code PATH} and
    * {@code JAVA_HOME} and leave nothing able to start.
    */
   private static boolean configuresTheSdk(String name) {
-    return name.startsWith("OTEL_") || name.startsWith("DASH0_");
+    return name.startsWith("OTEL_")
+        || name.startsWith("DASH0_")
+        || name.equals("SPRING_APPLICATION_NAME");
   }
 
   private static String contentOf(Path file) throws IOException {
