@@ -78,6 +78,27 @@ class AgentPackagingTest {
         .containsAll(providersRegisteredIn(UPSTREAM_AGENT_JAR));
   }
 
+  @Test
+  void registersTheTenCloudDetectorsThatResourceDetectionDocuments() throws IOException {
+    assertThat(providersRegisteredIn(AGENT_JAR))
+        .as(
+            "docs/resource-detection.md names these ten and sorts them into four toggle groups."
+                + " An upstream bump that adds or drops one makes that table wrong, and the"
+                + " comparison against upstream's own copy above cannot notice, because it"
+                + " follows upstream wherever it goes.")
+        .contains(
+            "io.opentelemetry.contrib.aws.resource.BeanstalkResourceProvider",
+            "io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider",
+            "io.opentelemetry.contrib.aws.resource.EcsResourceProvider",
+            "io.opentelemetry.contrib.aws.resource.EksResourceProvider",
+            "io.opentelemetry.contrib.aws.resource.LambdaResourceProvider",
+            "io.opentelemetry.contrib.azure.resource.AzureAppServiceResourceProvider",
+            "io.opentelemetry.contrib.azure.resource.AzureFunctionsResourceProvider",
+            "io.opentelemetry.contrib.azure.resource.AzureVmResourceProvider",
+            "io.opentelemetry.contrib.gcp.resource.GCPResourceProvider",
+            "io.opentelemetry.contrib.cloudfoundry.resources.CloudFoundryResourceProvider");
+  }
+
   private static List<String> providersRegisteredIn(Path jarPath) throws IOException {
     List<String> providers = new ArrayList<>();
     for (String line : readEntry(jarPath, RESOURCE_PROVIDER_SERVICE_FILE).split("\\R")) {
