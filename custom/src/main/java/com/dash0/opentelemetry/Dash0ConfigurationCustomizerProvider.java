@@ -16,10 +16,9 @@ import java.util.logging.Logger;
 
 /**
  * Translates the Dash0 settings this distribution honours into the standard OpenTelemetry settings
- * the upstream agent already understands, and supplies the one standard default it changes on its
- * own, {@code otel.traces.sampler}.
+ * the upstream agent already understands.
  *
- * <p>Two Dash0 settings are translated, and only two. Both exist so that one {@code
+ * <p>Two settings are translated, and only two. Both exist so that one {@code
  * /etc/opentelemetry/injector/default_env.conf} on a host configures every Dash0 language
  * distribution the same way: without them a host that sets only the {@code DASH0_}-prefixed names
  * instruments its Node.js, Python and Ruby processes and silently does nothing useful for its JVMs.
@@ -56,10 +55,6 @@ import java.util.logging.Logger;
  * signature takes no {@link ConfigProperties}, so the Dash0 names would have to be read straight
  * from {@link System#getenv}. That would drop the dotted system-property spelling and make the
  * logic untestable without mutating the environment.
- *
- * <p>{@code otel.traces.sampler} registers through {@code addPropertiesSupplier} instead, which
- * both system properties and environment variables beat. {@code docs/configuration.md} covers the
- * value and the choice of hook.
  *
  * <p>None of this applies under declarative configuration. When {@code OTEL_CONFIG_FILE} names a
  * file the SDK never consults the autoconfigure SPI, so this class is not invoked at all. See

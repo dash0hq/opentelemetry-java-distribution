@@ -11,8 +11,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts that what this distribution configures reaches a real instrumented JVM and changes what
- * it does.
+ * Asserts that the Dash0 settings reach a real instrumented JVM and change what it does.
  *
  * <p>The unit tests in {@code :custom} prove that the customizer returns the right map. They cannot
  * prove that the agent ever invokes it, that the environment variable name resolves to the property
