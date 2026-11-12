@@ -61,9 +61,10 @@ two do tie; it contributes only `service.instance.id`, which no Dash0 package
 writes. Leaving the Dash0 provider on the default `0` would tie
 with those detectors, and a tie is settled by position in the merged `META-INF/services`
 file, which is a byproduct of the order `mergeServiceFiles` concatenates in and
-could flip without failing anything. `0` is not the only value already taken:
-the `order()` column of the table under `Upstream detectors` carries the value
-every one of the 23 declares, and six of them declare something other than `0`.
+could flip without failing anything. `0` is not the only value already taken.
+Read the `order()` column of the table under `Upstream detectors` before
+choosing one: it carries the value every one of the 23 declares, and several of
+them declare something other than `0`.
 
 The Dash0 Linux packages write exactly two keys:
 
