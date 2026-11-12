@@ -29,15 +29,15 @@ class Dash0ConfigurationTest {
   private static final String OTEL_HOST = "otel-exporter-endpoint.invalid";
   private static final String AMBIENT_HOST = "ambient-environment.invalid";
 
-  private static final String INSTRUMENTED_METHOD = TestApplication.class.getName() + "[main]";
+  /** The {@code otel.instrumentation.methods.include} value that records one span for main. */
+  static final String INSTRUMENTED_METHOD = TestApplication.class.getName() + "[main]";
 
   /** The {@code code} attribute the stable semantic conventions emit. */
-  private static final String STABLE_CODE_ATTRIBUTE =
+  static final String STABLE_CODE_ATTRIBUTE =
       "code.function.name=" + TestApplication.class.getName() + ".main";
 
   /** The {@code code} attribute the superseded semantic conventions emit. */
-  private static final String OLD_CODE_ATTRIBUTE =
-      "code.namespace=" + TestApplication.class.getName();
+  static final String OLD_CODE_ATTRIBUTE = "code.namespace=" + TestApplication.class.getName();
 
   @Test
   void theStandardEndpointTakesPrecedenceOverTheCollectorBaseUrl() throws Exception {

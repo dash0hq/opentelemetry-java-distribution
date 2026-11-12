@@ -4,6 +4,9 @@
  */
 package com.dash0.opentelemetry.smoketest;
 
+import static com.dash0.opentelemetry.smoketest.Dash0ConfigurationTest.INSTRUMENTED_METHOD;
+import static com.dash0.opentelemetry.smoketest.Dash0ConfigurationTest.OLD_CODE_ATTRIBUTE;
+import static com.dash0.opentelemetry.smoketest.Dash0ConfigurationTest.STABLE_CODE_ATTRIBUTE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -81,6 +84,31 @@ class ExtensionRuntimeTest {
             exported)
         .contains("extension-wins.invalid")
         .doesNotContain("extension-loses.invalid");
+  }
+
+  @Test
+  void suppliesTheSemconvStabilityOptIn() throws Exception {
+    String exported =
+        InstrumentedJvm.runningTheTestApplication()
+            .attaching(Paths.get(System.getProperty("dash0.upstream.agent.jar")))
+            .withJvmArguments(
+                "-Dotel.javaagent.extensions=" + extensionJar(),
+                "-Dotel.traces.exporter=logging",
+                "-Dotel.logs.exporter=none",
+                "-Dotel.metrics.exporter=none",
+                "-Dotel.service.name=smoke-test",
+                "-Dotel.instrumentation.methods.include=" + INSTRUMENTED_METHOD)
+            .run();
+
+    assertThat(exported)
+        .as(
+            "the default is applied from customize(), which the stock agent invokes through the"
+                + " extension class loader. Moving it to a hook only the repackaged agent"
+                + " registers would leave the extension emitting the superseded attribute names"
+                + " with every test still green. The JVM's output was:%n%s",
+            exported)
+        .contains(STABLE_CODE_ATTRIBUTE)
+        .doesNotContain(OLD_CODE_ATTRIBUTE);
   }
 
   @Test
