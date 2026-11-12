@@ -1,4 +1,4 @@
-change_type: enhancement
+change_type: breaking
 
 component: custom
 
@@ -23,7 +23,10 @@ subtext: |
   attribute names stop matching the affected spans. Set
   ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the
   workload to choose your own domains, or append ``/dup`` to a domain, as in
-  ``database/dup,code,rpc,messaging``, to emit both sets while you migrate.
+  ``database/dup,code,rpc,messaging``, to emit both sets while you migrate. To
+  keep the old names everywhere, set the variable to a value that names no
+  domain, such as ``none``; clearing it does not work, because a blank value is
+  treated as unset and the default applies again.
   The value is applied with ``System.setProperty`` during agent startup rather
   than through an autoconfiguration hook. The agent resolves it in
   ``SemconvSelectionResolver`` with ``SystemProperty.getString``, which reads
