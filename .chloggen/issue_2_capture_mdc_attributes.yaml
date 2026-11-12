@@ -1,0 +1,50 @@
+change_type: enhancement
+
+component: custom
+
+note: Capture MDC attributes on exported log records by default, except keys whose names look like credentials
+
+issues: [2]
+
+subtext: |
+  MDC is where an application puts the identifiers people filter logs by:
+  request id, tenant, customer, user, job id. The upstream agent captures
+  none of them, so those values reached Dash0 only as a substring of the
+  message body, if the log pattern included them at all.
+  The distribution now sets ``mdc-attributes.excluded`` on all three appender
+  instrumentations that read an MDC selector, Logback, Log4j and JBoss Log
+  Manager, and sets no ``mdc-attributes.included``. An excluded selector with
+  no included selector captures every key that does not match it, so one
+  value both turns capture on and keeps the credential-shaped keys out.
+  The value is twelve case-sensitive glob patterns, four stems in three
+  spellings: ``*token*``, ``*Token*``, ``*TOKEN*``, ``*secret*``,
+  ``*Secret*``, ``*SECRET*``, ``*password*``, ``*Password*``, ``*PASSWORD*``,
+  ``*authorization*``, ``*Authorization*`` and ``*AUTHORIZATION*``. Matching
+  is case-sensitive upstream, so the spellings are not redundant: ``*token*``
+  alone matches ``session-token`` and misses both ``authToken`` and
+  ``AUTH_TOKEN``.
+  This is a privacy tradeoff and the deny list is a mitigation rather than a
+  guarantee. It matches four stems, so an MDC key named ``jwt``, ``bearer``,
+  ``pwd``, ``apiKey``, ``sessionId``, ``email`` or ``ssn`` is captured and
+  exported like any other, and nothing inspects values. Review what the
+  application puts in MDC before upgrading.
+  Setting any of an appender's three MDC properties on the workload replaces
+  the default for that appender and leaves the other two appenders alone.
+  ``OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*'``
+  restores the previous behaviour of capturing nothing. All three properties
+  feed one selector in the agent, and configuring any of them makes the agent
+  ignore the other two, so the distribution contributes its value only when
+  all three are absent or blank; an existing
+  ``CAPTURE_MDC_ATTRIBUTES`` allow list therefore still decides what is
+  captured rather than being widened to everything not denied.
+  The property names are marked experimental by upstream and may be renamed
+  or removed in any minor release. Between agent 2.32.0 and 2.33.1
+  ``capture-mdc-attributes`` changed from a boolean to a comma-separated list
+  of literal MDC keys; ``docs/configuration.md`` records that and says what to
+  recheck on an agent bump.
+  Declarative configuration is unaffected and remains unsupported. Under
+  ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so these
+  defaults do not apply there any more than ``DASH0_DISABLE`` and the
+  ``always_on`` sampler do; see ``docs/configuration.md``.
+
+change_logs: [user]
