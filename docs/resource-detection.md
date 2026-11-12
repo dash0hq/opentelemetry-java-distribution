@@ -103,6 +103,198 @@ default. This distribution adds to that set rather than replacing it, and
 `AgentPackagingTest` asserts that the merged service file still contains more
 than just the Dash0 entry.
 
+## Cloud detectors
+
+Agent 2.33.1 registers ten cloud detectors and starts every one of them
+disabled. This distribution leaves them disabled and does not plan to change
+that. Turning a group on is one environment variable, documented below.
+
+### The toggles
+
+Four properties control the ten, read by
+`io.opentelemetry.instrumentation.resources.internal.ResourceProviderPropertiesCustomizer`.
+Each takes `true` or `false` and covers a whole group at once.
+
+| Variable | System property | Detectors in the group |
+|---|---|---|
+| `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | `otel.resource.providers.aws.enabled` | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` |
+| `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | `otel.resource.providers.azure.enabled` | `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider`, `AzureVmResourceProvider` |
+| `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | `otel.resource.providers.gcp.enabled` | `GCPResourceProvider` |
+| `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | `otel.resource.providers.cloudfoundry.enabled` | `CloudFoundryResourceProvider` |
+
+A fifth toggle of the same shape, `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED`,
+covers `HostIdResourceProvider`, which reads `/etc/machine-id` on Linux and
+reports `host.id`. It holds no cloud detector and is named here because it is
+off by default through the same mechanism, which is easy to miss while looking
+for a `host.id` that never arrives.
+
+The customizer also lists `AzureAksResourceProvider` and
+`AzureContainersResourceProvider` under the `azure` group. Agent 2.33.1
+registers neither in its merged service file, so neither runs whatever the
+toggle says.
+
+`AgentPackagingTest` asserts that the ten names above are registered in the
+agent jar, so an upstream bump that adds or drops one fails the build instead
+of leaving this table wrong.
+
+### What each detector contributes, and what it costs off its own cloud
+
+| Detector | Group | Attributes | Cost when the process is elsewhere |
+|---|---|---|---|
+| `Ec2ResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `host.id`, `host.type`, `host.image_id`, `host.name` | two HTTP calls to `169.254.169.254`, 2 s timeout each |
+| `AzureVmResourceProvider` | `azure` | `cloud.provider`, `cloud.platform`, `cloud.region`, `cloud.resource_id`, `host.id`, `host.name`, `host.type`, `os.type`, `os.version`, `azure.vm.scaleset.name`, `azure.vm.sku` | one HTTP call to `169.254.169.254`, 5 s timeout |
+| `GCPResourceProvider` | `gcp` | `cloud.*` plus GCE, GKE, Cloud Run, Cloud Functions and App Engine specifics | one HTTP call to `metadata.google.internal`, no timeout set |
+| `EksResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `k8s.cluster.name`, `container.id` | free off Kubernetes; inside any pod, one HTTPS call to `kubernetes.default.svc`, 2 s timeout |
+| `EcsResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `cloud.resource_id`, `aws.ecs.*`, `aws.log.*`, `container.id`, `container.name`, `container.image.name`, `container.image.tags` | free, gated on `ECS_CONTAINER_METADATA_URI_V4` or `ECS_CONTAINER_METADATA_URI` |
+| `BeanstalkResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `service.instance.id`, `service.version`, `service.namespace` | free, gated on `/var/elasticbeanstalk/xray/environment.conf` |
+| `LambdaResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.region`, `faas.name`, `faas.version` | free, gated on `AWS_LAMBDA_FUNCTION_NAME` or `AWS_LAMBDA_FUNCTION_VERSION` |
+| `AzureAppServiceResourceProvider` | `azure` | **`service.name`**, `cloud.region`, `cloud.account.id`, `cloud.resource_id`, `deployment.environment.name`, `host.id`, `service.instance.id`, `azure.app.service.stamp`, `azure.resource_group.name` | free, gated on `WEBSITE_SITE_NAME` |
+| `AzureFunctionsResourceProvider` | `azure` | **`service.name`**, `faas.*`, `cloud.region`, `cloud.account.id` | free, gated on `WEBSITE_SITE_NAME` together with `FUNCTIONS_EXTENSION_VERSION` |
+| `CloudFoundryResourceProvider` | `cloudfoundry` | `cloudfoundry.app.*`, `cloudfoundry.org.*`, `cloudfoundry.space.*`, `cloudfoundry.process.*` | free, gated on `VCAP_APPLICATION` |
+
+Seven of the ten read an environment variable or a local file and stop. Three
+open a socket: `Ec2ResourceProvider`, `AzureVmResourceProvider` and
+`GCPResourceProvider`. `EksResourceProvider` is the awkward one, free on a host
+and not free in a pod.
+
+Whatever a detector costs is added to startup rather than paid in the
+background. The SDK is autoconfigured from the agent's `premain`, and the
+experiment below shows the consequence: a program whose `main` prints one line
+and exits still waits out every timeout before printing it.
+
+### How much that is, in an experiment
+
+Linux 6.18.62, OpenJDK 21.0.12.1, agent 2.33.1, a program whose `main` prints
+one line and exits. Nine runs per configuration, wall clock in seconds. On this
+host `169.254.169.254` is routed to the default gateway, which drops the packets
+silently, and `metadata.google.internal` does not resolve.
+
+| Configuration | min | mean | max |
+|---|---|---|---|
+| no agent | 0.05 | 0.06 | 0.08 |
+| agent, no group enabled | 2.14 | 2.77 | 3.60 |
+| `cloudfoundry` | 2.61 | 3.02 | 3.76 |
+| `host-id` | 2.62 | 3.33 | 4.39 |
+| `gcp` | 2.57 | 3.02 | 3.52 |
+| `aws` | 6.49 | 6.59 | 6.71 |
+| `azure` | 7.32 | 7.55 | 7.69 |
+| all five groups | 11.42 | 11.61 | 11.78 |
+
+The two large figures match the declared timeouts exactly. `aws` adds 4.3 s,
+which is `Ec2ResourceProvider` making its token and identity-document calls at
+2 s each; naming `io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider` in
+`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS` returns the configuration to the
+baseline. `azure` adds 5.2 s, all of it `AzureVmResourceProvider`, and removing
+that one provider the same way returns it to the baseline too.
+
+`gcp` is cheap here only because the name does not resolve. Nothing guarantees
+that elsewhere: `GcpMetadataConfig.fetchAttribute` opens an `HttpURLConnection`
+and never calls `setConnectTimeout` or `setReadTimeout`, so the JDK default of
+no timeout applies. Where `metadata.google.internal` resolves to an address that
+accepts the connection and then answers nothing, the `premain` waits with no
+bound on how long.
+
+A run of the same configurations on a macOS 14.6 host added between 0.1 s and
+0.4 s instead. Both sets of figures are right. What decides the cost is what the
+network does with a packet addressed to a metadata endpoint it has no route for:
+a host that answers with an ICMP error or a TCP reset pays almost nothing, and a
+host that drops the packet pays the full timeout. An operator shipping this
+distribution cannot know in advance which kind of host it lands on.
+
+### Why they stay off
+
+A default is worth changing when the upstream default loses data that cannot be
+recovered later. That is the case for `OTEL_TRACES_SAMPLER`, where an incoming
+`traceparent` silently deletes spans that no downstream processing can bring
+back, which is why `docs/configuration.md` documents a different default there.
+Cloud attributes are not in that category. They can be supplied out of process,
+once per host, by the Dash0 operator or by the `resourcedetection` processor in
+a collector, and a workload that wants them from the JVM gets them by setting
+one variable.
+
+Against that stands a startup cost measured in seconds, paid by every JVM that
+is not on the cloud in question, in an amount that depends on a network property
+the distribution cannot observe. Four further reasons make enabling a group by
+default worse than it looks.
+
+Every detector except the Cloud Foundry one carries the same guard:
+
+```java
+public final boolean shouldApply(ConfigProperties config, Resource existing) {
+  return existing.getAttribute(CLOUD_PROVIDER) == null;
+}
+```
+
+The first detector to produce `cloud.provider` stops the rest. Among the ten,
+only `AzureVmResourceProvider` declares an `order()`, of `100`. The other nine
+leave it at `0`, and `Ordered` says of equal values that the implementations
+"will be run in a non-deterministic order". In practice the sort is stable and
+the order is the position in the merged `META-INF/services` file, which
+`mergeServiceFiles` produces as a byproduct. Running the agent with `aws`
+enabled against a stub instance metadata service and a stub ECS task metadata
+endpoint, both answering, exports `cloud.platform="aws_ec2"` and not one ECS
+task attribute, because `Ec2ResourceProvider` is listed above
+`EcsResourceProvider`. Enabling one group makes that ordering this
+distribution's problem. Enabling two makes it a race between groups.
+
+`AzureAppServiceResourceProvider` and `AzureFunctionsResourceProvider` both set
+`service.name` from `WEBSITE_SITE_NAME`, and both run at order `0`. The two
+detectors that would otherwise decide the service name run later and decline to
+act once something else has decided it: `SpringBootServiceNameDetector` at order
+`100` and `JarServiceNameDetector` at order `1000` each apply only while the
+accumulated `service.name` is still the SDK default `unknown_service:java`.
+Enabling `azure` therefore renames every Azure App Service and Azure Functions
+deployment that was getting its name from the Spring Boot application name or
+from the jar file name. `OTEL_SERVICE_NAME` still beats it, because
+`EnvironmentResourceProvider` declares an order of `2147483646`.
+`CloudResourceDetectorsTest` in `smoke-tests/` asserts that the site name is
+absent with the group off and present with it on.
+
+The group toggles do not offer a "free detectors only" position. `aws` covers
+`Ec2ResourceProvider` together with four free ones, and `azure` covers
+`AzureVmResourceProvider` together with two. An operator can still reach that
+split, by pairing the group toggle with
+`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`, and it is shown below. This
+distribution cannot ship it as a default, because a default supplied through
+`addPropertiesSupplier` is the thing an environment variable of the same name
+overrides: a workload that sets `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS` for a
+reason of its own erases the Dash0 value, and the probing detector comes back
+with nothing reporting that it did.
+
+Leaving them off also keeps one sentence true, that the resource this
+distribution exports is the resource the upstream agent exports plus two Dash0
+attributes. Every upstream troubleshooting document then applies here unchanged.
+
+### Turning a group on
+
+For a workload known to run on EC2:
+
+```bash
+export OTEL_RESOURCE_PROVIDERS_AWS_ENABLED=true
+```
+
+Or `-Dotel.resource.providers.aws.enabled=true` on the command line. The two
+spellings reach the same setting: the SDK lowercases a property name and
+replaces `-` with `.`, and lowercases an environment variable name and replaces
+`_` with `.`, so both arrive as `otel.resource.providers.aws.enabled`.
+
+To take the four free AWS detectors without the IMDS probe, name the one
+provider to leave out:
+
+```bash
+export OTEL_RESOURCE_PROVIDERS_AWS_ENABLED=true
+export OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS=io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider
+```
+
+`io.opentelemetry.contrib.azure.resource.AzureVmResourceProvider` is the
+equivalent name for the `azure` group. The customizer merges the value with the
+list it builds itself, so nothing else is lost by setting it.
+
+`OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` is the opposite and is a trap here. It is
+an allowlist over every resource provider rather than over the cloud ones, so
+setting it to a cloud detector turns off the container, host, OS, process, jar
+service name and Spring Boot detectors, and both Dash0 providers with them.
+
 ## Not implemented
 
 The Node.js and Python distributions ship a `k8s.pod.uid` detector and this one
