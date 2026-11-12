@@ -193,6 +193,25 @@ class Dash0ConfigurationTest {
   }
 
   @Test
+  void aSemconvStabilityOptInNamingNoDomainKeepsTheSupersededNames() throws Exception {
+    String output =
+        recordingAMethodSpan()
+            .withEnvironmentVariable("OTEL_SEMCONV_STABILITY_OPT_IN", "none")
+            .run();
+
+    assertThat(output)
+        .as(
+            "docs/configuration.md and the changelog entry tell an operator that this is how to"
+                + " keep the superseded attribute names, which rests on the agent ignoring a token"
+                + " that names no domain rather than rejecting it. It is also the control for the"
+                + " test above: without it, that one would pass against an agent that had stopped"
+                + " applying the default at all. The JVM's output was:%n%s",
+            output)
+        .contains(OLD_CODE_ATTRIBUTE)
+        .doesNotContain(STABLE_CODE_ATTRIBUTE);
+  }
+
+  @Test
   void aSystemPropertySemconvStabilityOptInBeatsTheSuppliedOne() throws Exception {
     String output =
         recordingAMethodSpan().withJvmArguments("-Dotel.semconv-stability.opt-in=database").run();

@@ -163,6 +163,23 @@ JDBC span carries `db.statement`, `db.system`, `db.name` and `db.operation`;
 with it, `db.query.text`, `db.system.name`, `db.namespace` and
 `db.operation.name`.
 
+Attribute names are not the only thing that changes. Three other kinds of change
+come with the same switch, and a query written against any of them stops
+matching:
+
+| What changes | Without the opt-in | With it |
+|---|---|---|
+| JDBC span name | `<database> <operation>` | a summary of the query |
+| RPC span name | `<service>/<method>` | `<method>` |
+| Messaging receive span kind | `CONSUMER` | `CLIENT` |
+| Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
+| Database metrics | none | `db.client.operation.duration` |
+| Messaging producer metrics | `messaging.publish.duration` | `messaging.client.operation.duration`, `messaging.client.sent.messages` |
+
+A dashboard charting `messaging.publish.duration` goes flat, and an alert
+filtering on `span.kind = CONSUMER` for a Kafka or JMS receive stops firing.
+Neither reports an error.
+
 Append `/dup` to a domain to emit both sets at once, as in
 `database/dup,code,rpc,messaging`. That doubles the attributes on every affected
 span and is a migration aid rather than a resting state.

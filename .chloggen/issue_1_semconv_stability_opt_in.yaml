@@ -19,8 +19,15 @@ subtext: |
   ``service.peer`` is left out, because its attributes are expected to change
   again. ``http`` is not a value at all: HTTP semantic conventions are stable and
   the agent emits them whatever this setting says.
-  Existing dashboards, alerting rules and saved queries written against the old
-  attribute names stop matching the affected spans. Set
+  Attribute names are not the only thing that changes. A JDBC span is named after
+  a summary of the query rather than ``<database> <operation>``, an RPC span is
+  named ``<method>`` rather than ``<service>/<method>``, a messaging receive span
+  has kind ``CLIENT`` rather than ``CONSUMER``, the agent starts recording
+  ``db.client.operation.duration``, and it records
+  ``messaging.client.operation.duration`` and ``messaging.client.sent.messages``
+  in place of ``messaging.publish.duration``.
+  Existing dashboards, alerting rules and saved queries written against any of
+  the old names stop matching, and none of them reports an error. Set
   ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the
   workload to choose your own domains, or append ``/dup`` to a domain, as in
   ``database/dup,code,rpc,messaging``, to emit both sets while you migrate. To
