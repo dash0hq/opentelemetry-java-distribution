@@ -24,19 +24,34 @@ subtext: |
   span is named ``<method>`` rather than ``<service>/<method>``, except under
   gRPC, which always uses the full method name. A messaging receive span has kind
   ``CLIENT`` rather than ``CONSUMER``, and a send span whose context is not
-  propagated has kind ``CLIENT`` rather than ``PRODUCER``. The agent starts
-  recording ``db.client.operation.duration``,
-  ``messaging.client.operation.duration`` and ``messaging.client.sent.messages``,
-  and Pulsar, the one instrumentation still emitting the pre-1.43
-  ``messaging.publish.duration``, stops emitting it.
+  propagated has kind ``CLIENT`` rather than ``PRODUCER``. RabbitMQ starts
+  recording a receive span for every ``basicGet``, which it did not record at
+  all before.
+  The metrics change too. The agent starts recording
+  ``db.client.operation.duration``, ``messaging.client.operation.duration``,
+  ``messaging.client.sent.messages``, ``messaging.process.duration`` and
+  ``messaging.client.consumed.messages``. Pulsar, the one instrumentation still
+  emitting the pre-1.43 ``messaging.publish.duration``,
+  ``messaging.receive.duration`` and ``messaging.receive.messages``, stops
+  emitting all three. Every connection pool instrument is renamed from
+  ``db.client.connections.*`` to ``db.client.connection.*``, its ``pool.name``
+  and ``state`` attributes become ``db.client.connection.pool.name`` and
+  ``db.client.connection.state``, and ``create_time``, ``wait_time`` and
+  ``use_time`` are recorded in seconds rather than milliseconds. A threshold
+  written in milliseconds is then a thousand times too high and the alert stops
+  firing rather than failing.
   Existing dashboards, alerting rules and saved queries written against any of
   the old names stop matching, and none of them reports an error. Set
   ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the
   workload to choose your own domains, or append ``/dup`` to a domain, as in
-  ``database/dup,code,rpc,messaging``, to emit both sets while you migrate. To
-  keep the old names everywhere, set the variable to a value that names no
-  domain, such as ``none``; clearing it does not work, because a blank value is
-  treated as unset and the default applies again.
+  ``database/dup,code,rpc,messaging``, to emit both sets while you migrate.
+  ``/dup`` covers attributes only, so it still renames the connection pool
+  instruments and still moves those three histograms to seconds. To keep the old
+  names everywhere, set the variable to a value that names no domain, such as
+  ``none``. Clearing the variable does not work, because a blank value is
+  treated as unset, and neither does writing the setting in the file named by
+  ``otel.javaagent.configuration-file``, which reaches ``ConfigProperties``
+  rather than the place the agent reads this setting from.
   The value is applied with ``System.setProperty`` during agent startup rather
   than through an autoconfiguration hook. The agent resolves it in
   ``SemconvSelectionResolver`` with ``SystemProperty.getString``, which reads

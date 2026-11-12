@@ -163,9 +163,9 @@ JDBC span carries `db.statement`, `db.system`, `db.name` and `db.operation`;
 with it, `db.query.text`, `db.system.name`, `db.namespace` and
 `db.operation.name`.
 
-Attribute names are not the only thing that changes. Three other kinds of change
-come with the same switch, and a query written against any of them stops
-matching:
+Attribute names are not the only thing that changes. Span names, span kinds,
+metric names and one metric unit change with them, and a dashboard, query or
+alert written against any of these stops matching with no error anywhere:
 
 | What changes | Without the opt-in | With it |
 |---|---|---|
@@ -173,27 +173,41 @@ matching:
 | RPC span name, except gRPC | `<service>/<method>` | `<method>` |
 | Messaging receive span kind | `CONSUMER` | `CLIENT` |
 | Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
-| Database metrics | none | `db.client.operation.duration` |
-| Messaging producer metrics | none | `messaging.client.operation.duration`, `messaging.client.sent.messages` |
+| RabbitMQ `basicGet` receive span | not recorded | recorded |
+| Connection pool metrics | `db.client.connections.*` | `db.client.connection.*` |
+| Connection pool metric attributes | `pool.name`, `state` | `db.client.connection.pool.name`, `db.client.connection.state` |
+| `create_time`, `wait_time`, `use_time` | milliseconds | **seconds** |
+| Database operation metrics | none | `db.client.operation.duration` |
+| Messaging metrics | none | `messaging.client.operation.duration`, `messaging.client.sent.messages`, `messaging.process.duration`, `messaging.client.consumed.messages` |
 
-gRPC is the exception on span names because it never used the shared extractor:
-its spans are the full method name whatever this setting says.
+The unit change is the one to check first. A threshold written against
+`db.client.connections.wait_time` in milliseconds carried over to
+`db.client.connection.wait_time` in seconds is a thousand times too high, so the
+alert stops firing rather than failing.
 
-Pulsar is the exception on messaging producer metrics. It is the one
-instrumentation in agent 2.33.1 still emitting the pre-1.43
-`messaging.publish.duration`, and the opt-in stops it. Every other messaging
-instrumentation records no producer duration metric without the opt-in, so for
-Kafka, JMS, RabbitMQ and the rest the two stable instruments are an addition.
+Three instrumentations differ from the table:
 
-An alert filtering on `span.kind = CONSUMER` for a JMS receive stops firing, and
-nothing reports an error. Kafka receive spans are not affected in a default
-agent, because that instrumentation is off until
-`otel.instrumentation.common.experimental.receive-telemetry.enabled` turns it
-on.
+- gRPC span names never change. gRPC does not use the shared RPC span name
+  extractor, and its spans carry the full method name whatever this setting
+  says.
+- Pulsar loses metrics rather than gaining them. It is the one instrumentation
+  in agent 2.33.1 still emitting the pre-1.43 `messaging.publish.duration`,
+  `messaging.receive.duration` and `messaging.receive.messages`, and the opt-in
+  stops all three. Every other messaging instrumentation records none of them
+  either way, so the stable instruments are purely an addition there.
+- Kafka receive spans are unaffected in a default agent. That instrumentation
+  stays off until
+  `otel.instrumentation.common.messaging.experimental.receive-telemetry.enabled`
+  turns it on. RabbitMQ is the opposite case: its receive instrumenter is
+  enabled by this opt-in on its own, so an application polling a queue with
+  `basicGet` starts producing one span per call.
 
 Append `/dup` to a domain to emit both sets at once, as in
 `database/dup,code,rpc,messaging`. That doubles the attributes on every affected
-span and is a migration aid rather than a resting state.
+span and is a migration aid rather than a resting state. It applies to
+attributes only: the connection pool instruments are not dual-emitted, so
+`database/dup` still renames them and still moves the three histograms to
+seconds.
 
 To keep the superseded names everywhere, set the variable to a value that names
 no domain:
@@ -203,8 +217,13 @@ export OTEL_SEMCONV_STABILITY_OPT_IN=none
 ```
 
 `none` is not a domain and selects nothing, which is what leaves every domain on
-its upstream default. Clearing the variable does not do this: a blank value is
-treated as unset, so the default above applies again.
+its upstream default. Two other ways of saying it do not work. Clearing the
+variable does not, because a blank value is treated as unset and the default
+applies again. Writing the setting in the properties file named by
+`otel.javaagent.configuration-file` does not either: that file reaches
+`ConfigProperties`, which is not where the agent reads this setting from, so the
+line is ignored and the default applies over it. Use the environment variable or
+`-Dotel.semconv-stability.opt-in`.
 
 Unlike every other setting on this page, this one is applied by calling
 `System.setProperty` during agent startup, not by returning it from an

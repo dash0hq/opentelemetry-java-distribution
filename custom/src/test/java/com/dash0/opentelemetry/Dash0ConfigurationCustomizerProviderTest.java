@@ -194,6 +194,17 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void optsIntoTheFourDomainsAndNoOthers() {
+    assertThat(NEWER_SEMCONV_DOMAINS.split(","))
+        .as(
+            "every other assertion compares against this constant or inspects a code attribute, so"
+                + " dropping a domain from it changes what every deployment emits and fails"
+                + " nothing. service.peer is excluded because its experimental attributes are"
+                + " expected to change again, and http is not a value at all in agent 2.33.1.")
+        .containsExactly("database", "code", "rpc", "messaging");
+  }
+
+  @Test
   void defaultsTheSemconvStabilityOptInWhenNothingConfiguresIt() {
     setSemconvStabilityOptInUnlessConfigured(anEmptyEnvironment());
 
