@@ -24,6 +24,8 @@ class CloudResourceDetectorsTest {
 
   private static final String FUNCTIONS_VERSION = "~4";
 
+  private static final String SPRING_APPLICATION_NAME = "smoke-test-spring-app";
+
   @Test
   void contributesNoCloudAttributeWhileNoGroupToggleIsSet() throws Exception {
     String exported = exportingTheResourceToTheLog(appServiceEnvironment());
@@ -34,7 +36,8 @@ class CloudResourceDetectorsTest {
         .doesNotContain("cloud.provider=")
         .doesNotContain("cloudfoundry.app.name=")
         .doesNotContain("faas.name=")
-        .doesNotContain("service.name=\"" + SITE_NAME + "\"");
+        .doesNotContain("service.name=\"" + SITE_NAME + "\"")
+        .contains("service.name=\"" + SPRING_APPLICATION_NAME + "\"");
   }
 
   @Test
@@ -46,7 +49,8 @@ class CloudResourceDetectorsTest {
         .contains("telemetry.distro.name=\"dash0-java\"")
         .doesNotContain("cloud.provider=")
         .doesNotContain("faas.name=")
-        .doesNotContain("service.name=\"" + SITE_NAME + "\"");
+        .doesNotContain("service.name=\"" + SITE_NAME + "\"")
+        .contains("service.name=\"" + SPRING_APPLICATION_NAME + "\"");
   }
 
   @Test
@@ -96,10 +100,12 @@ class CloudResourceDetectorsTest {
 
   /**
    * An environment that the Azure App Service, AWS Lambda and Cloud Foundry detectors each
-   * recognise as their own platform.
+   * recognise as their own platform, and that gives {@code SpringBootServiceNameDetector} a name of
+   * its own to contribute.
    */
   private static Map<String, String> appServiceEnvironment() {
     Map<String, String> environment = new LinkedHashMap<>();
+    environment.put("SPRING_APPLICATION_NAME", SPRING_APPLICATION_NAME);
     environment.put("WEBSITE_SITE_NAME", SITE_NAME);
     environment.put(
         "VCAP_APPLICATION", "{\"application_name\":\"" + APPLICATION_NAME + "\",\"index\":\"0\"}");
