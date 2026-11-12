@@ -52,15 +52,18 @@ Two different mechanisms produce that, and the doc used to credit the wrong one
 for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
 `EnvironmentResourceProvider`, which declares an order of `2147483646`, so the
-environment is applied last whatever anything else does. The upstream detectors
-declare no order at all, which means `0`; `Dash0PackageResourceProvider`
-declares `Integer.MIN_VALUE`, so it is applied first and every detector
-overwrites it. `ServiceInstanceIdResourceProvider` declares `Integer.MIN_VALUE`
-too, so those two do tie; it contributes only `service.instance.id`, which no
-Dash0 package writes. Leaving the Dash0 provider on the default `0` would tie
-with the detectors, and a tie is settled by position in the merged `META-INF/services`
+environment is applied last whatever anything else does. The container, host,
+OS, process and process-runtime detectors declare no order at all, which means
+`0`; `Dash0PackageResourceProvider` declares `Integer.MIN_VALUE`, so it is
+applied first and every detector overwrites it.
+`ServiceInstanceIdResourceProvider` declares `Integer.MIN_VALUE` too, so those
+two do tie; it contributes only `service.instance.id`, which no Dash0 package
+writes. Leaving the Dash0 provider on the default `0` would tie
+with those detectors, and a tie is settled by position in the merged `META-INF/services`
 file, which is a byproduct of the order `mergeServiceFiles` concatenates in and
-could flip without failing anything.
+could flip without failing anything. `0` is not the only value already taken:
+the `order()` column of the table under `Upstream detectors` carries the value
+every one of the 23 declares, and six of them declare something other than `0`.
 
 The Dash0 Linux packages write exactly two keys:
 
