@@ -29,6 +29,16 @@ class Dash0ConfigurationTest {
   private static final String OTEL_HOST = "otel-exporter-endpoint.invalid";
   private static final String AMBIENT_HOST = "ambient-environment.invalid";
 
+  /** The {@code otel.instrumentation.methods.include} value that records one span for main. */
+  static final String INSTRUMENTED_METHOD = TestApplication.class.getName() + "[main]";
+
+  /** The {@code code} attribute the stable semantic conventions emit. */
+  static final String STABLE_CODE_ATTRIBUTE =
+      "code.function.name=" + TestApplication.class.getName() + ".main";
+
+  /** The {@code code} attribute the superseded semantic conventions emit. */
+  static final String OLD_CODE_ATTRIBUTE = "code.namespace=" + TestApplication.class.getName();
+
   @Test
   void theStandardEndpointTakesPrecedenceOverTheCollectorBaseUrl() throws Exception {
     Map<String, String> environment = new HashMap<>();
@@ -147,6 +157,83 @@ class Dash0ConfigurationTest {
                 + " and reporting nothing. The JVM's output was:%n%s",
             output)
         .doesNotContain("Unrecognized value for otel.traces.sampler");
+  }
+
+  @Test
+  void theSuppliedSemconvStabilityOptInReachesTheInstrumentation() throws Exception {
+    String output = recordingAMethodSpan().run();
+
+    assertThat(output)
+        .as(
+            "the agent resolves otel.semconv-stability.opt-in through SemconvSelectionResolver,"
+                + " which reads it with SystemProperty.getString and so sees neither"
+                + " addPropertiesSupplier nor addPropertiesCustomizer. Either hook would leave the"
+                + " old attribute names in place with nothing reporting it. The JVM's output"
+                + " was:%n%s",
+            output)
+        .contains(STABLE_CODE_ATTRIBUTE)
+        .doesNotContain(OLD_CODE_ATTRIBUTE);
+  }
+
+  @Test
+  void anEnvironmentVariableSemconvStabilityOptInBeatsTheSuppliedOne() throws Exception {
+    String output =
+        recordingAMethodSpan()
+            .withEnvironmentVariable("OTEL_SEMCONV_STABILITY_OPT_IN", "database")
+            .run();
+
+    assertThat(output)
+        .as(
+            "naming only database leaves code on the old conventions, which is what proves the"
+                + " workload's own value replaced the supplied one rather than being merged into"
+                + " it. The JVM's output was:%n%s",
+            output)
+        .contains(OLD_CODE_ATTRIBUTE)
+        .doesNotContain(STABLE_CODE_ATTRIBUTE);
+  }
+
+  @Test
+  void aSemconvStabilityOptInNamingNoDomainKeepsTheSupersededNames() throws Exception {
+    String output =
+        recordingAMethodSpan()
+            .withEnvironmentVariable("OTEL_SEMCONV_STABILITY_OPT_IN", "none")
+            .run();
+
+    assertThat(output)
+        .as(
+            "docs/configuration.md and the changelog entry tell an operator that this is how to"
+                + " keep the superseded attribute names, which rests on the agent ignoring a token"
+                + " that names no domain rather than rejecting it. It is also the control for the"
+                + " test above: without it, that one would pass against an agent that had stopped"
+                + " applying the default at all. The JVM's output was:%n%s",
+            output)
+        .contains(OLD_CODE_ATTRIBUTE)
+        .doesNotContain(STABLE_CODE_ATTRIBUTE);
+  }
+
+  @Test
+  void aSystemPropertySemconvStabilityOptInBeatsTheSuppliedOne() throws Exception {
+    String output =
+        recordingAMethodSpan().withJvmArguments("-Dotel.semconv-stability.opt-in=database").run();
+
+    assertThat(output)
+        .as("the JVM's output was:%n%s", output)
+        .contains(OLD_CODE_ATTRIBUTE)
+        .doesNotContain(STABLE_CODE_ATTRIBUTE);
+  }
+
+  /**
+   * An instrumented JVM that logs one span for {@code TestApplication.main}, carrying the {@code
+   * code} attributes the {@code code} entry of {@code otel.semconv-stability.opt-in} selects.
+   */
+  private static InstrumentedJvm recordingAMethodSpan() {
+    return InstrumentedJvm.runningTheTestApplication()
+        .withJvmArguments(
+            "-Dotel.traces.exporter=logging",
+            "-Dotel.metrics.exporter=none",
+            "-Dotel.logs.exporter=none",
+            "-Dotel.service.name=smoke-test",
+            "-Dotel.instrumentation.methods.include=" + INSTRUMENTED_METHOD);
   }
 
   private static InstrumentedJvm exportingMetricsToTheLog() {

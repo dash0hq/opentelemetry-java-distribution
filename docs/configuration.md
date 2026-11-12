@@ -73,8 +73,12 @@ three and the third has no Java counterpart:
 ## Standard OpenTelemetry variables
 
 All standard `OTEL_*` configuration works as it does with the upstream agent.
-One standard default is changed: `OTEL_TRACES_SAMPLER` is `always_on` here and
-`parentbased_always_on` upstream.
+Two standard defaults are changed:
+
+| Variable | Here | Upstream |
+|---|---|---|
+| `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
+| `OTEL_SEMCONV_STABILITY_OPT_IN` | `database,code,rpc,messaging` | unset |
 
 Upstream's configuration reference:
 https://opentelemetry.io/docs/zero-code/java/agent/configuration/
@@ -123,7 +127,126 @@ start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
 Declarative configuration does not apply this default either, for the reason the
-next section gives.
+Declarative configuration section below gives.
+
+### `OTEL_SEMCONV_STABILITY_OPT_IN`
+
+The distribution sets `otel.semconv-stability.opt-in=database,code,rpc,messaging`,
+so your spans carry the newer attribute names from the first day you run them
+rather than the superseded ones. Setting `OTEL_SEMCONV_STABILITY_OPT_IN` or
+`-Dotel.semconv-stability.opt-in` on the workload replaces the whole value; a
+blank one is treated as unset.
+
+The value is a comma-separated list of domains. Agent 2.33.1 accepts five, and
+the two columns below differ in what the semantic conventions working group has
+settled:
+
+| Domain | Without the opt-in | With it |
+|---|---|---|
+| `database` | old | stable |
+| `code` | old | stable |
+| `rpc` | old | experimental |
+| `messaging` | old | experimental |
+| `service.peer` | old | experimental |
+
+`http` is not in the list. HTTP semantic conventions are stable, the flag that
+selected them is gone, and the agent emits the stable attribute names whatever
+this variable says.
+
+`service.peer` is not in the default either, because its experimental attributes
+are expected to change again and adopting them now buys a second rename later.
+`rpc` and `messaging` are in it even though they are experimental, because the
+working group considers the current shape close to final.
+
+The database attributes are the ones most people notice. Without the opt-in a
+JDBC span carries `db.statement`, `db.system`, `db.name` and `db.operation`;
+with it, `db.query.text`, `db.system.name`, `db.namespace` and
+`db.operation.name`.
+
+Attribute names are not the only thing that changes. Span names, span kinds,
+metric names and one metric unit change with them, and a dashboard, query or
+alert written against any of these stops matching with no error anywhere:
+
+| What changes | Without the opt-in | With it |
+|---|---|---|
+| JDBC span name | `<operation> <database>.<table>` | a summary of the query |
+| RPC span name, except gRPC | `<service>/<method>` | `<method>` |
+| Messaging receive span kind | `CONSUMER` | `CLIENT` |
+| Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
+| RabbitMQ `basicGet` receive span | not recorded | recorded |
+| Connection pool metrics | `db.client.connections.usage`, `db.client.connections.max` | `db.client.connection.count`, `db.client.connection.limit` |
+| The other connection pool metrics | `db.client.connections.*` | `db.client.connection.*`, same suffix |
+| Connection pool metric attributes | `pool.name`, `state` | `db.client.connection.pool.name`, `db.client.connection.state` |
+| `create_time`, `wait_time`, `use_time` | milliseconds | **seconds** |
+| Database operation metrics | none | `db.client.operation.duration` |
+| Messaging metrics | none | `messaging.client.operation.duration`, `messaging.client.sent.messages`, `messaging.process.duration`, `messaging.client.consumed.messages` |
+
+The unit change is the one to check first. A threshold written against
+`db.client.connections.wait_time` in milliseconds carried over to
+`db.client.connection.wait_time` in seconds is a thousand times too high, so the
+alert stops firing rather than failing.
+
+Three instrumentations differ from the table:
+
+- gRPC span names never change. gRPC does not use the shared RPC span name
+  extractor, and its spans carry the full method name whatever this setting
+  says.
+- Pulsar loses metrics rather than gaining them. It is the one instrumentation
+  in agent 2.33.1 still emitting the pre-1.43 `messaging.publish.duration`,
+  `messaging.receive.duration` and `messaging.receive.messages`, and the opt-in
+  stops all three. Every other messaging instrumentation records none of them
+  either way, so the stable instruments are purely an addition there.
+- Kafka receive spans are unaffected in a default agent. That instrumentation
+  stays off until
+  `otel.instrumentation.common.messaging.experimental.receive-telemetry.enabled`
+  turns it on. RabbitMQ is the opposite case: its receive instrumenter is
+  enabled by this opt-in on its own, so an application polling a queue with
+  `basicGet` starts producing one span per call.
+
+Append `/dup` to a domain to emit both sets at once, as in
+`database/dup,code,rpc,messaging`. That doubles the attributes on every affected
+span and is a migration aid rather than a resting state. `messaging/dup` covers
+metrics too: it keeps Pulsar's three pre-1.43 instruments alongside the new
+ones. The connection pool instruments are the exception, because the agent picks
+one name for each of them rather than recording both, so `database/dup` still
+renames them and still moves the three histograms to seconds.
+
+To keep the superseded names everywhere, set the variable to a value that names
+no domain:
+
+```bash
+export OTEL_SEMCONV_STABILITY_OPT_IN=none
+```
+
+`none` is not a domain and selects nothing, which is what leaves every domain on
+its upstream default. Two other ways of saying it do not work. Clearing the
+variable does not, because a blank value is treated as unset and the default
+applies again. Writing the setting in the properties file named by
+`otel.javaagent.configuration-file` does not either: that file reaches
+`ConfigProperties`, which is not where the agent reads this setting from, so the
+line is ignored and the default applies over it. Use the environment variable or
+`-Dotel.semconv-stability.opt-in`.
+
+Unlike every other setting on this page, this one is applied by calling
+`System.setProperty` during agent startup, not by returning it from an
+autoconfiguration hook. The agent resolves it in `SemconvSelectionResolver`
+through `SystemProperty.getString`, which reads `System.getProperty` and then
+`System.getenv` and consults the SDK's resolved configuration for it in no other
+way. A value returned from `addPropertiesSupplier` or `addPropertiesCustomizer`
+reaches `ConfigProperties` and stops there, so the agent never sees it, the old
+attribute names keep arriving, and nothing in the log says why. Upstream
+documents the same restriction for the sibling setting
+`otel.semconv-stability.preview`.
+
+The guard reads both sources before setting anything: the system property is
+left alone when it already has a value, and nothing is set at all when
+`OTEL_SEMCONV_STABILITY_OPT_IN` is in the environment, since a system property
+would shadow the variable the agent reads next.
+
+Declarative configuration does not apply this default either, for the reason the
+next section gives. A file expresses the same choice as `stability_opt_in_list`
+under `general`, which `general.db.semconv.version` and its siblings then beat
+per domain.
 
 ## Declarative configuration
 
@@ -165,10 +288,10 @@ version string survives only because upstream's own
 `io.opentelemetry.javaagent.tooling.resources.ResourceCustomizerProvider` reads
 it from the agent jar manifest, which this build writes. No
 `AutoConfigurationCustomizerProvider` runs at all, so `DASH0_DISABLE`,
-`DASH0_OTEL_COLLECTOR_BASE_URL` and the `always_on` sampler default are silently
-ignored; a file that omits `sampler` gets the specification's
-`parentbased_always_on`. Every upstream host, process and OS detector disappears
-as well.
+`DASH0_OTEL_COLLECTOR_BASE_URL`, the `always_on` sampler default and the
+semantic convention opt-in default are silently ignored; a file that omits
+`sampler` gets the specification's `parentbased_always_on`. Every upstream host,
+process and OS detector disappears as well.
 
 The cause is that declarative configuration uses two different SPIs.
 `AutoConfigurationCustomizerProvider` and `ResourceProvider` are not consulted;
