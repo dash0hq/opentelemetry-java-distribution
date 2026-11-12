@@ -100,9 +100,8 @@ absent, so the unit tests cannot catch it.
 
 Every resource provider the upstream agent registers is active here and
 unmodified. This distribution adds to that set rather than replacing it, and
-`AgentPackagingTest` compares the merged service file against the upstream
-agent's own copy, so the set below stays correct when upstream adds or removes
-a detector.
+`AgentPackagingTest` asserts that every provider in the upstream agent's own
+service file survived the merge into ours.
 
 The service file is
 `inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider`
@@ -110,6 +109,17 @@ inside `agent/build/libs/dash0-opentelemetry-javaagent-*.jar`. At agent 2.33.1
 it lists 25 providers: the two Dash0 ones above and the 23 upstream ones here.
 The `.classdata` entries under `inst/` are ordinary class files, so `javap`
 reads the `order()` values out of them directly.
+
+The table below is read off agent 2.33.1 by hand and nothing pins it to the jar.
+`AgentPackagingTest` compares two jars of the same upstream version against each
+other, so it stays green when a version bump adds, removes or renames a
+provider. Re-derive the table from the service file whenever
+`opentelemetryJavaagent` in `gradle/libs.versions.toml` moves. One rename has
+already happened: `ServiceInstanceIdResourceProvider` was
+`io.opentelemetry.sdk.extension.incubator.resources.ServiceInstanceIdResourceProvider`
+at 2.32.0 and is `io.opentelemetry.sdk.autoconfigure.ServiceInstanceIdResourceProvider`
+at 2.33.1, which matters to anything naming it in
+`otel.java.disabled.resource.providers`.
 
 | Provider | `order()` | Contributes | On by default |
 |---|---|---|---|
@@ -154,7 +164,8 @@ with
 -Dotel.java.enabled.resource.providers=io.opentelemetry.instrumentation.resources.HostIdResourceProvider
 ```
 
-exports `host.id` and `service.name`, and nothing else. `host.name`, `os.type`,
+exports `host.id`, plus the `service.name` and `telemetry.sdk.*` attributes that
+`Resource.getDefault()` always carries, and nothing else. `host.name`, `os.type`,
 `process.pid` and `telemetry.distro.name` are all gone, because
 `DistroResourceProvider` is in the service file like everything else and the
 allow-list does not name it. All telemetry from that process is attributed to
@@ -165,7 +176,7 @@ Use `otel.resource.providers.<group>.enabled` to switch a disabled group on, and
 
 ### `service.name`
 
-Five providers can set `service.name`. Four of them are
+Five providers can set `service.name`. Three of them are
 `ConditionalResourceProvider`s guarded on the value still being
 `unknown_service:java`, so the first one to find a name in ascending `order()`
 is the one that wins:
@@ -178,8 +189,13 @@ is the one that wins:
 | `1000` | `JarServiceNameDetector` | the main jar's file name, without the `.jar` suffix |
 | `2147483646` | `EnvironmentResourceProvider` | `OTEL_SERVICE_NAME`, or a `service.name` entry in `OTEL_RESOURCE_ATTRIBUTES` |
 
-`EnvironmentResourceProvider` is not conditional, so `OTEL_SERVICE_NAME`
-replaces whatever a detector found rather than deferring to it.
+The three are `SpringBootServiceNameDetector`, `ManifestResourceProvider`, which
+inherits the guard from `AttributeResourceProvider`, and `JarServiceNameDetector`.
+The other two are plain `ResourceProvider`s and write whatever they have.
+`Dash0PackageResourceProvider` runs first of everything, at
+`Integer.MIN_VALUE`, so nothing has named the service yet when it writes, and
+`EnvironmentResourceProvider` runs at `2147483646` and replaces whatever a
+detector found rather than deferring to it.
 
 These are the values a real instrumented JVM exported for each launch shape, all
 reproduced on agent 2.33.1 and all covered by `ServiceNameDetectionTest` in
