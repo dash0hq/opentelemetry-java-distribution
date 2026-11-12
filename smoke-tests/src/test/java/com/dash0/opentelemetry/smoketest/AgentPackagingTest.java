@@ -20,15 +20,7 @@ import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import org.junit.jupiter.api.Test;
 
-/**
- * Checks the shape of the assembled agent jar.
- *
- * <p>These assertions exist because the three-step packaging in {@code
- * buildSrc/src/main/kotlin/dash0.agent-packaging-conventions.gradle.kts} fails silently when it
- * fails: a class in the wrong place, or a service file that was not merged, produces an agent that
- * starts happily and simply never applies the Dash0 customisation. Nothing logs an error. Only
- * inspecting the artifact catches it.
- */
+/** Checks the shape of the assembled agent jar. */
 class AgentPackagingTest {
 
   private static final Path AGENT_JAR = Paths.get(System.getProperty("dash0.agent.jar"));
@@ -50,8 +42,6 @@ class AgentPackagingTest {
 
   @Test
   void neverShipsDistroClassesAsPlainClassFiles() throws IOException {
-    // A .class under inst/ would be loadable by the application's class loader,
-    // which is exactly the isolation the .classdata rename exists to enforce.
     assertThat(entryNamesOf(AGENT_JAR))
         .noneMatch(name -> name.startsWith("inst/com/dash0/") && name.endsWith(".class"));
   }
@@ -67,9 +57,6 @@ class AgentPackagingTest {
 
   @Test
   void keepsEveryUpstreamResourceProviderAlongsideTheDash0Ones() throws IOException {
-    // DuplicatesStrategy.EXCLUDE on the outer jar would drop upstream's file
-    // entirely and take only ours. That would remove every upstream resource
-    // detector, which is a large regression that no test of our own code sees.
     assertThat(providersRegisteredIn(AGENT_JAR))
         .as(
             "every provider upstream registers has to survive the merge. Comparing against"

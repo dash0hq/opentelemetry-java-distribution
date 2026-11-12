@@ -226,13 +226,7 @@ class Dash0ConfigurationCustomizerProviderTest {
     }
   }
 
-  /**
-   * A {@link ConfigProperties} holding exactly the given values.
-   *
-   * <p>Only {@code getString} is reachable from the code under test; every other accessor throws
-   * rather than returning a default, so a change that starts reading configuration some other way
-   * fails loudly here instead of silently seeing nothing.
-   */
+  /** A {@link ConfigProperties} holding exactly the given values. */
   private static ConfigProperties configOf(Map<String, String> values) {
     return new ConfigProperties() {
       @Override

@@ -13,14 +13,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Asserts that the Dash0 settings reach a real instrumented JVM and change what it does.
  *
- * <p>The unit tests in {@code :custom} prove that the customizer returns the right map. They cannot
- * prove that the agent ever invokes it, that the environment variable name resolves to the property
- * name the customizer reads, or that the value survives into the exporter. Each of those fails
- * silently: the agent starts, instruments normally, and quietly ignores the setting.
- *
- * <p>The unroutable hosts below use the reserved {@code .invalid} top-level domain, which cannot
- * resolve anywhere, so the export failure naming a host is proof of which endpoint was configured
- * without needing a collector to run.
+ * <p>The hosts below use the reserved {@code .invalid} top-level domain, which cannot resolve
+ * anywhere, so the export failure naming a host reports which endpoint was configured.
  */
 class Dash0ConfigurationTest {
 

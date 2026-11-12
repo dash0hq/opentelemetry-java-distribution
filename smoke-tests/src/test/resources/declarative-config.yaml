@@ -1,12 +1,5 @@
 # SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
 # SPDX-License-Identifier: Apache-2.0
-#
-# The smallest declarative configuration that produces readable output, used by
-# DeclarativeConfigurationTest to pin what this distribution does when
-# OTEL_CONFIG_FILE is set.
-#
-# file_format is 1.0 rather than 1.1 because that is what the agent's own
-# vendored otel-config.yaml declares. The agent warns about it either way.
 
 file_format: "1.0"
 

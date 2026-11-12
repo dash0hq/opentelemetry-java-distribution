@@ -34,9 +34,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      # Runs spotless, the unit tests, both shadow jars, and the smoke tests.
-      # The smoke tests launch a real JVM with the built agent attached, so this
-      # single command covers packaging and runtime behaviour as well as compilation.
       - name: Build
         run: ./gradlew build --stacktrace
 
@@ -65,8 +62,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The upstream agent supports Java 8 and later, so the distribution has
-        # to attach cleanly across that range, not just on the build JDK.
         java: [8, 11, 17, 21, 25, 27]
     steps:
       - uses: actions/checkout@v5
@@ -91,10 +86,6 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
 
-      # Exports to the console rather than disabling every exporter, so this
-      # asserts that the Dash0 customisations work on each JVM rather than only
-      # that the agent attaches without crashing. The smoke tests cover the
-      # build JDK; without this, nothing covered the rest of the range.
       - name: Attach the agent and assert the Dash0 attributes
         run: |
           set -euo pipefail
@@ -120,9 +111,6 @@ jobs:
           grep -q "LoggingMetricExporter" <<< "$output"
           grep -q 'telemetry.distro.name="dash0-java"' <<< "$output"
 
-          # DASH0_DISABLE exercises the configuration customizer, the other half
-          # of what this distribution adds. The run above is its control: without
-          # it, this check would also pass on a JVM where nothing ran at all.
           disabled="$(DASH0_DISABLE=true run_agent)"
           echo "$disabled"
           grep -q "test-application-completed" <<< "$disabled"
@@ -140,10 +128,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # The relocation rules are copied from upstream and decide which packages
-      # are rewritten into the agent's shaded namespace. A rule upstream added
-      # and we did not copy produces no error, only instrumentation that never
-      # runs, so nothing but this comparison would notice.
       - name: Compare against upstream at the pinned agent version
         run: scripts/check-relocations.sh
 
@@ -165,17 +149,12 @@ jobs:
       - name: Validate pending changelog entries
         run: make chlog-validate
 
-      # Changes that do not affect users are exempt: start the pull request
-      # title with "chore" or apply the "Skip Changelog" label.
       - name: Require a changelog entry
         if: >
           !startsWith(github.event.pull_request.title, 'chore')
           && !contains(github.event.pull_request.labels.*.name, 'Skip Changelog')
         run: |
           set -euo pipefail
-          # chloggen's own configuration lives under .chloggen/ and matches the
-          # same pattern, so without the second filter a pull request could
-          # satisfy the changelog requirement by editing config.yaml.
           if ! git diff --name-only "origin/${{ github.base_ref }}"...HEAD \
               | grep -E '^\.chloggen/.+\.yaml$' \
               | grep -vE '^\.chloggen/(config|TEMPLATE)\.yaml$' > /dev/null; then

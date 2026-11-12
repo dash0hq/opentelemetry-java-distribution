@@ -14,10 +14,6 @@ class DistroResourceProviderTest {
 
   @Test
   void isRegisteredAsAResourceProviderService() {
-    // This is the test that matters. If the @AutoService annotation processor
-    // stops running, the class still compiles and every other test still
-    // passes, but the agent never discovers the provider and the distro
-    // attributes silently disappear from all telemetry.
     assertThat(ServiceLoader.load(ResourceProvider.class))
         .anyMatch(DistroResourceProvider.class::isInstance);
   }
