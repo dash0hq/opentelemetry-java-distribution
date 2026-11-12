@@ -101,7 +101,17 @@ does less than it should.
     `Dash0DefaultConfigurationFileProviderTest` guards it too, against a
     temporary directory, and runs on every host.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all ten. They
+11. **A setting the agent does not read through `ConfigProperties`.**
+    `otel.semconv-stability.opt-in` is resolved by `SemconvSelectionResolver`
+    through `SystemProperty.getString`, which reads `System.getProperty` and then
+    `System.getenv` and nothing else. Returning it from `addPropertiesSupplier`
+    or `addPropertiesCustomizer` puts it in `ConfigProperties`, where the agent
+    never looks: every span keeps the superseded attribute names and no log line
+    mentions it. The default is therefore applied with `System.setProperty`
+    during startup. Check how a setting is read before defaulting it; upstream
+    documents the same restriction for `otel.semconv-stability.preview`.
+
+The smoke tests in `smoke-tests/` exist specifically to catch all eleven. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
@@ -117,6 +127,7 @@ What guards what:
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
 | 9, declarative configuration | `DeclarativeConfigurationTest`, `Dash0DeclarativeConfigurationCustomizerProviderTest` |
 | 10, the order the default configuration file is picked in | `DefaultConfigurationFileTest`, `Dash0DefaultConfigurationFileProviderTest` |
+| 11, a setting read outside `ConfigProperties` | `Dash0ConfigurationTest` |
 | Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest`, `DefaultConfigurationFileTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
 
