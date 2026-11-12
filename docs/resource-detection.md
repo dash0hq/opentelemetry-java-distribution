@@ -21,7 +21,7 @@ the same two attributes to `opentelemetry-java-instrumentation` and the jar
 manifest version.
 
 Resource providers are applied in ascending `Ordered.order()`, and later ones
-win. `DistroResourceProvider.order()` therefore returns `100`, so the Dash0
+win. `DistroResourceProvider.order()` therefore returns `200`, so the Dash0
 values are applied after upstream's.
 
 **This produces no error when it is wrong.** Without the ordering the agent
@@ -45,7 +45,7 @@ into the file alongside `OTEL_SERVICE_NAME=from-env` in the environment exports
 rather than the file's. This is deliberate rather than inherited: a value the
 operator set on the workload should beat one the package baked in. It costs
 nothing today because the two keys below are ones nothing else sets, and
-`DistroResourceProvider` takes the opposite choice with an order of `100`
+`DistroResourceProvider` takes the opposite choice with an order of `200`
 precisely because its job is to overwrite the agent's own value.
 
 Two different mechanisms produce that, and the doc used to credit the wrong one
