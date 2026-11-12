@@ -167,6 +167,17 @@ Append `/dup` to a domain to emit both sets at once, as in
 `database/dup,code,rpc,messaging`. That doubles the attributes on every affected
 span and is a migration aid rather than a resting state.
 
+To keep the superseded names everywhere, set the variable to a value that names
+no domain:
+
+```bash
+export OTEL_SEMCONV_STABILITY_OPT_IN=none
+```
+
+`none` is not a domain and selects nothing, which is what leaves every domain on
+its upstream default. Clearing the variable does not do this: a blank value is
+treated as unset, so the default above applies again.
+
 Unlike every other setting on this page, this one is applied by calling
 `System.setProperty` during agent startup, not by returning it from an
 autoconfiguration hook. The agent resolves it in `SemconvSelectionResolver`
