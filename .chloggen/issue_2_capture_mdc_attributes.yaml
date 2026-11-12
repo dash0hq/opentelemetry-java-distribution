@@ -28,6 +28,16 @@ subtext: |
   ``pwd``, ``apiKey``, ``sessionId``, ``email`` or ``ssn`` is captured and
   exported like any other, and nothing inspects values. Review what the
   application puts in MDC before upgrading.
+  A large MDC also costs attributes. Every exported record now carries every
+  captured MDC entry, and ``OTEL_ATTRIBUTE_COUNT_LIMIT`` caps a record at 128
+  attributes and drops the excess with no warning. On Logback, JBoss Log
+  Manager and Log4j 1.2 the MDC entries are what get dropped. On Log4j 2.17
+  the thread context is recorded before the exception, so a thread context at
+  or over the limit displaces ``exception.type``, ``exception.message`` and
+  ``exception.stacktrace`` instead, and an error record arrives with no stack
+  trace at all. Review the size of the MDC before upgrading as well as its
+  contents, and bound it with an included list naming the keys you want;
+  ``docs/configuration.md`` has the measurements.
   Setting any of an appender's three MDC properties on the workload replaces
   the default for that appender and leaves the other two appenders alone.
   ``OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*'``
