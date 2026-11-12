@@ -122,8 +122,31 @@ downstream service still on `parentbased_always_on` will sample the traces you
 start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
-Declarative configuration does not apply this default either, for the reason the
-next section gives.
+Declarative configuration does not apply this default either, for the reason
+`Declarative configuration` below gives.
+
+### The cloud resource detector toggles
+
+Agent 2.33.1 ships ten cloud resource detectors and starts all ten disabled.
+This distribution changes nothing about that, so the five group toggles below
+behave exactly as they do with the upstream agent. They are listed here because
+a missing `cloud.region` or `host.id` sends people looking for a Dash0 setting
+that does not exist.
+
+| Variable | Covers |
+|---|---|
+| `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | EC2, ECS, EKS, Elastic Beanstalk, Lambda |
+| `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | Azure VM, Azure App Service, Azure Functions |
+| `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | GCE, GKE, Cloud Run, Cloud Functions, App Engine |
+| `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | Cloud Foundry |
+| `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` | `host.id` from `/etc/machine-id` and its per-platform equivalents |
+
+Three of the detectors open a socket to a metadata endpoint, so a group is not
+free to enable on a host that is somewhere else. On a Linux host where traffic
+to `169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and
+`azure` adds 5.18 s to JVM startup. `docs/resource-detection.md` has the full
+table, the experiment behind those two figures, the attributes each detector
+contributes, and the reason this distribution leaves them off.
 
 ## Declarative configuration
 
