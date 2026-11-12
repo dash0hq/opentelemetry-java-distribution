@@ -48,8 +48,11 @@ subtext: |
   ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the
   workload to choose your own domains, or append ``/dup`` to a domain, as in
   ``database/dup,code,rpc,messaging``, to emit both sets while you migrate.
-  ``/dup`` covers attributes only, so it still renames the connection pool
-  instruments and still moves those three histograms to seconds. To keep the old
+  ``messaging/dup`` covers metrics too and keeps Pulsar's three pre-1.43
+  instruments alongside the new ones. The connection pool instruments are the
+  exception, because the agent picks one name for each of them rather than
+  recording both, so ``database/dup`` still renames them and still moves those
+  three histograms to seconds. To keep the old
   names everywhere, set the variable to a value that names no domain, such as
   ``none``. Clearing the variable does not work, because a blank value is
   treated as unset, and neither does writing the setting in the file named by
