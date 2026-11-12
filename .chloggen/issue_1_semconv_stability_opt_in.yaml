@@ -20,12 +20,15 @@ subtext: |
   again. ``http`` is not a value at all: HTTP semantic conventions are stable and
   the agent emits them whatever this setting says.
   Attribute names are not the only thing that changes. A JDBC span is named after
-  a summary of the query rather than ``<database> <operation>``, an RPC span is
-  named ``<method>`` rather than ``<service>/<method>``, a messaging receive span
-  has kind ``CLIENT`` rather than ``CONSUMER``, the agent starts recording
-  ``db.client.operation.duration``, and it records
-  ``messaging.client.operation.duration`` and ``messaging.client.sent.messages``
-  in place of ``messaging.publish.duration``.
+  a summary of the query rather than ``<operation> <database>.<table>``. An RPC
+  span is named ``<method>`` rather than ``<service>/<method>``, except under
+  gRPC, which always uses the full method name. A messaging receive span has kind
+  ``CLIENT`` rather than ``CONSUMER``, and a send span whose context is not
+  propagated has kind ``CLIENT`` rather than ``PRODUCER``. The agent starts
+  recording ``db.client.operation.duration``,
+  ``messaging.client.operation.duration`` and ``messaging.client.sent.messages``,
+  and Pulsar, the one instrumentation still emitting the pre-1.43
+  ``messaging.publish.duration``, stops emitting it.
   Existing dashboards, alerting rules and saved queries written against any of
   the old names stop matching, and none of them reports an error. Set
   ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the

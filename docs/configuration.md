@@ -169,16 +169,27 @@ matching:
 
 | What changes | Without the opt-in | With it |
 |---|---|---|
-| JDBC span name | `<database> <operation>` | a summary of the query |
-| RPC span name | `<service>/<method>` | `<method>` |
+| JDBC span name | `<operation> <database>.<table>` | a summary of the query |
+| RPC span name, except gRPC | `<service>/<method>` | `<method>` |
 | Messaging receive span kind | `CONSUMER` | `CLIENT` |
 | Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
 | Database metrics | none | `db.client.operation.duration` |
-| Messaging producer metrics | `messaging.publish.duration` | `messaging.client.operation.duration`, `messaging.client.sent.messages` |
+| Messaging producer metrics | none | `messaging.client.operation.duration`, `messaging.client.sent.messages` |
 
-A dashboard charting `messaging.publish.duration` goes flat, and an alert
-filtering on `span.kind = CONSUMER` for a Kafka or JMS receive stops firing.
-Neither reports an error.
+gRPC is the exception on span names because it never used the shared extractor:
+its spans are the full method name whatever this setting says.
+
+Pulsar is the exception on messaging producer metrics. It is the one
+instrumentation in agent 2.33.1 still emitting the pre-1.43
+`messaging.publish.duration`, and the opt-in stops it. Every other messaging
+instrumentation records no producer duration metric without the opt-in, so for
+Kafka, JMS, RabbitMQ and the rest the two stable instruments are an addition.
+
+An alert filtering on `span.kind = CONSUMER` for a JMS receive stops firing, and
+nothing reports an error. Kafka receive spans are not affected in a default
+agent, because that instrumentation is off until
+`otel.instrumentation.common.experimental.receive-telemetry.enabled` turns it
+on.
 
 Append `/dup` to a domain to emit both sets at once, as in
 `database/dup,code,rpc,messaging`. That doubles the attributes on every affected

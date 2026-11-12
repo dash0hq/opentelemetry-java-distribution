@@ -18,7 +18,10 @@ The first two replace the upstream agent's own values, which report
 `opentelemetry-java-instrumentation`.
 
 Two environment variables are read: `DASH0_OTEL_COLLECTOR_BASE_URL` sets the
-OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. See
+OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. Two standard
+defaults are changed: `OTEL_TRACES_SAMPLER` is `always_on` and
+`OTEL_SEMCONV_STABILITY_OPT_IN` is `database,code,rpc,messaging`, which renames
+attributes on database, code, RPC and messaging spans. See
 [configuration](configuration).
 
 Everything else is upstream behaviour, unchanged.
