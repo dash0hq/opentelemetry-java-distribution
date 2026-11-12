@@ -92,21 +92,26 @@ The release notes are the CHANGELOG.rst section for the version, converted to
 Markdown. A tag with no matching section fails the workflow.
 
 
-What is not automated
-=====================
+The documentation sync
+======================
 
-The documentation sync. ``.github/workflows/sync-docs.yml`` runs in dry-run
-mode on any pull request touching ``docs/``, which needs no credentials, but a
-real sync needs three repository secrets that do not exist on this repository:
-``DASH0_WEBSITE_SYNC_TOKEN``, ``SYNC_DOCUMENTATION_TARGET_REPOSITORY`` and
+``.github/workflows/release.yml`` calls ``.github/workflows/sync-docs.yml``
+once the release is published, so a release syncs the docs without anyone
+asking it to.
+
+A real sync needs three repository secrets that do not exist on this
+repository: ``DASH0_WEBSITE_SYNC_TOKEN``,
+``SYNC_DOCUMENTATION_TARGET_REPOSITORY`` and
 ``SYNC_DOCUMENTATION_TARGET_DIRECTORY``. They are repository-level secrets on
 the Ruby distribution, not organisation-level, so someone with administrator
-access has to create them here.
+access has to create them here. Until they exist, the sync job fails on every
+release. The sync job runs after the publish step, so the release itself is
+already published and complete when the sync fails, and the failure is
+repaired by running the sync again from the Actions tab.
 
-Until they exist, run the sync by hand from the Actions tab with ``dry-run``
-unchecked. Once they exist, chain it off the release the way the Ruby
-distribution does, with a ``workflow_call`` trigger here and a ``needs:`` job
-in ``release.yml``.
+The sync also runs in dry-run mode on any pull request touching ``docs/``.
+Dry-run mode needs no credentials and checks that every file under ``docs/``
+is listed in ``transformations.yaml``.
 
 
 Cadence
@@ -143,10 +148,6 @@ the same agent:
 - ``images/instrumentation/jvm/pom.xml`` in `dash0hq/dash0-operator
   <https://github.com/dash0hq/dash0-operator>`_, which the operator's
   instrumentation image uses to download the agent it injects.
-
-This repository is at 2.33.1 and the operator at 2.32.0, so they disagree
-today. Nothing depends on them agreeing while the operator downloads the
-stock agent from Maven rather than consuming this distribution.
 
 Nothing enforces that they agree, and they are bumped by different people on
 different schedules. Once this distribution is what the operator ships, the
