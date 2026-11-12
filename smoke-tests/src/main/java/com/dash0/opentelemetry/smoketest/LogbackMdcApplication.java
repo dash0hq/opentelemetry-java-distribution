@@ -14,9 +14,9 @@ public final class LogbackMdcApplication {
 
   public static void main(String[] args) throws InterruptedException {
     MDC.put(MdcEntries.ORDINARY_KEY, MdcEntries.ORDINARY_VALUE);
-    MDC.put(MdcEntries.LOWER_CASE_KEY, MdcEntries.CREDENTIAL_VALUE);
-    MDC.put(MdcEntries.CAMEL_CASE_KEY, MdcEntries.CREDENTIAL_VALUE);
-    MDC.put(MdcEntries.UPPER_CASE_KEY, MdcEntries.CREDENTIAL_VALUE);
+    for (String key : MdcEntries.CREDENTIAL_KEYS) {
+      MDC.put(key, MdcEntries.CREDENTIAL_VALUE);
+    }
 
     LoggerFactory.getLogger(LogbackMdcApplication.class).info(MdcEntries.MESSAGE);
 

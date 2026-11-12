@@ -19,9 +19,9 @@ public final class Log4jMdcApplication {
 
   public static void main(String[] args) throws InterruptedException {
     ThreadContext.put(MdcEntries.ORDINARY_KEY, MdcEntries.ORDINARY_VALUE);
-    ThreadContext.put(MdcEntries.LOWER_CASE_KEY, MdcEntries.CREDENTIAL_VALUE);
-    ThreadContext.put(MdcEntries.CAMEL_CASE_KEY, MdcEntries.CREDENTIAL_VALUE);
-    ThreadContext.put(MdcEntries.UPPER_CASE_KEY, MdcEntries.CREDENTIAL_VALUE);
+    for (String key : MdcEntries.CREDENTIAL_KEYS) {
+      ThreadContext.put(key, MdcEntries.CREDENTIAL_VALUE);
+    }
 
     LogManager.getLogger(Log4jMdcApplication.class).info(MdcEntries.MESSAGE);
 

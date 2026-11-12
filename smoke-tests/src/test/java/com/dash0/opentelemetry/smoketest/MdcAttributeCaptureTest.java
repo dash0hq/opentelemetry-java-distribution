@@ -81,7 +81,10 @@ class MdcAttributeCaptureTest {
         exportingLogsToTheConsole(
                 InstrumentedJvm.runningTheApplication(LogbackMdcApplication.class))
             .withJvmArguments(
-                "-D" + LOGBACK_SELECTOR + "capture-mdc-attributes=" + MdcEntries.UPPER_CASE_KEY)
+                "-D"
+                    + LOGBACK_SELECTOR
+                    + "capture-mdc-attributes="
+                    + MdcEntries.UPPER_CASE_AUTHORIZATION_KEY)
             .run();
 
     assertThat(output)
@@ -90,7 +93,7 @@ class MdcAttributeCaptureTest {
                 + " is what makes the two cases tell apart. Standing down exports %s and nothing"
                 + " else; contributing the deny list anyway makes agent 2.33.1 ignore"
                 + " capture-mdc-attributes and export %s instead. The JVM's output was:%n%s",
-            MdcEntries.UPPER_CASE_KEY, MdcEntries.ORDINARY_KEY, output)
+            MdcEntries.UPPER_CASE_AUTHORIZATION_KEY, MdcEntries.ORDINARY_KEY, output)
         .contains(MdcEntries.CREDENTIAL_VALUE)
         .doesNotContain(MdcEntries.ORDINARY_VALUE);
   }
@@ -106,11 +109,12 @@ class MdcAttributeCaptureTest {
         .contains(MdcEntries.ORDINARY_VALUE);
     assertThat(output)
         .as(
-            "the deny list is twelve case-sensitive globs covering three spellings, so %s, %s and"
-                + " %s are all excluded. A dead agent exports nothing and would satisfy this"
+            "the application sets one credential-shaped key per deny-list pattern, each matched by"
+                + " that pattern alone, so deleting or mistyping any one of the twelve exports the"
+                + " key it covered: %s. A dead agent exports nothing and would satisfy this"
                 + " assertion on its own, which is why the attribute above is asserted present in"
                 + " the same run. The JVM's output was:%n%s",
-            MdcEntries.LOWER_CASE_KEY, MdcEntries.CAMEL_CASE_KEY, MdcEntries.UPPER_CASE_KEY, output)
+            MdcEntries.CREDENTIAL_KEYS, output)
         .doesNotContain(MdcEntries.CREDENTIAL_VALUE);
   }
 

@@ -4,11 +4,15 @@
  */
 package com.dash0.opentelemetry.smoketest;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * The MDC keys and values the three MDC applications set, and the message they log.
  *
- * <p>One key is an ordinary identifier and the other three carry a credential-shaped key, one per
- * spelling the deny list has to cover.
+ * <p>One key is an ordinary identifier. The other twelve are credential-shaped, one for each
+ * pattern in the distribution's deny list, and each matched by that pattern alone.
  */
 public final class MdcEntries {
 
@@ -21,17 +25,28 @@ public final class MdcEntries {
   /** The value of {@link #ORDINARY_KEY}. */
   public static final String ORDINARY_VALUE = "tenant-4711";
 
-  /** A credential-shaped MDC key spelled in lower case. */
-  public static final String LOWER_CASE_KEY = "session-token";
+  /** The credential-shaped key matched by the {@code *AUTHORIZATION*} pattern. */
+  public static final String UPPER_CASE_AUTHORIZATION_KEY = "X-AUTHORIZATION";
 
-  /** A credential-shaped MDC key spelled in camel case. */
-  public static final String CAMEL_CASE_KEY = "authToken";
-
-  /** A credential-shaped MDC key spelled in upper case. */
-  public static final String UPPER_CASE_KEY = "X-AUTHORIZATION";
-
-  /** The value of all three credential-shaped keys. */
+  /** The value of every key in {@link #CREDENTIAL_KEYS}. */
   public static final String CREDENTIAL_VALUE = "credential-value-that-must-not-be-exported";
+
+  /** One credential-shaped key per deny-list pattern, in the order the patterns are written. */
+  public static final List<String> CREDENTIAL_KEYS =
+      Collections.unmodifiableList(
+          Arrays.asList(
+              "session-token",
+              "authToken",
+              "REFRESH_TOKEN",
+              "client-secret",
+              "clientSecret",
+              "CLIENT_SECRET",
+              "user-password",
+              "userPassword",
+              "DB_PASSWORD",
+              "authorization",
+              "proxyAuthorization",
+              UPPER_CASE_AUTHORIZATION_KEY));
 
   private MdcEntries() {}
 }
