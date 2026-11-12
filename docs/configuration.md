@@ -73,12 +73,13 @@ three and the third has no Java counterpart:
 ## Standard OpenTelemetry variables
 
 Under environment configuration, all standard `OTEL_*` configuration works as it
-does with the upstream agent. Two standard defaults are changed:
+does with the upstream agent. Three standard defaults are changed:
 
 | Variable | This distribution | Upstream |
 |---|---|---|
 | `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
 | `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | `tracecontext,baggage` |
+| `OTEL_SEMCONV_STABILITY_OPT_IN` | `database,code,rpc,messaging` | unset |
 
 Under a configuration file the SDK reads almost none of them, and that mode is now
 reached without setting `OTEL_CONFIG_FILE` at all. [Declarative
@@ -256,6 +257,65 @@ or logs.
 
 Declarative configuration applies this default too, as
 `propagator.composite_list`. The next section describes the mechanism.
+
+### `OTEL_SEMCONV_STABILITY_OPT_IN`
+
+The distribution sets `otel.semconv-stability.opt-in=database,code,rpc,messaging`,
+so your spans carry the newer attribute names from the first day you run them
+rather than the superseded ones. Setting `OTEL_SEMCONV_STABILITY_OPT_IN` or
+`-Dotel.semconv-stability.opt-in` on the workload replaces the whole value; a
+blank one is treated as unset.
+
+The value is a comma-separated list of domains. Agent 2.33.1 accepts five, and
+the two columns below differ in what the semantic conventions working group has
+settled:
+
+| Domain | Without the opt-in | With it |
+|---|---|---|
+| `database` | old | stable |
+| `code` | old | stable |
+| `rpc` | old | experimental |
+| `messaging` | old | experimental |
+| `service.peer` | old | experimental |
+
+`http` is not in the list. HTTP semantic conventions are stable, the flag that
+selected them is gone, and the agent emits the stable attribute names whatever
+this variable says.
+
+`service.peer` is not in the default either, because its experimental attributes
+are expected to change again and adopting them now buys a second rename later.
+`rpc` and `messaging` are in it even though they are experimental, because the
+working group considers the current shape close to final.
+
+The database attributes are the ones most people notice. Without the opt-in a
+JDBC span carries `db.statement`, `db.system`, `db.name` and `db.operation`;
+with it, `db.query.text`, `db.system.name`, `db.namespace` and
+`db.operation.name`.
+
+Append `/dup` to a domain to emit both sets at once, as in
+`database/dup,code,rpc,messaging`. That doubles the attributes on every affected
+span and is a migration aid rather than a resting state.
+
+Unlike every other setting on this page, this one is applied by calling
+`System.setProperty` during agent startup, not by returning it from an
+autoconfiguration hook. The agent resolves it in `SemconvSelectionResolver`
+through `SystemProperty.getString`, which reads `System.getProperty` and then
+`System.getenv` and consults the SDK's resolved configuration for it in no other
+way. A value returned from `addPropertiesSupplier` or `addPropertiesCustomizer`
+reaches `ConfigProperties` and stops there, so the agent never sees it, the old
+attribute names keep arriving, and nothing in the log says why. Upstream
+documents the same restriction for the sibling setting
+`otel.semconv-stability.preview`.
+
+The guard reads both sources before setting anything: the system property is
+left alone when it already has a value, and nothing is set at all when
+`OTEL_SEMCONV_STABILITY_OPT_IN` is in the environment, since a system property
+would shadow the variable the agent reads next.
+
+Declarative configuration does not apply this default either, for the reason the
+next section gives. A file expresses the same choice as `stability_opt_in_list`
+under `general`, which `general.db.semconv.version` and its siblings then beat
+per domain.
 
 ## Declarative configuration
 
