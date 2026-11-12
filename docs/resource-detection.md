@@ -52,11 +52,16 @@ Two different mechanisms produce that, and the doc used to credit the wrong one
 for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
 `EnvironmentResourceProvider`, which declares an order of `2147483646`, so the
-environment is applied last whatever anything else does. The upstream detectors
-declare no order at all, which means `0`; `Dash0PackageResourceProvider`
-declares `Integer.MIN_VALUE`, so it is applied first and every detector
+environment is applied last whatever anything else does. Four other upstream
+detectors declare an order of their own, `100` on the Spring Boot service-name
+detector, `300` on `ManifestResourceProvider`, `1000` on
+`JarServiceNameDetector` and `2147483646` on `HostIdResourceProvider`, while
+the container, host, OS, process and process-runtime detectors leave it at the
+default `0`. `Dash0PackageResourceProvider` declares `Integer.MIN_VALUE`, which
+sorts below every one of them, so it is applied first and every detector
 overwrites it. Leaving the Dash0 provider on the default `0` would tie with the
-detectors, and a tie is settled by position in the merged `META-INF/services`
+five that sit there, and a tie is settled by position in the merged
+`META-INF/services`
 file, which is a byproduct of the order `mergeServiceFiles` concatenates in and
 could flip without failing anything.
 
@@ -203,12 +208,14 @@ no timeout applies. Where `metadata.google.internal` resolves to an address that
 accepts the connection and then answers nothing, the `premain` waits with no
 bound on how long.
 
-A run of the same configurations on a macOS 14.6 host added between 0.1 s and
-0.4 s instead. Both sets of figures are right. What decides the cost is what the
-network does with a packet addressed to a metadata endpoint it has no route for:
-a host that answers with an ICMP error or a TCP reset pays almost nothing, and a
-host that drops the packet pays the full timeout. An operator shipping this
-distribution cannot know in advance which kind of host it lands on.
+The run reported in issue 4 of this repository, on a macOS 14.6 host, costs
+almost nothing. Reduced the same way, fastest run against fastest baseline run,
+`aws` adds 0.13 s there, `azure` 0.09 s and `gcp` 0.03 s. Both sets of figures
+are right. What decides the cost is what the network does with a packet
+addressed to a metadata endpoint it has no route for: a host that answers with
+an ICMP error or a TCP reset pays almost nothing, and a host that drops the
+packet pays the full timeout. An operator shipping this distribution cannot know
+in advance which kind of host it lands on.
 
 ### Why they stay off
 
@@ -278,13 +285,11 @@ second of those, leaving `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` and its own
 trap as the only way back. That is machinery to maintain for a group this
 distribution has decided not to enable.
 
-Leaving them off also keeps one sentence true, that this distribution runs
-upstream's detectors and no others. It changes the value of
-`telemetry.distro.name` and `telemetry.distro.version` and contributes
-`dash0.package.name` and `dash0.package.version` when a Linux package wrote the
-file they come from, so the set of attributes a detector produces stays
-upstream's. Every upstream troubleshooting document therefore applies here
-unchanged.
+Leaving them off also keeps one sentence true, that this distribution enables
+no detector upstream ships disabled. Every upstream troubleshooting document
+about a cloud attribute that did not arrive therefore applies here unchanged,
+and the answer to "why is `cloud.region` missing" is upstream's answer rather
+than one of ours.
 
 ### Turning a group on
 
