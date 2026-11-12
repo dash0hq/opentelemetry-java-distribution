@@ -4,7 +4,7 @@ component: custom
 
 note: Default otel.semconv-stability.opt-in to database,code,rpc,messaging, so spans carry the newer semantic convention attribute names
 
-issues: [1]
+issues: [12]
 
 subtext: |
   The distribution set nothing and inherited the upstream agent's default, which
