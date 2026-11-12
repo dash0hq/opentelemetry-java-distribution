@@ -1,0 +1,39 @@
+change_type: enhancement
+
+component: custom
+
+note: Default otel.semconv-stability.opt-in to database,code,rpc,messaging, so spans carry the newer semantic convention attribute names
+
+issues: [1]
+
+subtext: |
+  The distribution set nothing and inherited the upstream agent's default, which
+  is the superseded convention in every domain. A JDBC span carried
+  ``db.statement``, ``db.system``, ``db.name`` and ``db.operation`` rather than
+  ``db.query.text``, ``db.system.name``, ``db.namespace`` and
+  ``db.operation.name``.
+  ``database`` and ``code`` select conventions the semantic conventions working
+  group has declared stable. ``rpc`` and ``messaging`` select experimental ones,
+  included because the working group considers their current shape close to
+  final; a future agent version may still rename those attributes.
+  ``service.peer`` is left out, because its attributes are expected to change
+  again. ``http`` is not a value at all: HTTP semantic conventions are stable and
+  the agent emits them whatever this setting says.
+  Existing dashboards, alerting rules and saved queries written against the old
+  attribute names stop matching the affected spans. Set
+  ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the
+  workload to choose your own domains, or append ``/dup`` to a domain, as in
+  ``database/dup,code,rpc,messaging``, to emit both sets while you migrate.
+  The value is applied with ``System.setProperty`` during agent startup rather
+  than through an autoconfiguration hook. The agent resolves it in
+  ``SemconvSelectionResolver`` with ``SystemProperty.getString``, which reads
+  only ``System.getProperty`` and ``System.getenv``, so a value returned from
+  ``addPropertiesSupplier`` or ``addPropertiesCustomizer`` would reach
+  ``ConfigProperties`` and change no attribute. Nothing is set when the system
+  property or the environment variable already carries a value.
+  Declarative configuration is unaffected and remains unsupported. Under
+  ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so this
+  default does not apply there any more than ``DASH0_DISABLE`` and the
+  ``always_on`` sampler do; see ``docs/configuration.md``.
+
+change_logs: [user]
