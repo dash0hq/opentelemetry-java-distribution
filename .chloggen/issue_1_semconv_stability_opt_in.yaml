@@ -34,7 +34,10 @@ subtext: |
   emitting the pre-1.43 ``messaging.publish.duration``,
   ``messaging.receive.duration`` and ``messaging.receive.messages``, stops
   emitting all three. Every connection pool instrument is renamed from
-  ``db.client.connections.*`` to ``db.client.connection.*``, its ``pool.name``
+  ``db.client.connections.*`` to ``db.client.connection.*``, two of them by more
+  than the prefix: ``db.client.connections.usage`` becomes
+  ``db.client.connection.count`` and ``db.client.connections.max`` becomes
+  ``db.client.connection.limit``. The ``pool.name``
   and ``state`` attributes become ``db.client.connection.pool.name`` and
   ``db.client.connection.state``, and ``create_time``, ``wait_time`` and
   ``use_time`` are recorded in seconds rather than milliseconds. A threshold

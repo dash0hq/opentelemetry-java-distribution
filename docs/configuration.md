@@ -174,7 +174,8 @@ alert written against any of these stops matching with no error anywhere:
 | Messaging receive span kind | `CONSUMER` | `CLIENT` |
 | Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
 | RabbitMQ `basicGet` receive span | not recorded | recorded |
-| Connection pool metrics | `db.client.connections.*` | `db.client.connection.*` |
+| Connection pool metrics | `db.client.connections.usage`, `db.client.connections.max` | `db.client.connection.count`, `db.client.connection.limit` |
+| The other connection pool metrics | `db.client.connections.*` | `db.client.connection.*`, same suffix |
 | Connection pool metric attributes | `pool.name`, `state` | `db.client.connection.pool.name`, `db.client.connection.state` |
 | `create_time`, `wait_time`, `use_time` | milliseconds | **seconds** |
 | Database operation metrics | none | `db.client.operation.duration` |
