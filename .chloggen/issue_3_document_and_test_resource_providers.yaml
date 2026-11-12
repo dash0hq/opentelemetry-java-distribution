@@ -1,0 +1,34 @@
+change_type: enhancement
+
+component: custom
+
+note: Move DistroResourceProvider to an order value no other resource provider in the agent jar uses, and document every provider the distribution ships
+
+issues: [3]
+
+subtext: |
+  ``DistroResourceProvider`` returned ``100`` from ``order()``. At agent 2.33.1
+  so do ``SpringBootServiceNameDetector``, which inherits it, and
+  ``AzureVmResourceProvider``. Three providers at one order value leaves the
+  sequence they are applied in decided by their position in the merged
+  ``META-INF/services`` file, which is a byproduct of the order
+  ``mergeServiceFiles`` concatenates in. The keys are disjoint today, so
+  nothing observable changes; what the tie costs is the guarantee, because a
+  provider added at ``100`` later that does set ``telemetry.distro.name``
+  would overwrite the Dash0 value with no error at all. ``200`` is unused by
+  all 25 providers in the built jar, and still beats upstream's own
+  ``DistroResourceProvider``, which declares no order and so gets ``0``.
+  ``docs/resource-detection.md`` now lists all 23 upstream providers with their
+  ``order()`` values and what each contributes, says which eleven are off by
+  default, and gives the ``service.name`` a real JVM reported for each of eight
+  launch shapes. ``docs/configuration.md`` gains the five
+  ``otel.resource.providers.<group>.enabled`` toggles and a section on
+  ``host.id``, which stays off: ``/etc/machine-id`` is baked into a container
+  image, so every container started from one image would report the same value.
+  Both files now warn that ``otel.java.enabled.resource.providers`` is an
+  allow-list. Setting it to enable one detector switches off every provider it
+  does not name, including ``DistroResourceProvider``, and the process then
+  reports no distribution attributes at all with nothing in its output saying
+  so.
+
+change_logs: [user]
