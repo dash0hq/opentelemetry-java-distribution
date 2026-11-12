@@ -73,8 +73,12 @@ three and the third has no Java counterpart:
 ## Standard OpenTelemetry variables
 
 All standard `OTEL_*` configuration works as it does with the upstream agent.
-One standard default is changed: `OTEL_TRACES_SAMPLER` is `always_on` here and
-`parentbased_always_on` upstream.
+Two standard defaults are changed:
+
+| Setting | Here | Upstream |
+|---|---|---|
+| `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
+| `OTEL_INSTRUMENTATION_<APPENDER>_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED` | a deny list of credential-shaped key patterns | unset, which captures no MDC |
 
 Upstream's configuration reference:
 https://opentelemetry.io/docs/zero-code/java/agent/configuration/
@@ -123,7 +127,109 @@ start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
 Declarative configuration does not apply this default either, for the reason the
-next section gives.
+last section gives.
+
+### MDC capture
+
+MDC, the Mapped Diagnostic Context, is where an application puts the
+identifiers people filter logs by: request id, tenant, customer, user, job id.
+The upstream agent captures none of them, so those values reach Dash0 only as
+a substring of the message body, if the log pattern includes them at all.
+
+This distribution captures every MDC entry whose key does not look like a
+credential, on all three appender instrumentations that read an MDC selector:
+
+| Property | Appender |
+|---|---|
+| `otel.instrumentation.logback-appender.experimental.mdc-attributes.excluded` | Logback 1.0 and later |
+| `otel.instrumentation.log4j-appender.experimental.mdc-attributes.excluded` | Log4j 2.17 and later, where MDC is called context data |
+| `otel.instrumentation.jboss-logmanager.experimental.mdc-attributes.excluded` | JBoss Log Manager 1.1 and later, used by WildFly and JBoss EAP |
+
+Each is set to the same twelve patterns:
+
+```
+*token*,*Token*,*TOKEN*,*secret*,*Secret*,*SECRET*,*password*,*Password*,*PASSWORD*,*authorization*,*Authorization*,*AUTHORIZATION*
+```
+
+No `.included` property is set. An excluded selector with no included selector
+captures every key that does not match it, so this one value both turns capture
+on and keeps the credential-shaped keys out.
+
+The patterns are globs, where `*` matches any number of characters and `?`
+matches exactly one. Matching is case-sensitive, which is why each stem appears
+in three spellings: `*token*` on its own matches `session-token` and misses
+both `authToken` and `AUTH_TOKEN`.
+
+#### Changing what is captured
+
+Setting any of an appender's three MDC properties on the workload replaces the
+default for that appender and leaves the other two appenders alone:
+
+```
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_INCLUDED
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES
+```
+
+All three feed one selector in the agent, and configuring any of them makes the
+agent ignore the other two. A default excluded list that applied anyway would
+turn an existing `CAPTURE_MDC_ATTRIBUTES` allow list into everything-not-denied
+and capture more than its author asked for, so the distribution contributes its
+value only when all three are absent or blank. An exported but empty variable
+counts as absent, matching what the agent does with one.
+
+Capture everything, including the credential-shaped keys:
+
+```bash
+export OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_INCLUDED='*'
+```
+
+Capture nothing, which is the upstream behaviour:
+
+```bash
+export OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*'
+```
+
+Capture a known set of keys and nothing else:
+
+```bash
+export OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_INCLUDED='request.id,tenant.id,user.*'
+```
+
+Extend the deny list rather than replace it by restating the twelve patterns
+above and appending to them. There is no property that adds to a default.
+
+#### What the deny list does not do
+
+It is a mitigation and not a guarantee. It matches four stems, so an MDC key
+named `jwt`, `bearer`, `pwd`, `apiKey`, `sessionId`, `email` or `ssn` is
+captured and exported like any other. Nothing inspects values, so a credential
+stored under an innocuous key goes through whatever the key is called.
+
+Treat the deny list as the floor and raise it where the application warrants
+it, with an included list naming the keys you want, with Dash0's Signal Control
+transformations, or by keeping the value out of MDC in the first place.
+
+#### These are experimental property names
+
+Every property on this page under `otel.instrumentation.*.experimental.*` is
+marked experimental by upstream, which may rename or remove it in any minor
+release with no deprecation period that the agent enforces. Recheck all nine
+names against the appender READMEs of the new version whenever
+`opentelemetryJavaagent` in `gradle/libs.versions.toml` is bumped. A name that
+no longer exists is read by nothing and reports nothing: logs simply arrive
+without MDC attributes.
+
+Between agent 2.32.0 and 2.33.1 that happened to the setting this feature was
+first specified against. At 2.32.0,
+`otel.instrumentation.logback-appender.experimental.capture-mdc-attributes` was
+a boolean defaulting to `false`. At 2.33.1 it is a deprecated comma-separated
+list of literal MDC keys, so setting it to `true` captures an MDC key named
+`true` and nothing else, with no warning. The `mdc-attributes.included` and
+`mdc-attributes.excluded` pair replaced it, and is what this distribution sets.
+
+Declarative configuration does not apply these defaults either, for the reason
+the next section gives.
 
 ## Declarative configuration
 
@@ -165,10 +271,11 @@ version string survives only because upstream's own
 `io.opentelemetry.javaagent.tooling.resources.ResourceCustomizerProvider` reads
 it from the agent jar manifest, which this build writes. No
 `AutoConfigurationCustomizerProvider` runs at all, so `DASH0_DISABLE`,
-`DASH0_OTEL_COLLECTOR_BASE_URL` and the `always_on` sampler default are silently
-ignored; a file that omits `sampler` gets the specification's
-`parentbased_always_on`. Every upstream host, process and OS detector disappears
-as well.
+`DASH0_OTEL_COLLECTOR_BASE_URL`, the `always_on` sampler default and the MDC
+capture defaults are silently ignored; a file that omits `sampler` gets the
+specification's `parentbased_always_on`, and one that omits
+`mdc_attributes/development` captures no MDC. Every upstream host, process and
+OS detector disappears as well.
 
 The cause is that declarative configuration uses two different SPIs.
 `AutoConfigurationCustomizerProvider` and `ResourceProvider` are not consulted;
