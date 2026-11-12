@@ -4,7 +4,7 @@ component: custom
 
 note: Move DistroResourceProvider to an order value no other resource provider in the agent jar uses, and document every provider the distribution ships
 
-issues: [3]
+issues: [13]
 
 subtext: |
   ``DistroResourceProvider`` returned ``100`` from ``order()``. At agent 2.33.1
