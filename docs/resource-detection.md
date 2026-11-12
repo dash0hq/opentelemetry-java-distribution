@@ -108,7 +108,8 @@ The service file is
 inside `agent/build/libs/dash0-opentelemetry-javaagent-*.jar`. At agent 2.33.1
 it lists 25 providers: the two Dash0 ones above and the 23 upstream ones here.
 The `.classdata` entries under `inst/` are ordinary class files, so `javap`
-reads the `order()` values out of them directly.
+reads the `order()` values out of them once each entry is copied to a file whose
+name ends in `.class`, which `javap` requires.
 
 The table below is read off agent 2.33.1 by hand and nothing pins it to the jar.
 `AgentPackagingTest` compares two jars of the same upstream version against each
@@ -144,8 +145,8 @@ at 2.33.1, which matters to anything naming it in
 
 Eleven of the 23 are off by default, and ten of those eleven are cloud
 detectors. `HostIdResourceProvider` is the only non-cloud one. The five group
-names and what each toggle does are in
-[`docs/configuration.md`](configuration.md#resource-provider-toggles).
+names and what each toggle does are in the resource-provider section of
+[configuration](configuration).
 
 ### `otel.java.enabled.resource.providers` is an allow-list
 
@@ -184,7 +185,7 @@ is the one that wins:
 | `order()` | Provider | Where the name comes from |
 |---|---|---|
 | `-2147483648` | `Dash0PackageResourceProvider` | a `service.name` key in `dash0-resource-attributes.properties`, which no Dash0 package writes |
-| `100` | `SpringBootServiceNameDetector` | a `--spring.application.name=` argument in `sun.java.command`, the `spring.application.name` system property, `SPRING_APPLICATION_NAME`, then `application` and `bootstrap` `.properties`, `.yml` and `.yaml` files in the working directory and on the class path |
+| `100` | `SpringBootServiceNameDetector` | a `--spring.application.name=` argument in `sun.java.command`, the `spring.application.name` system property, `SPRING_APPLICATION_NAME`, then `application.properties`, `application.yml` and `application.yaml` in the working directory, then the same three on the class path, then `bootstrap.properties`, `bootstrap.yml` and `bootstrap.yaml` on the class path. There is no working-directory lookup for a `bootstrap` file. |
 | `300` | `ManifestResourceProvider` | `Implementation-Title` in the main jar's manifest |
 | `1000` | `JarServiceNameDetector` | the main jar's file name, without the `.jar` suffix |
 | `2147483646` | `EnvironmentResourceProvider` | `OTEL_SERVICE_NAME`, or a `service.name` entry in `OTEL_RESOURCE_ATTRIBUTES` |

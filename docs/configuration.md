@@ -66,7 +66,7 @@ three and the third has no Java counterpart:
 
 | Variable | Why it is absent |
 |---|---|
-| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default; see [`docs/resource-detection.md`](resource-detection.md#servicename). |
+| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default; the `service.name` section of [resource detection](resource-detection) gives the value a JVM reports for each launch shape. |
 | `DASH0_FLUSH_ON_SIGTERM_SIGINT` | The agent registers a JVM shutdown hook that flushes. |
 | `DASH0_BOOTSTRAP_SPAN` | No Java equivalent, and no demand recorded for one. |
 
@@ -143,16 +143,21 @@ Those five are the only correct toggles, and this distribution changes none of
 the defaults.
 
 `otel.java.enabled.resource.providers` is an allow-list rather than a second way
-to spell these, and setting it switches off every provider it does not name. See
-[`docs/resource-detection.md`](resource-detection.md#oteljavaenabledresourceproviders-is-an-allow-list).
+to spell these, and setting it switches off every provider it does not name.
+[Resource detection](resource-detection) gives what a JVM exported when it was
+set.
 
 The hyphen in `otel.resource.providers.host-id.enabled` is not a typo, and the
-environment spelling is still all underscores. `ConfigUtil.normalizePropertyKey`
-lowercases a name and replaces each hyphen with a dot before the lookup, so
-`OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
-`-Dotel.resource.providers.host-id.enabled` arrive as the same key. Both were
-observed switching `HostIdResourceProvider` on at agent 2.33.1. An environment
-variable whose name carries a literal hyphen was observed doing nothing.
+environment spelling is still all underscores. Two different methods normalise a
+name before the lookup. `ConfigUtil.normalizePropertyKey` lowercases it and
+turns each hyphen into a dot, and is applied to a system property and to the key
+a provider asks for. `ConfigUtil.normalizeEnvironmentVariableKey` lowercases it
+and turns each underscore into a dot, and is applied to an environment variable.
+Both `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
+`-Dotel.resource.providers.host-id.enabled` therefore arrive as
+`otel.resource.providers.host.id.enabled`, and both were observed switching
+`HostIdResourceProvider` on at agent 2.33.1. An environment variable whose name
+carries a literal hyphen was observed doing nothing.
 
 ### `host.id`
 
