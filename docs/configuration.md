@@ -66,7 +66,7 @@ three and the third has no Java counterpart:
 
 | Variable | Why it is absent |
 |---|---|
-| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default. |
+| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default; see [`docs/resource-detection.md`](resource-detection.md#servicename). |
 | `DASH0_FLUSH_ON_SIGTERM_SIGINT` | The agent registers a JVM shutdown hook that flushes. |
 | `DASH0_BOOTSTRAP_SPAN` | No Java equivalent, and no demand recorded for one. |
 
@@ -124,6 +124,58 @@ someone else's process rather than yours.
 
 Declarative configuration does not apply this default either, for the reason the
 next section gives.
+
+### Resource-provider toggles
+
+The upstream agent ships eleven resource providers switched off, grouped into
+five groups that `ResourceProviderPropertiesCustomizer` gates on one property
+each:
+
+| Property | Environment variable | Providers it covers | Default |
+|---|---|---|---|
+| `otel.resource.providers.aws.enabled` | `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` | `false` |
+| `otel.resource.providers.gcp.enabled` | `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | `GCPResourceProvider` | `false` |
+| `otel.resource.providers.azure.enabled` | `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider`, `AzureVmResourceProvider` | `false` |
+| `otel.resource.providers.cloudfoundry.enabled` | `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | `CloudFoundryResourceProvider` | `false` |
+| `otel.resource.providers.host-id.enabled` | `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` | `HostIdResourceProvider` | `false` |
+
+Those five are the only correct toggles, and this distribution changes none of
+the defaults.
+
+`otel.java.enabled.resource.providers` is an allow-list rather than a second way
+to spell these, and setting it switches off every provider it does not name. See
+[`docs/resource-detection.md`](resource-detection.md#oteljavaenabledresourceproviders-is-an-allow-list).
+
+The hyphen in `otel.resource.providers.host-id.enabled` is not a typo, and the
+environment spelling is still all underscores. `ConfigUtil.normalizePropertyKey`
+lowercases a name and replaces each hyphen with a dot before the lookup, so
+`OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
+`-Dotel.resource.providers.host-id.enabled` arrive as the same key. Both were
+observed switching `HostIdResourceProvider` on at agent 2.33.1. An environment
+variable whose name carries a literal hyphen was observed doing nothing.
+
+### `host.id`
+
+`HostIdResourceProvider` is the one non-cloud provider the agent ships disabled,
+and this distribution leaves it disabled. Switch it on with
+`OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED=true` only after reading what it does
+on your platform.
+
+On Linux it reads `/etc/machine-id`, falling back to
+`/var/lib/dbus/machine-id`. Either file is baked into a container image at build
+time, so every container started from one image reports the same `host.id`, and
+the attribute groups unrelated workloads together instead of separating them.
+The failure is confident rather than noisy: a wrong identifier arrives looking
+exactly like a right one.
+
+On macOS and Windows it forks a subprocess at startup, `/usr/sbin/ioreg` and
+`reg.exe query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid`
+respectively, which costs startup time in every process the agent attaches to.
+On BSD it reads `/etc/hostid` or runs `/bin/kenv`.
+
+On a Linux host running the Dash0 Linux package rather than a container,
+`/etc/machine-id` is a stable and correct identifier for that host, and
+switching the group on is reasonable.
 
 ## Declarative configuration
 
