@@ -149,8 +149,6 @@ the same agent:
   <https://github.com/dash0hq/dash0-operator>`_, which the operator's
   instrumentation image uses to download the agent it injects.
 
-Both are at 2.33.1 today.
-
 Nothing enforces that they agree, and they are bumped by different people on
 different schedules. Once this distribution is what the operator ships, the
 operator's pom stops naming the agent at all and the coupling disappears. Until
