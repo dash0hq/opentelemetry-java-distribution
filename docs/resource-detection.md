@@ -278,9 +278,13 @@ second of those, leaving `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` and its own
 trap as the only way back. That is machinery to maintain for a group this
 distribution has decided not to enable.
 
-Leaving them off also keeps one sentence true, that the resource this
-distribution exports is the resource the upstream agent exports plus two Dash0
-attributes. Every upstream troubleshooting document then applies here unchanged.
+Leaving them off also keeps one sentence true, that this distribution runs
+upstream's detectors and no others. It changes the value of
+`telemetry.distro.name` and `telemetry.distro.version` and contributes
+`dash0.package.name` and `dash0.package.version` when a Linux package wrote the
+file they come from, so the set of attributes a detector produces stays
+upstream's. Every upstream troubleshooting document therefore applies here
+unchanged.
 
 ### Turning a group on
 
