@@ -26,48 +26,18 @@ import java.util.logging.Logger;
 /**
  * Contributes the resource attributes written by whatever installed the agent jar.
  *
- * <p>The Dash0 Node.js, Python and Ruby distributions are started by a script the Linux package
- * owns, so that script appends {@code dash0.package.name} and {@code dash0.package.version} to
- * {@code OTEL_RESOURCE_ATTRIBUTES} before the SDK starts. A Java agent has no such script: the
- * OpenTelemetry injector contributes only {@code -javaagent:}, so there is nowhere for the package
- * to put those attributes.
+ * <p>The package writes {@value #PROPERTIES_FILE_NAME} into the same directory as the agent jar,
+ * and every key in that file becomes a resource attribute. The file is absent in every other way of
+ * running the agent, and its absence is not an error. Anything else setting the same key wins.
  *
- * <p>Instead the package writes {@value #PROPERTIES_FILE_NAME} into the same directory as the agent
- * jar, and this provider reads it. Every key in that file becomes a resource attribute whose value
- * is the property value, which keeps the set of attributes a property of the package rather than of
- * this code.
- *
- * <p>Anything else setting the same key wins: an upstream detector, or {@code
- * OTEL_RESOURCE_ATTRIBUTES}. That is deliberate, because a value the operator set on the workload
- * should beat one the package baked in. {@code DistroResourceProvider} makes the opposite choice,
- * and says so. {@link #order()} is what makes losing a guarantee.
- *
- * <p>The file is absent in every other way of running the agent, and its absence is not an error.
- *
- * <p>This works only in the repackaged agent jar, which is the shape the Linux packages install.
- * Loaded from the standalone extension jar, the class reports an {@code otel:} code source served
- * by the agent's own class loader rather than a file, so no directory can be resolved and no
- * attributes are contributed. See {@code docs/resource-detection.md}.
+ * <p>This works only in the repackaged agent jar. See {@code docs/resource-detection.md}.
  */
 @AutoService(ResourceProvider.class)
 public final class Dash0PackageResourceProvider implements ResourceProvider, Ordered {
 
-  /** The file this provider reads, resolved against the directory holding the agent jar. */
   static final String PROPERTIES_FILE_NAME = "dash0-resource-attributes.properties";
 
-  /**
-   * Applied before every provider, so that every provider can overwrite what the package declared.
-   *
-   * <p>Not declaring an order at all would give {@code 0}, which upstream's detectors also have,
-   * and the outcome would then be decided by position in the merged {@code META-INF/services} file
-   * rather than by the order. That position is a byproduct of the sequence {@code
-   * mergeServiceFiles} happens to concatenate in, nothing asserts it, and a build change that moved
-   * this line after upstream's would silently invert the precedence this class documents.
-   *
-   * <p>{@code OTEL_SERVICE_NAME} and {@code OTEL_RESOURCE_ATTRIBUTES} win for a different reason
-   * that does not depend on this value: {@code EnvironmentResourceProvider} declares {@code
-   * 2147483646}.
-   */
+  /** Applied before every other provider, so every one of them can overwrite these attributes. */
   @Override
   public int order() {
     return Integer.MIN_VALUE;
@@ -79,10 +49,7 @@ public final class Dash0PackageResourceProvider implements ResourceProvider, Ord
   /**
    * {@inheritDoc}
    *
-   * <p>Never throws. A resource provider that throws aborts SDK autoconfiguration, which takes the
-   * whole agent down with it and loses every signal, including the ones this distribution has
-   * nothing to do with. No attribute is worth that, so every failure here degrades to an empty
-   * resource.
+   * <p>Never throws. Every failure degrades to an empty resource.
    */
   @Override
   public Resource createResource(ConfigProperties config) {
@@ -102,9 +69,8 @@ public final class Dash0PackageResourceProvider implements ResourceProvider, Ord
   }
 
   /**
-   * Locates the directory containing the jar this class was loaded from.
-   *
-   * @return that directory, or null when this class was not loaded from a jar on the file system
+   * @return the directory holding the jar this class was loaded from, or null when it was not
+   *     loaded from a jar on the file system
    */
   private static Path directoryHoldingThisClassesJar() {
     CodeSource codeSource =
@@ -118,9 +84,6 @@ public final class Dash0PackageResourceProvider implements ResourceProvider, Ord
       return null;
     }
 
-    // Only a file: URL can become a Path. Loaded from the standalone extension jar, this class
-    // reports an otel: URL, which the agent's own class loader serves and no FileSystemProvider
-    // understands; Paths.get would throw FileSystemNotFoundException.
     if (!"file".equals(location.getProtocol())) {
       logger.log(
           Level.FINE,

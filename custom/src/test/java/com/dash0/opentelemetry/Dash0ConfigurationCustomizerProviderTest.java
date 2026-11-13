@@ -181,14 +181,6 @@ class Dash0ConfigurationCustomizerProviderTest {
         .containsEntry(OTLP_ENDPOINT, "https://ingress.dash0.com");
   }
 
-  /**
-   * An {@link AutoConfigurationCustomizer} that keeps what was registered with it instead of
-   * configuring anything.
-   *
-   * <p>The two property hooks record what is registered with them. The four hooks this distribution
-   * does not use throw, so a change that starts customizing a sampler or a resource fails here
-   * rather than going unnoticed.
-   */
   private static final class RecordingCustomizer implements AutoConfigurationCustomizer {
 
     final List<Supplier<Map<String, String>>> suppliers = new ArrayList<>();
@@ -234,13 +226,7 @@ class Dash0ConfigurationCustomizerProviderTest {
     }
   }
 
-  /**
-   * A {@link ConfigProperties} holding exactly the given values.
-   *
-   * <p>Only {@code getString} is reachable from the code under test; every other accessor throws
-   * rather than returning a default, so a change that starts reading configuration some other way
-   * fails loudly here instead of silently seeing nothing.
-   */
+  /** A {@link ConfigProperties} holding exactly the given values. */
   private static ConfigProperties configOf(Map<String, String> values) {
     return new ConfigProperties() {
       @Override

@@ -22,26 +22,17 @@ java {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-  // The upstream agent supports Java 8 and later, so everything that can end up
-  // inside it must compile to Java 8 bytecode.
   options.release.set(8)
   // Two lint categories are switched off, and only these two:
-  //   -options    "source/target value 8 is obsolete", a property of the Java 8
-  //               floor above rather than of any code in this repository.
-  //   -processing "No processor claimed any of these annotations: ...AutoService".
-  //               AutoService's processor returns false from process(), so javac
-  //               reports the annotation as unclaimed even though it handled it
-  //               and wrote META-INF/services correctly. The registration is
-  //               asserted for real in DistroResourceProviderTest and in the
-  //               packaging smoke tests, which is where it actually matters.
+  //   -options    "source/target value 8 is obsolete", a property of the Java 8 floor.
+  //   -processing AutoService's processor returns false from process(), so javac reports
+  //               its annotation as unclaimed even though it wrote META-INF/services.
   options.compilerArgs.addAll(
     listOf("-Werror", "-Xlint:all", "-Xlint:-options", "-Xlint:-processing"),
   )
 }
 
 dependencies {
-  // The alpha BOM is required for the javaagent extension APIs; it transitively
-  // provides the non-alpha instrumentation BOM.
   implementation(platform(libs.opentelemetryInstrumentationBomAlpha))
 
   testImplementation(platform(libs.junitBom))

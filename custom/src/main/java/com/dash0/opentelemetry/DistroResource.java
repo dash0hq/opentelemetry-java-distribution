@@ -13,20 +13,11 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * The {@code telemetry.distro.*} resource attributes that identify this distribution.
- *
- * <p>The upstream agent already reports {@code telemetry.distro.name} as {@code
- * opentelemetry-java-instrumentation}. This resource replaces that value with {@code dash0-java},
- * so telemetry produced through this distribution can be attributed to it and filtered by its
- * version.
- */
+/** The {@code telemetry.distro.*} resource attributes that identify this distribution. */
 public final class DistroResource {
 
-  /** The value reported as {@code telemetry.distro.name}. */
   public static final String DISTRO_NAME = "dash0-java";
 
-  /** Reported as {@code telemetry.distro.version} when the version cannot be determined. */
   static final String UNKNOWN_VERSION = "unknown";
 
   /** Generated into the jar by the {@code generateVersionResource} Gradle task. */
@@ -55,11 +46,8 @@ public final class DistroResource {
   }
 
   /**
-   * Reads the distribution version from the properties file the build generates into the jar.
-   *
-   * <p>Returns {@link #UNKNOWN_VERSION} when the file is absent or unreadable. Not being able to
-   * determine the version must never stop the distribution from starting, so this reports the
-   * failure at {@code FINE} and carries on.
+   * Reads the distribution version from the properties file the build generates into the jar. Never
+   * throws: returns {@link #UNKNOWN_VERSION} when the file is absent or unreadable.
    *
    * @param classLoader the loader to read the generated resource from
    */

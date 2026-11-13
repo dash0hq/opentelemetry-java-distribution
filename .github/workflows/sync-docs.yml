@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-# Mirrors docs/*.md into the Dash0 website repository.
-
 name: Synchronize docs to the Dash0 website
 
 on:

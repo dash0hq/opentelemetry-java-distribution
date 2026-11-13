@@ -4,8 +4,7 @@
 services:
 
   # Receives OTLP/HTTP from both applications and writes each signal to a JSONL
-  # file under ./output. It runs as the host user so the files it creates in
-  # that bind mount are owned by whoever ran docker compose, not by root.
+  # file under ./output, as the host user so the files are not owned by root.
   collector:
     image: otel/opentelemetry-collector-contrib:0.163.2
     user: "${SCRIPT_UID:-1000}:${SCRIPT_GID:-1000}"
@@ -14,11 +13,9 @@ services:
       - ./collector-config.yaml:/etc/otelcol/collector-config.yaml:ro
       - ./output:/output
 
-  # The ordinary way to use the distribution: the agent jar straight from the
-  # Gradle build, attached with -javaagent:, pointed at a collector with
-  # DASH0_OTEL_COLLECTOR_BASE_URL. The application never names an OTLP endpoint
-  # and contains no OpenTelemetry code; telemetry arriving at all is what proves
-  # that variable is honoured.
+  # The ordinary way to use the distribution: the agent jar from the Gradle
+  # build, attached with -javaagent:, pointed at a collector with
+  # DASH0_OTEL_COLLECTOR_BASE_URL.
   app:
     image: eclipse-temurin:21-jdk
     working_dir: /app
@@ -45,10 +42,7 @@ services:
 
   # The same application in the layout a Dash0 Linux package installs: the agent
   # jar under a fixed directory with dash0-resource-attributes.properties beside
-  # it. Dash0PackageResourceProvider reads that file and turns each key into a
-  # resource attribute, which is how dash0.package.name and dash0.package.version
-  # reach telemetry for a package-installed agent. The jar is copied out of the
-  # read-only mount because the properties file has to sit next to it.
+  # it.
   app-packaged:
     image: eclipse-temurin:21-jdk
     working_dir: /app

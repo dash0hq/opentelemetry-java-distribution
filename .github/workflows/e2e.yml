@@ -1,11 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-# Runs the Dockerized end-to-end example: the agent exporting over OTLP to a
-# real collector, with assertions on what the collector received. Kept out of
-# ci.yml so its Docker and network cost does not slow the unit and smoke
-# suites, following the Ruby distribution's injection-smoke workflow.
-
 name: End-to-end
 
 on:

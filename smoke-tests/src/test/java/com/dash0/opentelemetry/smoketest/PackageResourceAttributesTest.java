@@ -18,15 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Asserts that a properties file written beside the agent jar reaches the exported resource.
  *
- * <p>The unit tests for {@code Dash0PackageResourceProvider} supply the path directly, so they
- * cannot show that the provider finds the file on its own. That resolution goes through the code
- * source of a class the agent loads from {@code inst/} as a {@code .classdata} entry rather than as
- * an ordinary class file, which is unusual enough that it has to be demonstrated rather than
- * assumed. When it breaks, the agent starts normally and the package attributes are simply absent.
- *
- * <p>Each case copies the agent jar into a fresh directory, because the provider reads the
- * directory the jar it is loaded from sits in, and the build output directory is shared with every
- * other test.
+ * <p>Each case copies the agent jar into a fresh directory, since the provider reads the directory
+ * the jar it is loaded from sits in.
  */
 class PackageResourceAttributesTest {
 

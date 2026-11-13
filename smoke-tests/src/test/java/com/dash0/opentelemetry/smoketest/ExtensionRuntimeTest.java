@@ -20,15 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Runs the Dash0 code as an extension on the stock upstream agent.
  *
- * <p>{@code ExtensionPackagingTest} reads entry names out of the extension jar. That shows the jar
- * has the right shape and nothing more. Until this test existed, no test attached the extension to
- * a JVM, even though it is published as a release asset and the README calls it a supported
- * artifact.
- *
- * <p>The two delivery shapes are not interchangeable internally. The agent jar relocates its
- * packages and loads the Dash0 classes from {@code inst/} as {@code .classdata} entries; the
- * extension is relocated not at all and is loaded as ordinary class files. A defect confined to
- * either one is invisible from the other, which is the reason both are exercised here.
+ * <p>A defect confined to one of the two delivery shapes is invisible from the other, so both are
+ * exercised.
  */
 class ExtensionRuntimeTest {
 

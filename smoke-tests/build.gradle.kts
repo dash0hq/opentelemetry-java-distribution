@@ -18,10 +18,6 @@ val extensionJar: Configuration by configurations.creating {
   isCanBeConsumed = false
 }
 
-// The stock upstream agent, needed by two tests that cannot use the Dash0 one:
-// the extension has to be loaded by an unmodified agent to prove that delivery
-// shape works, and the jar-composition check has to diff against the jar this
-// build repackaged.
 val upstreamAgentJar: Configuration by configurations.creating {
   isCanBeResolved = true
   isCanBeConsumed = false
@@ -35,13 +31,6 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
-  // Set on purpose, and never read by anything here. ProcessBuilder.environment()
-  // starts from the environment this JVM was launched with, so every JVM the tests
-  // start inherits whatever the developer exported. Anyone working on OpenTelemetry
-  // exports exactly these, and the suite then fails on a correct tree with nothing
-  // to explain it. Making the hostile case the normal one means InstrumentedJvm has
-  // to keep stripping them, and theLaunchedJvmIsNotReachedByTheAmbientEnvironment in
-  // Dash0ConfigurationTest says so out loud.
   environment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://ambient-environment.invalid:4318")
   environment("DASH0_DISABLE", "true")
 
@@ -57,8 +46,6 @@ tasks.withType<Test>().configureEach {
     testApplicationClasses,
   )
 
-  // Resolved through an argument provider so the jars are built before the tests
-  // run, rather than being resolved while the build is still being configured.
   jvmArgumentProviders.add(
     CommandLineArgumentProvider {
       listOf(
