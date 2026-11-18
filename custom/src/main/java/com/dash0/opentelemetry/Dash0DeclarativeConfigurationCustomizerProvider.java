@@ -10,9 +10,17 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigura
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.AlwaysOnSamplerModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.AttributeNameValueModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.LogRecordExporterModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.LogRecordProcessorModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.LoggerProviderModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.MeterProviderModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.MetricReaderModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OpenTelemetryConfigurationModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.PushMetricExporterModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.ResourceModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SamplerModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SpanExporterModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SpanProcessorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.TracerProviderModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalHostResourceDetectorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalProcessResourceDetectorModel;
@@ -41,6 +49,14 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
 
   static final String DISABLE_PROPERTY = "dash0.disable";
   static final String DISABLE_VARIABLE = "DASH0_DISABLE";
+  static final String COLLECTOR_BASE_URL_PROPERTY = "dash0.otel.collector.base.url";
+  static final String COLLECTOR_BASE_URL_VARIABLE = "DASH0_OTEL_COLLECTOR_BASE_URL";
+  static final String OTLP_ENDPOINT_PROPERTY = "otel.exporter.otlp.endpoint";
+  static final String OTLP_ENDPOINT_VARIABLE = "OTEL_EXPORTER_OTLP_ENDPOINT";
+
+  static final String TRACES_PATH = "/v1/traces";
+  static final String METRICS_PATH = "/v1/metrics";
+  static final String LOGS_PATH = "/v1/logs";
 
   private static final Logger logger =
       Logger.getLogger(Dash0DeclarativeConfigurationCustomizerProvider.class.getName());
@@ -50,16 +66,28 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     customizer.addModelCustomizer(
         model ->
             applyDash0Settings(
-                model, systemPropertyOrEnvironmentVariable(DISABLE_PROPERTY, DISABLE_VARIABLE)));
+                model,
+                systemPropertyOrEnvironmentVariable(DISABLE_PROPERTY, DISABLE_VARIABLE),
+                systemPropertyOrEnvironmentVariable(
+                    COLLECTOR_BASE_URL_PROPERTY, COLLECTOR_BASE_URL_VARIABLE),
+                systemPropertyOrEnvironmentVariable(
+                    OTLP_ENDPOINT_PROPERTY, OTLP_ENDPOINT_VARIABLE)));
   }
 
   /**
    * Rewrites {@code model} into what this distribution configures.
    *
    * @param disable the value of {@code DASH0_DISABLE}, or null when it is not set
+   * @param collectorBaseUrl the value of {@code DASH0_OTEL_COLLECTOR_BASE_URL}, or null when it is
+   *     not set
+   * @param configuredOtlpEndpoint the value of {@code OTEL_EXPORTER_OTLP_ENDPOINT}, or null when it
+   *     is not set
    */
   static OpenTelemetryConfigurationModel applyDash0Settings(
-      OpenTelemetryConfigurationModel model, String disable) {
+      OpenTelemetryConfigurationModel model,
+      String disable,
+      String collectorBaseUrl,
+      String configuredOtlpEndpoint) {
     if (dash0DisableIsTrue(disable)) {
       logger.log(
           Level.INFO,
@@ -73,6 +101,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     addTheDash0ResourceAttributes(model);
     enableTheHostAndProcessDetectors(model);
     defaultTheSamplerToAlwaysOn(model);
+    useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+        model, collectorBaseUrl, configuredOtlpEndpoint);
     return model;
   }
 
@@ -164,6 +194,126 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
     if (tracerProvider.getSampler() == null) {
       tracerProvider.setSampler(new SamplerModel().setAlwaysOn(new AlwaysOnSamplerModel()));
+    }
+  }
+
+  /**
+   * Points every OTLP exporter the file declares without an {@code endpoint} at {@code
+   * collectorBaseUrl}, leaving the file alone when {@code configuredOtlpEndpoint} is set.
+   *
+   * @param collectorBaseUrl the value of {@code DASH0_OTEL_COLLECTOR_BASE_URL}, whose trailing
+   *     slashes are stripped
+   * @param configuredOtlpEndpoint the value of {@code OTEL_EXPORTER_OTLP_ENDPOINT}
+   */
+  static void useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+      OpenTelemetryConfigurationModel model,
+      String collectorBaseUrl,
+      String configuredOtlpEndpoint) {
+    if (collectorBaseUrl == null || collectorBaseUrl.trim().isEmpty()) {
+      return;
+    }
+    if (configuredOtlpEndpoint != null && !configuredOtlpEndpoint.trim().isEmpty()) {
+      logger.log(
+          Level.FINE,
+          "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
+              + " unapplied.",
+          configuredOtlpEndpoint);
+      return;
+    }
+
+    String baseUrl = collectorBaseUrl.trim().replaceAll("/+$", "");
+    logger.log(
+        Level.FINE, "Using DASH0_OTEL_COLLECTOR_BASE_URL as the OTLP endpoint: {0}", baseUrl);
+
+    TracerProviderModel tracerProvider = model.getTracerProvider();
+    if (tracerProvider != null && tracerProvider.getProcessors() != null) {
+      for (SpanProcessorModel processor : tracerProvider.getProcessors()) {
+        if (processor.getBatch() != null) {
+          setTheSpanExporterEndpointWhenItDeclaresNone(processor.getBatch().getExporter(), baseUrl);
+        }
+        if (processor.getSimple() != null) {
+          setTheSpanExporterEndpointWhenItDeclaresNone(
+              processor.getSimple().getExporter(), baseUrl);
+        }
+      }
+    }
+
+    MeterProviderModel meterProvider = model.getMeterProvider();
+    if (meterProvider != null && meterProvider.getReaders() != null) {
+      for (MetricReaderModel reader : meterProvider.getReaders()) {
+        if (reader.getPeriodic() != null) {
+          setTheMetricExporterEndpointWhenItDeclaresNone(
+              reader.getPeriodic().getExporter(), baseUrl);
+        }
+      }
+    }
+
+    LoggerProviderModel loggerProvider = model.getLoggerProvider();
+    if (loggerProvider != null && loggerProvider.getProcessors() != null) {
+      for (LogRecordProcessorModel processor : loggerProvider.getProcessors()) {
+        if (processor.getBatch() != null) {
+          setTheLogRecordExporterEndpointWhenItDeclaresNone(
+              processor.getBatch().getExporter(), baseUrl);
+        }
+        if (processor.getSimple() != null) {
+          setTheLogRecordExporterEndpointWhenItDeclaresNone(
+              processor.getSimple().getExporter(), baseUrl);
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets {@code exporter}'s endpoint to {@code baseUrl}, with {@value #TRACES_PATH} appended for
+   * the HTTP exporter and nothing appended for the gRPC one, unless the exporter declares an
+   * endpoint already.
+   */
+  static void setTheSpanExporterEndpointWhenItDeclaresNone(
+      SpanExporterModel exporter, String baseUrl) {
+    if (exporter == null) {
+      return;
+    }
+    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+      exporter.getOtlpHttp().setEndpoint(baseUrl + TRACES_PATH);
+    }
+    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+      exporter.getOtlpGrpc().setEndpoint(baseUrl);
+    }
+  }
+
+  /**
+   * Sets {@code exporter}'s endpoint to {@code baseUrl}, with {@value #METRICS_PATH} appended for
+   * the HTTP exporter and nothing appended for the gRPC one, unless the exporter declares an
+   * endpoint already.
+   */
+  static void setTheMetricExporterEndpointWhenItDeclaresNone(
+      PushMetricExporterModel exporter, String baseUrl) {
+    if (exporter == null) {
+      return;
+    }
+    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+      exporter.getOtlpHttp().setEndpoint(baseUrl + METRICS_PATH);
+    }
+    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+      exporter.getOtlpGrpc().setEndpoint(baseUrl);
+    }
+  }
+
+  /**
+   * Sets {@code exporter}'s endpoint to {@code baseUrl}, with {@value #LOGS_PATH} appended for the
+   * HTTP exporter and nothing appended for the gRPC one, unless the exporter declares an endpoint
+   * already.
+   */
+  static void setTheLogRecordExporterEndpointWhenItDeclaresNone(
+      LogRecordExporterModel exporter, String baseUrl) {
+    if (exporter == null) {
+      return;
+    }
+    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+      exporter.getOtlpHttp().setEndpoint(baseUrl + LOGS_PATH);
+    }
+    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+      exporter.getOtlpGrpc().setEndpoint(baseUrl);
     }
   }
 
