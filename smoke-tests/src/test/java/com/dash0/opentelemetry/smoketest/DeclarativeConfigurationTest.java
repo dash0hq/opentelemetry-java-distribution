@@ -6,21 +6,24 @@ package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URISyntaxException;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Records what this distribution does when {@code OTEL_CONFIG_FILE} is set: none of the Dash0
- * customisations run. See {@code docs/configuration.md}.
- *
- * <p>A failure here is not necessarily a defect. Read it as a prompt to re-measure, update {@code
- * docs/configuration.md}, and decide whether declarative support can now be declared.
+ * Asserts that the Dash0 customisations reach a real instrumented JVM when {@code OTEL_CONFIG_FILE}
+ * is set. See {@code docs/configuration.md}.
  */
 class DeclarativeConfigurationTest {
 
+  private static final String DASH0_HOST = "declarative-collector-base-url.invalid";
+  private static final String OTEL_HOST = "declarative-exporter-endpoint.invalid";
+
   @Test
   void theAgentStartsAndExportsWhatTheFileAsksFor() throws Exception {
-    String exported = configuredFromTheYamlFile().run();
+    String exported = configuredFrom("/declarative-config.yaml").run();
 
     assertThat(exported)
         .as("the JVM's output was:%n%s", exported)
@@ -28,54 +31,111 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
-  void theDash0ResourceProvidersDoNotRun() throws Exception {
-    String exported = configuredFromTheYamlFile().run();
+  void theDash0DistroAttributesArePresent() throws Exception {
+    String exported = configuredFrom("/declarative-config.yaml").run();
 
     assertThat(exported)
         .as(
-            "DistroResourceProvider is a ResourceProvider, which declarative configuration does"
-                + " not consult. Upstream's own value survives because it registers a"
-                + " DeclarativeConfigurationCustomizerProvider instead. The JVM's output was:%n%s",
+            "Dash0DeclarativeConfigurationCustomizerProvider writes them into resource.attributes,"
+                + " which ResourceFactory applies after every detector, so upstream's own value"
+                + " loses. The JVM's output was:%n%s",
             exported)
-        .contains("telemetry.distro.name=\"opentelemetry-javaagent\"")
-        .doesNotContain("telemetry.distro.name=\"dash0-java\"");
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .doesNotContain("telemetry.distro.name=\"opentelemetry-javaagent\"");
   }
 
   @Test
-  void theUpstreamHostAndProcessDetectorsDoNotRunEither() throws Exception {
-    String exported = configuredFromTheYamlFile().run();
+  void theUpstreamHostAndProcessDetectorsRunToo() throws Exception {
+    String exported = configuredFrom("/declarative-config.yaml").run();
 
     assertThat(exported)
         .as(
-            "every ResourceProvider is skipped, not only the Dash0 ones, so the resource is far"
-                + " smaller than under environment configuration. The JVM's output was:%n%s",
+            "the customizer names the host and process detectors in"
+                + " resource.detection/development, which the file itself does not. The JVM's"
+                + " output was:%n%s",
             exported)
-        .doesNotContain("host.name=")
-        .doesNotContain("process.pid=");
+        .contains("host.name=")
+        .contains("process.pid=");
   }
 
   @Test
-  void dash0DisableIsIgnored() throws Exception {
+  void dash0DisableSwitchesTheSdkOff() throws Exception {
     String exported =
-        configuredFromTheYamlFile().withEnvironmentVariable("DASH0_DISABLE", "true").run();
+        configuredFrom("/declarative-config.yaml")
+            .withEnvironmentVariable("DASH0_DISABLE", "true")
+            .run();
 
     assertThat(exported)
         .as(
-            "no AutoConfigurationCustomizerProvider runs, so the setting that would switch the SDK"
-                + " off never reaches it and telemetry keeps flowing. The JVM's output was:%n%s",
+            "the customizer sets the model's disabled flag, which makes the SDK a no-op. The"
+                + " application still ran to completion, which InstrumentedJvm.run checks, so this"
+                + " is a silenced SDK and not a dead agent. The JVM's output was:%n%s",
             exported)
-        .contains("service.name=\"declarative-smoke-test\"");
+        .doesNotContain("service.name=\"declarative-smoke-test\"");
   }
 
-  private static InstrumentedJvm configuredFromTheYamlFile() throws Exception {
+  @Test
+  void theCollectorBaseUrlReachesAnExporterTheFileLeftWithoutAnEndpoint() throws Exception {
+    String exported =
+        configuredFrom("/declarative-config-otlp.yaml")
+            .withEnvironmentVariable("DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST)
+            .run();
+
+    assertThat(exported)
+        .as(
+            "the export failure names the host the exporter was pointed at. The signal path the"
+                + " customizer appends is asserted in"
+                + " Dash0DeclarativeConfigurationCustomizerProviderTest, since the exporter thread"
+                + " name truncates the URL. The JVM's output was:%n%s",
+            exported)
+        .contains(DASH0_HOST);
+  }
+
+  @Test
+  void theStandardEndpointTakesPrecedenceOverTheCollectorBaseUrl() throws Exception {
+    Map<String, String> environment = new HashMap<>();
+    environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST);
+    environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://" + OTEL_HOST + ":4318");
+
+    String exported =
+        configuredFrom("/declarative-config-otlp.yaml").withEnvironment(environment).run();
+
+    assertThat(exported)
+        .as(
+            "the precedence has to be the same under OTEL_CONFIG_FILE as it is under environment"
+                + " configuration. The JVM's output was:%n%s",
+            exported)
+        .doesNotContain(DASH0_HOST);
+  }
+
+  @Test
+  void theExtensionJarContributesTheSameThingsAsTheAgent() throws Exception {
+    String exported =
+        InstrumentedJvm.runningTheTestApplication()
+            .attaching(Paths.get(System.getProperty("dash0.upstream.agent.jar")))
+            .withJvmArguments(
+                "-Dotel.javaagent.extensions=" + System.getProperty("dash0.extension.jar"))
+            .withEnvironmentVariable("OTEL_CONFIG_FILE", fixture("/declarative-config.yaml"))
+            .exitingAfter(4000)
+            .run();
+
+    assertThat(exported)
+        .as(
+            "that the component loader reaches the extension class loader on the declarative path"
+                + " is a separate question from the agent jar, so both delivery shapes are"
+                + " exercised. The JVM's output was:%n%s",
+            exported)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .contains("host.name=");
+  }
+
+  private static InstrumentedJvm configuredFrom(String fixture) throws URISyntaxException {
     return InstrumentedJvm.runningTheTestApplication()
-        .withEnvironmentVariable(
-            "OTEL_CONFIG_FILE",
-            Paths.get(
-                    DeclarativeConfigurationTest.class
-                        .getResource("/declarative-config.yaml")
-                        .toURI())
-                .toString())
+        .withEnvironmentVariable("OTEL_CONFIG_FILE", fixture(fixture))
         .exitingAfter(3000);
+  }
+
+  private static String fixture(String name) throws URISyntaxException {
+    return Paths.get(DeclarativeConfigurationTest.class.getResource(name).toURI()).toString();
   }
 }
