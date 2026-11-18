@@ -30,9 +30,9 @@ subtext: |
   ``-Dotel.traces.sampler`` on the workload to keep the previous behaviour; the
   value is registered through ``addPropertiesSupplier``, which both of those
   beat.
-  Declarative configuration is unaffected and remains unsupported. Under
-  ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so this
-  default does not apply there any more than ``DASH0_DISABLE`` and
-  ``DASH0_OTEL_COLLECTOR_BASE_URL`` do; see ``docs/configuration.md``.
+  Under ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so
+  the default arrives by another route: the customizer described in
+  ``docs/configuration.md`` sets ``tracer_provider.sampler`` on the parsed
+  model when the file declares no sampler.
 
 change_logs: [user]

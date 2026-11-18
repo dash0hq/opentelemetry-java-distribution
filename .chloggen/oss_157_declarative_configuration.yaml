@@ -1,0 +1,44 @@
+change_type: enhancement
+
+component: config
+
+note: Honour the Dash0 settings and contribute the Dash0 attributes under OTEL_CONFIG_FILE
+
+issues: [11]
+
+subtext: |
+  Setting ``OTEL_CONFIG_FILE`` made the SDK skip every
+  ``AutoConfigurationCustomizerProvider`` and every ``ResourceProvider``, which
+  is where this distribution contributed everything it contributed. A Java
+  process under declarative configuration therefore ran as the stock upstream
+  agent, and nothing said so. The expensive case was ``DASH0_DISABLE``: an
+  operator who set it to stop a host sending telemetry kept sending and kept
+  being billed.
+  ``Dash0DeclarativeConfigurationCustomizerProvider`` registers under
+  ``DeclarativeConfigurationCustomizerProvider``, which that mode does consult,
+  and writes into the parsed configuration model. ``DASH0_DISABLE=true`` sets
+  the model's ``disabled`` flag, compared against the string ``true``
+  case-insensitively and after trimming as before, so ``1``, ``yes`` and ``on``
+  still leave the SDK enabled. ``telemetry.distro.name``,
+  ``telemetry.distro.version`` and the ``dash0.package.*`` attributes a Linux
+  package writes beside the agent jar go into ``resource.attributes``, which
+  the SDK applies after every detector. The upstream ``host`` and ``process``
+  detectors are named in ``resource.detection/development``, so ``host.name``
+  and ``process.pid`` come back. ``tracer_provider.sampler`` is set to
+  ``always_on`` when the file declares no sampler.
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` fills in the ``endpoint`` of an OTLP
+  exporter the file declared and left without one, across the batch and simple
+  processors of all three signals and both the HTTP and gRPC exporters. It adds
+  no exporter and no provider the file did not declare, since the file is the
+  whole configuration under ``OTEL_CONFIG_FILE``.
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` still beats it, and setting it leaves the
+  file untouched. Both Dash0 settings are read from the system property first
+  and the environment variable second, the precedence the autoconfigure SPI
+  gives the same two names.
+  An existing deployment that sets ``OTEL_CONFIG_FILE`` is affected without
+  changing its configuration, and three of the changes are visible. A process
+  with ``DASH0_DISABLE=true`` stops exporting. Telemetry is attributed to
+  ``dash0-java`` rather than to ``opentelemetry-javaagent``. Spans arrive that
+  an incoming ``traceparent`` with the sampled flag off used to suppress. Both
+  delivery shapes are covered: the repackaged agent jar and the standalone
+  extension jar.

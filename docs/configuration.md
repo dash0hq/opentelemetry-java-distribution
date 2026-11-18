@@ -122,68 +122,117 @@ downstream service still on `parentbased_always_on` will sample the traces you
 start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
-Declarative configuration does not apply this default either, for the reason the
-next section gives.
+Declarative configuration applies this default too, through a different
+mechanism that the next section describes.
 
 ## Declarative configuration
 
 `OTEL_CONFIG_FILE` points the agent at a YAML file that replaces environment
-configuration entirely. This distribution does not ship one, and does not yet
-work correctly when one is supplied. The variable is named `OTEL_CONFIG_FILE`;
+configuration entirely. This distribution does not ship one, and works when one
+is supplied. The variable is named `OTEL_CONFIG_FILE`;
 `OTEL_EXPERIMENTAL_CONFIG_FILE` is read by nothing in agent 2.33.1.
 
-Observed on agent 2.33.1 with a file declaring only `service.name` and a console
-metric exporter, the exported resource is:
-
-```
-service.name="declarative-probe"
-telemetry.distro.name="opentelemetry-javaagent"
-telemetry.distro.version="dash0-0.1.0-SNAPSHOT-otel-2.33.1"
-telemetry.sdk.language="java"
-telemetry.sdk.name="opentelemetry"
-telemetry.sdk.version="1.67.0"
-```
-
-The same application configured through the environment exports, among other
-attributes:
-
-```
-service.name="env-probe"
-telemetry.distro.name="dash0-java"
-telemetry.distro.version="0.1.0-SNAPSHOT"
-telemetry.sdk.language="java"
-telemetry.sdk.name="opentelemetry"
-telemetry.sdk.version="1.67.0"
-host.name="demoman"
-os.type="linux"
-process.pid=343529
-```
-
-Three things differ. `DistroResourceProvider` does not run, so
-`telemetry.distro.name` reverts to upstream's `opentelemetry-javaagent`; the
-version string survives only because upstream's own
-`io.opentelemetry.javaagent.tooling.resources.ResourceCustomizerProvider` reads
-it from the agent jar manifest, which this build writes. No
-`AutoConfigurationCustomizerProvider` runs at all, so `DASH0_DISABLE`,
-`DASH0_OTEL_COLLECTOR_BASE_URL` and the `always_on` sampler default are silently
-ignored; a file that omits `sampler` gets the specification's
-`parentbased_always_on`. Every upstream host, process and OS detector disappears
-as well.
-
-The cause is that declarative configuration uses two different SPIs.
-`AutoConfigurationCustomizerProvider` and `ResourceProvider` are not consulted;
+The SDK consults a different pair of SPIs in this mode.
+`AutoConfigurationCustomizerProvider` and `ResourceProvider`, which carry
+everything this distribution contributes under environment configuration, are
+never loaded: `AutoConfiguredOpenTelemetrySdkBuilder.buildImpl` returns from
+`maybeConfigureFromFile` before it reaches either. The two that are loaded are
 `DeclarativeConfigurationCustomizerProvider` and
-`io.opentelemetry.sdk.autoconfigure.spi.internal.ComponentProvider` are. Upstream
-keeps its own distro attributes across the switch by registering
-`ResourceCustomizerProvider` under the first of those. Supporting declarative
-configuration here means implementing the same pair, and that is planned as a
-separate release after v0.1.0 rather than part of it.
+`io.opentelemetry.sdk.autoconfigure.spi.internal.ComponentProvider`.
 
-The agent also logs a warning for the file above:
+`Dash0DeclarativeConfigurationCustomizerProvider` in `custom/` registers under
+the first of those. Its `addModelCustomizer` function receives the parsed
+`OpenTelemetryConfigurationModel`, a mutable bean tree, and the SDK is built
+from whatever it returns.
+
+| Setting | What the customizer writes into the model |
+|---|---|
+| `DASH0_DISABLE=true` | `disabled: true`, which builds an SDK with no providers at all |
+| `DASH0_OTEL_COLLECTOR_BASE_URL` | the `endpoint` of every OTLP exporter the file declared without one |
+| the `always_on` sampler default | `tracer_provider.sampler`, unless the file declares a sampler |
+| `telemetry.distro.name` and `telemetry.distro.version` | `resource.attributes`, unless the file declares that name |
+| `dash0.package.*`, read from beside the agent jar | `resource.attributes`, unless the file declares that name |
+| the upstream `host` and `process` detectors | `resource.detection/development`, unless the file names them |
+
+Both Dash0 settings are read from the system property first and the environment
+variable second, which is the precedence `DefaultConfigProperties` gives the
+same two names under environment configuration. There is no `ConfigProperties`
+instance in this mode. `DASH0_DISABLE` is compared against the string `true`
+case-insensitively and after trimming, exactly as it is under environment
+configuration, so `1`, `yes` and `on` still leave the SDK enabled.
+
+A YAML file cannot express the trailing-slash stripping or the precedence rule,
+and neither of them is lost: the customizer runs as plain Java after the file is
+parsed, so it reads the environment itself.
+
+The resource ordering follows from `ResourceFactory`, which starts from
+`Resource.getDefault()`, applies the detectors under `detection/development`,
+then `attributes_list`, then `attributes`, each overwriting the one before. So
+the Dash0 attributes, written into `attributes`, beat every detector, which
+reproduces the ordering `DistroResourceProvider.order()` gives today. The host
+and process detectors are inserted ahead of every detector the file names, so a
+detector the operator chose wins over them on any attribute both would set.
+
+`OTEL_RESOURCE_ATTRIBUTES` is still ignored in this mode, by the SDK rather than
+by this distribution. See `docs/resource-detection.md`.
+
+### What the endpoint mapping does and does not touch
+
+`DASH0_OTEL_COLLECTOR_BASE_URL` reaches an exporter node only when the file
+declared that exporter and left its `endpoint` unset. The customizer walks
+`tracer_provider.processors`, `meter_provider.readers` and
+`logger_provider.processors`, and covers the `batch` and `simple` processors and
+both the `otlp_http` and `otlp_grpc` exporters.
+
+A file that declares no tracer provider gets no tracer provider invented for it,
+and a provider that declares no processors gets none added. The point of
+`OTEL_CONFIG_FILE` is that the file is the configuration, and a signal the
+operator did not ask to export is not switched on by a host-wide variable.
+Declare the exporter in the file and leave the `endpoint` out to have the
+variable fill it in:
+
+```yaml
+file_format: "1.0"
+
+tracer_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp_http: {}
+```
+
+The `endpoint` of an `otlp_http` exporter is a full per-signal URL, so the
+customizer appends `/v1/traces`, `/v1/metrics` and `/v1/logs` itself. The
+`endpoint` of an `otlp_grpc` exporter carries no signal path and receives the
+base URL unchanged.
+
+`OTEL_EXPORTER_OTLP_ENDPOINT` still wins. When it is set, the file is left
+exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
+The variable itself configures nothing in this mode, since the SDK reads no
+`OTEL_*` variable from a declaratively configured process.
+
+### The file format warning
+
+The agent logs this for a file declaring `file_format: "1.0"`:
 
 ```
-Configuration file_format '1.0' does not exactly match expected version '1.1'.
+Configuration file_format '1.0' does not exactly match expected version '1.2'.
 ```
 
-Declaring `1.1` is not a fix, because the vendored `otel-config.yaml` upstream
+Declaring `1.2` is not a fix, because the vendored `otel-config.yaml` upstream
 ships for Java declares `1.0` as well.
+
+### Where this is asserted
+
+`DeclarativeConfigurationTest` in `smoke-tests/` launches a real JVM with
+`OTEL_CONFIG_FILE` set and reads what it exports, for the repackaged agent jar
+and for the standalone extension jar.
+`Dash0DeclarativeConfigurationCustomizerProviderTest` in `custom/` runs the
+customizer over a model it builds by hand and asserts on the result, which is
+where the exporter shapes no fixture declares are covered.
+
+The declarative model classes are marked internal and experimental upstream, and
+the path spelling `detection/development` is itself a version marker that will
+change when the format stabilises. Upstream's own `javaagent-tooling` depends on
+the same classes, so this distribution is no more exposed than the agent it is
+built from, and a minor agent bump can break the compile.

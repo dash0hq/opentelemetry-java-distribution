@@ -123,6 +123,8 @@ the operator the injector already supplies the attributes. The gap is real and
 is an inconsistency with Python rather than an oversight.
 
 Declarative configuration is a second reason to revisit this. When
-`OTEL_CONFIG_FILE` is set, `OTEL_RESOURCE_ATTRIBUTES` is ignored, so the
-injector's attributes disappear for every runtime including Java. See the
-measurement in `docs/configuration.md`.
+`OTEL_CONFIG_FILE` is set, `OTEL_RESOURCE_ATTRIBUTES` is ignored by the SDK, so
+the injector's attributes disappear for every runtime including Java. The Dash0
+customizer described in `docs/configuration.md` restores the Dash0 attributes
+and the host and process detectors in that mode, and does not restore
+`OTEL_RESOURCE_ATTRIBUTES`.

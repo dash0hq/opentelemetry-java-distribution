@@ -75,7 +75,7 @@ does less than it should.
    ordinary class file. When that resolution breaks the agent starts normally
    and the package attributes are simply absent.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all eight. They
+The smoke tests in `smoke-tests/` exist specifically to catch all nine. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
@@ -89,7 +89,8 @@ What guards what:
 | 5, service-file merging | `AgentPackagingTest` |
 | 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 27 |
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
-| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest` |
+| 9, declarative configuration | `DeclarativeConfigurationTest`, `Dash0DeclarativeConfigurationCustomizerProviderTest` |
+| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
 
 Two habits these tests encode, both learned the hard way. Assert a presence
@@ -99,11 +100,17 @@ that stopped the agent from starting went unnoticed while its test passed.
 And never let a resource provider throw, because SDK autoconfiguration aborts
 and takes the whole agent with it.
 
-Declarative configuration is a ninth hazard, of a different kind: setting
-`OTEL_CONFIG_FILE` disables items 1, 6, 7 and 8 at once, because neither
-`ResourceProvider` nor `AutoConfigurationCustomizerProvider` is consulted in
-that mode. The measurement is in `docs/configuration.md`. Nothing in the test
-suite covers it, because the distribution does not claim to support it yet.
+9. **Declarative configuration.** Setting `OTEL_CONFIG_FILE` makes the SDK
+   skip every `ResourceProvider` and every `AutoConfigurationCustomizerProvider`,
+   which is items 1, 6, 7 and 8 at once.
+   `Dash0DeclarativeConfigurationCustomizerProvider` puts them back through the
+   SPI that mode does consult. Two traps live inside it.
+   `ResourceModel.setExtensionProperty` stores a Jackson copy of the value, so
+   mutating a detection model after handing it over throws the change away.
+   And a detector name written into `resource.detection/development` has to
+   match a registered `ComponentProvider`, or the SDK fails to build.
+   `DeclarativeConfigurationTest` and
+   `Dash0DeclarativeConfigurationCustomizerProviderTest` guard this one.
 
 ## Coding conventions
 
