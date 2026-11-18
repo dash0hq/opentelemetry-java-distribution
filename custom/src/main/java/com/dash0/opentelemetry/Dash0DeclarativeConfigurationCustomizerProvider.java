@@ -98,7 +98,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       return model;
     }
 
-    addTheDash0ResourceAttributes(model);
+    addResourceAttributesTheFileDoesNotDeclare(
+        model, DistroResource.get().merge(Dash0PackageResource.get()));
     enableTheHostAndProcessDetectors(model);
     defaultTheSamplerToAlwaysOn(model);
     useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
@@ -115,10 +116,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   }
 
   /**
-   * Appends {@code telemetry.distro.*} and the attributes a Dash0 Linux package wrote beside the
-   * agent jar to {@code resource.attributes}, skipping every name the file already declares.
+   * Appends every attribute of {@code dash0Attributes} to {@code resource.attributes}, skipping
+   * every name the file already declares.
    */
-  static void addTheDash0ResourceAttributes(OpenTelemetryConfigurationModel model) {
+  static void addResourceAttributesTheFileDoesNotDeclare(
+      OpenTelemetryConfigurationModel model, Resource dash0Attributes) {
     ResourceModel resource = resourceModelCreatingItWhenAbsent(model);
 
     List<AttributeNameValueModel> attributes = resource.getAttributes();
@@ -132,7 +134,6 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       declared.add(attribute.getName());
     }
 
-    Resource dash0Attributes = DistroResource.get().merge(Dash0PackageResource.get());
     for (Map.Entry<AttributeKey<?>, Object> entry :
         dash0Attributes.getAttributes().asMap().entrySet()) {
       String name = entry.getKey().getKey();
@@ -155,7 +156,6 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     ExperimentalResourceDetectionModel detection = ResourceModelAccessor.getDetection(resource);
     if (detection == null) {
       detection = new ExperimentalResourceDetectionModel();
-      ResourceModelAccessor.setDetection(resource, detection);
     }
 
     List<ExperimentalResourceDetectorModel> detectors = detection.getDetectors();
@@ -183,6 +183,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
           new ExperimentalResourceDetectorModel()
               .setProcess(new ExperimentalProcessResourceDetectorModel()));
     }
+
+    ResourceModelAccessor.setDetection(resource, detection);
   }
 
   /** Sets {@code tracer_provider.sampler} to {@code always_on} unless the file declares one. */
