@@ -18,6 +18,7 @@ opentelemetryJavaagentTooling = { group = "io.opentelemetry.javaagent", name = "
 opentelemetryInstrumentationApi = { group = "io.opentelemetry.instrumentation", name = "opentelemetry-instrumentation-api" }
 opentelemetrySdk = { group = "io.opentelemetry", name = "opentelemetry-sdk" }
 opentelemetrySdkAutoconfigureSpi = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-autoconfigure-spi" }
+opentelemetrySdkDeclarativeConfig = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-declarative-config" }
 opentelemetrySdkTesting = { group = "io.opentelemetry", name = "opentelemetry-sdk-testing" }
 
 autoServiceAnnotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "autoService" }

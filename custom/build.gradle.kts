@@ -18,6 +18,7 @@ dependencies {
   compileOnly(project(":bootstrap"))
   compileOnly(libs.opentelemetrySdk)
   compileOnly(libs.opentelemetrySdkAutoconfigureSpi)
+  compileOnly(libs.opentelemetrySdkDeclarativeConfig)
   compileOnly(libs.opentelemetryJavaagentExtensionApi)
   compileOnly(libs.opentelemetryInstrumentationApi)
 
@@ -26,6 +27,7 @@ dependencies {
 
   testImplementation(libs.opentelemetrySdk)
   testImplementation(libs.opentelemetrySdkAutoconfigureSpi)
+  testImplementation(libs.opentelemetrySdkDeclarativeConfig)
   testImplementation(libs.opentelemetrySdkTesting)
   // The tests read DistroResourceProvider, which carries @AutoService, so the
   // annotation has to be resolvable when compiling them even though it is
