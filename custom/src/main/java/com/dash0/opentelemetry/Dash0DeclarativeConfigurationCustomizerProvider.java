@@ -14,6 +14,11 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OpenTelemetryC
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.ResourceModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SamplerModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.TracerProviderModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalHostResourceDetectorModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalProcessResourceDetectorModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalResourceDetectionModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalResourceDetectorModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ResourceModelAccessor;
 import io.opentelemetry.sdk.resources.Resource;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -66,6 +71,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
 
     addTheDash0ResourceAttributes(model);
+    enableTheHostAndProcessDetectors(model);
     defaultTheSamplerToAlwaysOn(model);
     return model;
   }
@@ -83,11 +89,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
    * agent jar to {@code resource.attributes}, skipping every name the file already declares.
    */
   static void addTheDash0ResourceAttributes(OpenTelemetryConfigurationModel model) {
-    ResourceModel resource = model.getResource();
-    if (resource == null) {
-      resource = new ResourceModel();
-      model.setResource(resource);
-    }
+    ResourceModel resource = resourceModelCreatingItWhenAbsent(model);
 
     List<AttributeNameValueModel> attributes = resource.getAttributes();
     if (attributes == null) {
@@ -112,6 +114,47 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
   }
 
+  /**
+   * Adds the upstream {@code host} and {@code process} resource detectors to {@code
+   * resource.detection/development}, each one only when the file does not already name it, and each
+   * one before every detector the file names.
+   */
+  static void enableTheHostAndProcessDetectors(OpenTelemetryConfigurationModel model) {
+    ResourceModel resource = resourceModelCreatingItWhenAbsent(model);
+
+    ExperimentalResourceDetectionModel detection = ResourceModelAccessor.getDetection(resource);
+    if (detection == null) {
+      detection = new ExperimentalResourceDetectionModel();
+      ResourceModelAccessor.setDetection(resource, detection);
+    }
+
+    List<ExperimentalResourceDetectorModel> detectors = detection.getDetectors();
+    if (detectors == null) {
+      detectors = new ArrayList<>();
+      detection.setDetectors(detectors);
+    }
+
+    boolean hostIsNamed = false;
+    boolean processIsNamed = false;
+    for (ExperimentalResourceDetectorModel detector : detectors) {
+      hostIsNamed = hostIsNamed || detector.getHost() != null;
+      processIsNamed = processIsNamed || detector.getProcess() != null;
+    }
+
+    if (!hostIsNamed) {
+      detectors.add(
+          0,
+          new ExperimentalResourceDetectorModel()
+              .setHost(new ExperimentalHostResourceDetectorModel()));
+    }
+    if (!processIsNamed) {
+      detectors.add(
+          0,
+          new ExperimentalResourceDetectorModel()
+              .setProcess(new ExperimentalProcessResourceDetectorModel()));
+    }
+  }
+
   /** Sets {@code tracer_provider.sampler} to {@code always_on} unless the file declares one. */
   static void defaultTheSamplerToAlwaysOn(OpenTelemetryConfigurationModel model) {
     TracerProviderModel tracerProvider = model.getTracerProvider();
@@ -122,6 +165,17 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (tracerProvider.getSampler() == null) {
       tracerProvider.setSampler(new SamplerModel().setAlwaysOn(new AlwaysOnSamplerModel()));
     }
+  }
+
+  /** Returns {@code model}'s resource, attaching an empty one when the file declares none. */
+  private static ResourceModel resourceModelCreatingItWhenAbsent(
+      OpenTelemetryConfigurationModel model) {
+    ResourceModel resource = model.getResource();
+    if (resource == null) {
+      resource = new ResourceModel();
+      model.setResource(resource);
+    }
+    return resource;
   }
 
   /**
