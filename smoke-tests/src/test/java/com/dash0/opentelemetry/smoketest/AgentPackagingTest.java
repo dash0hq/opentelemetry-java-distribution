@@ -31,6 +31,10 @@ class AgentPackagingTest {
   private static final String RESOURCE_PROVIDER_SERVICE_FILE =
       "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider";
 
+  private static final String DECLARATIVE_CUSTOMIZER_SERVICE_FILE =
+      "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.declarativeconfig"
+          + ".DeclarativeConfigurationCustomizerProvider";
+
   @Test
   void bundlesTheDistroClassesUnderInstAsClassdata() throws IOException {
     List<String> entries = entryNamesOf(AGENT_JAR);
@@ -48,7 +52,7 @@ class AgentPackagingTest {
 
   @Test
   void registersBothDash0ProvidersInTheMergedServiceFile() throws IOException {
-    assertThat(providersRegisteredIn(AGENT_JAR))
+    assertThat(providersRegisteredIn(AGENT_JAR, RESOURCE_PROVIDER_SERVICE_FILE))
         .as("the Dash0 providers must survive the service-file merge with upstream's own")
         .contains(
             "com.dash0.opentelemetry.DistroResourceProvider",
@@ -57,17 +61,32 @@ class AgentPackagingTest {
 
   @Test
   void keepsEveryUpstreamResourceProviderAlongsideTheDash0Ones() throws IOException {
-    assertThat(providersRegisteredIn(AGENT_JAR))
+    assertThat(providersRegisteredIn(AGENT_JAR, RESOURCE_PROVIDER_SERVICE_FILE))
         .as(
             "every provider upstream registers has to survive the merge. Comparing against"
                 + " upstream's own copy keeps the expected set correct when upstream adds or"
                 + " removes a detector, which a count written down here would not.")
-        .containsAll(providersRegisteredIn(UPSTREAM_AGENT_JAR));
+        .containsAll(providersRegisteredIn(UPSTREAM_AGENT_JAR, RESOURCE_PROVIDER_SERVICE_FILE));
   }
 
-  private static List<String> providersRegisteredIn(Path jarPath) throws IOException {
+  @Test
+  void registersTheDash0DeclarativeCustomizerInTheMergedServiceFile() throws IOException {
+    assertThat(providersRegisteredIn(AGENT_JAR, DECLARATIVE_CUSTOMIZER_SERVICE_FILE))
+        .as("nothing applies the Dash0 settings under OTEL_CONFIG_FILE unless this is registered")
+        .contains("com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider");
+  }
+
+  @Test
+  void keepsEveryUpstreamDeclarativeCustomizerAlongsideTheDash0One() throws IOException {
+    assertThat(providersRegisteredIn(AGENT_JAR, DECLARATIVE_CUSTOMIZER_SERVICE_FILE))
+        .containsAll(
+            providersRegisteredIn(UPSTREAM_AGENT_JAR, DECLARATIVE_CUSTOMIZER_SERVICE_FILE));
+  }
+
+  private static List<String> providersRegisteredIn(Path jarPath, String serviceFile)
+      throws IOException {
     List<String> providers = new ArrayList<>();
-    for (String line : readEntry(jarPath, RESOURCE_PROVIDER_SERVICE_FILE).split("\\R")) {
+    for (String line : readEntry(jarPath, serviceFile).split("\\R")) {
       String name = line.trim();
       if (!name.isEmpty() && !name.startsWith("#")) {
         providers.add(name);

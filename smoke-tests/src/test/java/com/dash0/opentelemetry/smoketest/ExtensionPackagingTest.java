@@ -33,12 +33,15 @@ class ExtensionPackagingTest {
   }
 
   @Test
-  void registersBothServicesTheDistributionImplements() throws IOException {
+  void registersEveryServiceTheDistributionImplements() throws IOException {
     assertThat(entryNamesOf(EXTENSION_JAR))
         .contains("META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider")
         .contains(
             "META-INF/services/"
-                + "io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider");
+                + "io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider")
+        .contains(
+            "META-INF/services/io.opentelemetry.sdk.autoconfigure.declarativeconfig"
+                + ".DeclarativeConfigurationCustomizerProvider");
   }
 
   @Test
