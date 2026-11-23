@@ -154,10 +154,24 @@ This keeps one trace across an AWS Application Load Balancer:
 - Both headers are written on injection, so a load balancer further downstream
   sees a `Parent`.
 
+The flip side is that any valid `X-Amzn-Trace-Id` beats `traceparent`, even one
+this service's direct caller didn't write. A hop that forwards incoming headers
+unchanged but writes a fresh `traceparent`, e.g. a reverse proxy instrumented
+with only `tracecontext`, passes along the `X-Amzn-Trace-Id` from the hop before
+it. This service then parents its span to that earlier hop, and the proxy's span
+ends up with no children. AWS services with X-Ray active tracing, such as API
+Gateway, write a `Parent` that exists only in X-Ray, which has a similar effect.
+Setting `OTEL_PROPAGATORS=tracecontext,baggage` restores `traceparent`-only
+extraction.
+
 `baggage` comes before `xray` because the two treat existing baggage
 differently. The X-Ray propagator adds its `Lineage` field to the baggage
 already extracted, while the baggage propagator replaces it, so the reverse
-order would drop `Lineage` whenever both headers arrive.
+order would drop `Lineage` whenever both headers arrive. When an incoming
+`X-Amzn-Trace-Id` carries `Lineage`, the entry stays in baggage for the rest of
+the request. That means it is written to the outgoing W3C `baggage` header as
+well as `X-Amzn-Trace-Id`, and it appears wherever baggage is copied onto spans
+or logs.
 
 Declarative configuration does not apply this default either.
 
