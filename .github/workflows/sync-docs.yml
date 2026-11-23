@@ -34,13 +34,24 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Create GitHub App token for the documentation repository
+        id: app-token
+        if: ${{ !(github.event_name == 'pull_request' || inputs.dry-run) }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.DOCS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DOCS_SYNC_APP_PRIVATE_KEY }}
+          repositories: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Sync docs to the Dash0 website
         uses: dash0hq/sync-docs-action@1dc3817bec558ec22265a321177e58fb64a9324c # v0.5.0
         with:
           dry-run: ${{ github.event_name == 'pull_request' || inputs.dry-run }}
           target-repository: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}
           target-directory: ${{ secrets.SYNC_DOCUMENTATION_TARGET_DIRECTORY }}
-          target-github-token: ${{ secrets.DASH0_WEBSITE_SYNC_TOKEN }}
+          target-github-token: ${{ steps.app-token.outputs.token }}
           pr-branch: sync/opentelemetry-java-distribution-docs
           pr-title: "docs: synchronize Java distribution documentation"
           pr-body: |
