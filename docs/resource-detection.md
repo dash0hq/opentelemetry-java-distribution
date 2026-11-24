@@ -193,7 +193,9 @@ there and `Implementation-Version: 9.9.9` in its manifest exports
 Eleven of the 23 are off by default, and ten of those eleven are cloud
 detectors. `HostIdResourceProvider` is the only non-cloud one. The five group
 names and what each toggle does are in the resource-provider section of
-[configuration](configuration).
+[configuration](configuration). The `Cloud detectors` section below gives what
+each of the ten contributes, what it costs, and why this distribution leaves
+every one of the four cloud groups off.
 
 ### `otel.java.enabled.resource.providers` is an allow-list
 

@@ -163,14 +163,15 @@ Both `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
 `HostIdResourceProvider` on at agent 2.33.1. An environment variable whose name
 carries a literal hyphen was observed doing nothing.
 
-Three of the ten cloud detectors open a socket to a metadata endpoint, so the
-`aws`, `azure` and `gcp` groups are not free to enable on a host that is
-somewhere else. On a Linux host where traffic to `169.254.169.254` is dropped
-rather than refused, `aws` adds 4.35 s and `azure` adds 5.18 s to JVM startup.
-The `cloudfoundry` group reads `VCAP_APPLICATION` and opens nothing.
-[Resource detection](resource-detection) has the per-detector cost table, the
-experiment behind those two figures, the attributes each detector contributes,
-and the reason this distribution leaves every group off.
+Ten of those eleven are cloud detectors, and three of the ten open a socket to a
+metadata endpoint, so the `aws`, `azure` and `gcp` groups are not free to enable
+on a host that is somewhere else. On a Linux host where traffic to
+`169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and `azure`
+adds 5.18 s to JVM startup. The `cloudfoundry` group reads `VCAP_APPLICATION`
+and opens nothing. [Resource detection](resource-detection) has the per-detector
+cost table, the experiment behind those two figures, the attributes each
+detector contributes, and the reason this distribution leaves the cloud groups
+off. The eleventh is `HostIdResourceProvider`, which the next section covers.
 
 ### `host.id`
 
