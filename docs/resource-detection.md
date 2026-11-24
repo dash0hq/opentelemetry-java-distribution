@@ -267,11 +267,13 @@ Foundry, the absent attributes are plain in the exported resource, and one
 variable turns the group on. The upstream parity at the end of this section is
 the other, and it reaches this group as much as it reaches the other nine.
 
-For the `aws`, `azure` and `gcp` groups what enabling buys is therefore small,
-and what it costs is a startup penalty the experiment above puts in seconds,
-paid by every JVM that is not on the cloud in question, in an amount that
-depends on a network property the distribution cannot observe. The `cloudfoundry`
-and `host-id` groups cost under half a second in that same experiment. Four
+For the `aws`, `azure` and `gcp` groups what enabling buys is therefore small.
+What it costs is a startup penalty the experiment above puts in seconds for
+`aws` and for `azure`, paid by every JVM that is not on the cloud in question,
+in an amount that depends on a network property the distribution cannot
+observe. The other three groups came in under half a second in that same
+experiment, and the `gcp` figure holds only where `metadata.google.internal`
+does not resolve, which is the unbounded wait the section above describes. Four
 further reasons make enabling a group by default worse than it looks.
 
 Every detector except the Cloud Foundry one carries the same guard:
