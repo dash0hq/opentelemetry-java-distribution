@@ -58,6 +58,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -355,6 +359,81 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void saysNothingWhenTheFileNamesEveryEndpointItself() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://declared.invalid:4318/v1/traces");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://declared.invalid:4318/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://declared.invalid:4318/v1/logs");
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model, COLLECTOR_BASE_URL, "http://collector.internal:4318"));
+
+    assertThat(warningsIn(logged))
+        .as(
+            "DASH0_OTEL_COLLECTOR_BASE_URL arrives host-wide, so warning every workload that"
+                + " already names its endpoints would warn on a correct configuration")
+        .isEmpty();
+  }
+
+  @Test
+  void saysNothingWhenTheFileDeclaresNoOtlpExporterAtAll() {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setTracerProvider(
+                new TracerProviderModel()
+                    .setProcessors(
+                        Collections.singletonList(
+                            new SpanProcessorModel()
+                                .setBatch(
+                                    new BatchSpanProcessorModel()
+                                        .setExporter(
+                                            new SpanExporterModel()
+                                                .setConsole(new ConsoleExporterModel()))))));
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model, COLLECTOR_BASE_URL, "http://collector.internal:4318"));
+
+    assertThat(warningsIn(logged)).isEmpty();
+  }
+
+  @Test
+  void namesTheHttpDefaultForAnHttpExporterLeftWithoutAnEndpoint() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model, COLLECTOR_BASE_URL, "http://collector.internal:4318"));
+
+    assertThat(warningsIn(logged)).hasSize(1);
+    assertThat(warningsIn(logged).get(0).getParameters()[1])
+        .isEqualTo(Dash0DeclarativeConfigurationCustomizerProvider.OTLP_HTTP_DEFAULT_ENDPOINT);
+  }
+
+  @Test
+  void namesTheGrpcDefaultForAGrpcExporterLeftWithoutAnEndpoint() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpGrpcExporterForEverySignal();
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model, COLLECTOR_BASE_URL, "http://collector.internal:4317"));
+
+    assertThat(warningsIn(logged)).hasSize(1);
+    assertThat(warningsIn(logged).get(0).getParameters()[1])
+        .as("a gRPC endpoint carries no signal path and its default port is 4317, not 4318")
+        .isEqualTo(Dash0DeclarativeConfigurationCustomizerProvider.OTLP_GRPC_DEFAULT_ENDPOINT);
+  }
+
+  @Test
   void leavesTheFileAloneWhenTheOtlpEndpointIsAlreadySet() {
     OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
 
@@ -460,6 +539,45 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
     assertThat(
             systemPropertyOrEnvironmentVariable("dash0.no.such.setting", "DASH0_NO_SUCH_SETTING"))
         .isNull();
+  }
+
+  private static List<LogRecord> whileCapturingTheCustomizersLog(Runnable action) {
+    List<LogRecord> captured = new ArrayList<>();
+    Logger logger =
+        Logger.getLogger(Dash0DeclarativeConfigurationCustomizerProvider.class.getName());
+    Handler handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord record) {
+            captured.add(record);
+          }
+
+          @Override
+          public void flush() {}
+
+          @Override
+          public void close() {}
+        };
+    logger.addHandler(handler);
+    Level previous = logger.getLevel();
+    logger.setLevel(Level.ALL);
+    try {
+      action.run();
+    } finally {
+      logger.removeHandler(handler);
+      logger.setLevel(previous);
+    }
+    return captured;
+  }
+
+  private static List<LogRecord> warningsIn(List<LogRecord> records) {
+    List<LogRecord> warnings = new ArrayList<>();
+    for (LogRecord record : records) {
+      if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
+        warnings.add(record);
+      }
+    }
+    return warnings;
   }
 
   private static OpenTelemetryConfigurationModel modelDeclaring(

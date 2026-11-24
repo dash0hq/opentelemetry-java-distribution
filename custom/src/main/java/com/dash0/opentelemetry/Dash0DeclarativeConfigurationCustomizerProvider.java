@@ -31,6 +31,7 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.Resou
 import io.opentelemetry.sdk.resources.Resource;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +59,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   static final String TRACES_PATH = "/v1/traces";
   static final String METRICS_PATH = "/v1/metrics";
   static final String LOGS_PATH = "/v1/logs";
+
+  static final String OTLP_HTTP_DEFAULT_ENDPOINT = "http://localhost:4318";
+  static final String OTLP_GRPC_DEFAULT_ENDPOINT = "http://localhost:4317";
 
   private static final Logger logger =
       Logger.getLogger(Dash0DeclarativeConfigurationCustomizerProvider.class.getName());
@@ -233,30 +237,25 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (collectorBaseUrl == null || collectorBaseUrl.trim().isEmpty()) {
       return;
     }
-    if (configuredOtlpEndpoint != null && !configuredOtlpEndpoint.trim().isEmpty()) {
-      logger.log(
-          Level.WARNING,
-          "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
-              + " unapplied. A declaratively configured SDK reads no OTEL_* variable, so an"
-              + " exporter the configuration file left without an endpoint falls back to"
-              + " http://localhost:4318. Name the endpoint in the configuration file instead.",
-          configuredOtlpEndpoint);
-      return;
-    }
+    boolean suppressed = configuredOtlpEndpoint != null && !configuredOtlpEndpoint.trim().isEmpty();
 
-    String baseUrl = collectorBaseUrl.trim().replaceAll("/+$", "");
-    logger.log(
-        Level.FINE, "Using DASH0_OTEL_COLLECTOR_BASE_URL as the OTLP endpoint: {0}", baseUrl);
+    String baseUrl = suppressed ? null : collectorBaseUrl.trim().replaceAll("/+$", "");
+    if (!suppressed) {
+      logger.log(
+          Level.FINE, "Using DASH0_OTEL_COLLECTOR_BASE_URL as the OTLP endpoint: {0}", baseUrl);
+    }
+    Set<String> defaultsLeftInPlace = new LinkedHashSet<>();
 
     TracerProviderModel tracerProvider = model.getTracerProvider();
     if (tracerProvider != null && tracerProvider.getProcessors() != null) {
       for (SpanProcessorModel processor : tracerProvider.getProcessors()) {
         if (processor.getBatch() != null) {
-          setTheSpanExporterEndpointWhenItDeclaresNone(processor.getBatch().getExporter(), baseUrl);
+          applyTheBaseUrlToASpanExporterOrRecordItsDefault(
+              processor.getBatch().getExporter(), baseUrl, defaultsLeftInPlace);
         }
         if (processor.getSimple() != null) {
-          setTheSpanExporterEndpointWhenItDeclaresNone(
-              processor.getSimple().getExporter(), baseUrl);
+          applyTheBaseUrlToASpanExporterOrRecordItsDefault(
+              processor.getSimple().getExporter(), baseUrl, defaultsLeftInPlace);
         }
       }
     }
@@ -265,8 +264,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (meterProvider != null && meterProvider.getReaders() != null) {
       for (MetricReaderModel reader : meterProvider.getReaders()) {
         if (reader.getPeriodic() != null) {
-          setTheMetricExporterEndpointWhenItDeclaresNone(
-              reader.getPeriodic().getExporter(), baseUrl);
+          applyTheBaseUrlToAMetricExporterOrRecordItsDefault(
+              reader.getPeriodic().getExporter(), baseUrl, defaultsLeftInPlace);
         }
       }
     }
@@ -275,68 +274,103 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (loggerProvider != null && loggerProvider.getProcessors() != null) {
       for (LogRecordProcessorModel processor : loggerProvider.getProcessors()) {
         if (processor.getBatch() != null) {
-          setTheLogRecordExporterEndpointWhenItDeclaresNone(
-              processor.getBatch().getExporter(), baseUrl);
+          applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
+              processor.getBatch().getExporter(), baseUrl, defaultsLeftInPlace);
         }
         if (processor.getSimple() != null) {
-          setTheLogRecordExporterEndpointWhenItDeclaresNone(
-              processor.getSimple().getExporter(), baseUrl);
+          applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
+              processor.getSimple().getExporter(), baseUrl, defaultsLeftInPlace);
         }
+      }
+    }
+
+    if (suppressed && !defaultsLeftInPlace.isEmpty()) {
+      logger.log(
+          Level.WARNING,
+          "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
+              + " unapplied. A declaratively configured SDK reads no OTEL_* variable, so every"
+              + " OTLP exporter the configuration file left without an endpoint falls back to"
+              + " its specification default, {1}. Name the endpoint in the configuration file"
+              + " instead.",
+          new Object[] {configuredOtlpEndpoint.trim(), String.join(" and ", defaultsLeftInPlace)});
+    }
+  }
+
+  /**
+   * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #TRACES_PATH} for the HTTP
+   * exporter and to {@code baseUrl} alone for the gRPC one, or, when {@code baseUrl} is null, adds
+   * to {@code defaultsLeftInPlace} the specification default each one keeps.
+   */
+  static void applyTheBaseUrlToASpanExporterOrRecordItsDefault(
+      SpanExporterModel exporter, String baseUrl, Set<String> defaultsLeftInPlace) {
+    if (exporter == null) {
+      return;
+    }
+    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+      if (baseUrl == null) {
+        defaultsLeftInPlace.add(OTLP_HTTP_DEFAULT_ENDPOINT);
+      } else {
+        exporter.getOtlpHttp().setEndpoint(baseUrl + TRACES_PATH);
+      }
+    }
+    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+      if (baseUrl == null) {
+        defaultsLeftInPlace.add(OTLP_GRPC_DEFAULT_ENDPOINT);
+      } else {
+        exporter.getOtlpGrpc().setEndpoint(baseUrl);
       }
     }
   }
 
   /**
-   * Sets {@code exporter}'s endpoint to {@code baseUrl}, with {@value #TRACES_PATH} appended for
-   * the HTTP exporter and nothing appended for the gRPC one, unless the exporter declares an
-   * endpoint already.
+   * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #METRICS_PATH} for the HTTP
+   * exporter and to {@code baseUrl} alone for the gRPC one, or, when {@code baseUrl} is null, adds
+   * to {@code defaultsLeftInPlace} the specification default each one keeps.
    */
-  static void setTheSpanExporterEndpointWhenItDeclaresNone(
-      SpanExporterModel exporter, String baseUrl) {
+  static void applyTheBaseUrlToAMetricExporterOrRecordItsDefault(
+      PushMetricExporterModel exporter, String baseUrl, Set<String> defaultsLeftInPlace) {
     if (exporter == null) {
       return;
     }
     if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
-      exporter.getOtlpHttp().setEndpoint(baseUrl + TRACES_PATH);
+      if (baseUrl == null) {
+        defaultsLeftInPlace.add(OTLP_HTTP_DEFAULT_ENDPOINT);
+      } else {
+        exporter.getOtlpHttp().setEndpoint(baseUrl + METRICS_PATH);
+      }
     }
     if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
-      exporter.getOtlpGrpc().setEndpoint(baseUrl);
+      if (baseUrl == null) {
+        defaultsLeftInPlace.add(OTLP_GRPC_DEFAULT_ENDPOINT);
+      } else {
+        exporter.getOtlpGrpc().setEndpoint(baseUrl);
+      }
     }
   }
 
   /**
-   * Sets {@code exporter}'s endpoint to {@code baseUrl}, with {@value #METRICS_PATH} appended for
-   * the HTTP exporter and nothing appended for the gRPC one, unless the exporter declares an
-   * endpoint already.
+   * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #LOGS_PATH} for the HTTP
+   * exporter and to {@code baseUrl} alone for the gRPC one, or, when {@code baseUrl} is null, adds
+   * to {@code defaultsLeftInPlace} the specification default each one keeps.
    */
-  static void setTheMetricExporterEndpointWhenItDeclaresNone(
-      PushMetricExporterModel exporter, String baseUrl) {
+  static void applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
+      LogRecordExporterModel exporter, String baseUrl, Set<String> defaultsLeftInPlace) {
     if (exporter == null) {
       return;
     }
     if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
-      exporter.getOtlpHttp().setEndpoint(baseUrl + METRICS_PATH);
+      if (baseUrl == null) {
+        defaultsLeftInPlace.add(OTLP_HTTP_DEFAULT_ENDPOINT);
+      } else {
+        exporter.getOtlpHttp().setEndpoint(baseUrl + LOGS_PATH);
+      }
     }
     if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
-      exporter.getOtlpGrpc().setEndpoint(baseUrl);
-    }
-  }
-
-  /**
-   * Sets {@code exporter}'s endpoint to {@code baseUrl}, with {@value #LOGS_PATH} appended for the
-   * HTTP exporter and nothing appended for the gRPC one, unless the exporter declares an endpoint
-   * already.
-   */
-  static void setTheLogRecordExporterEndpointWhenItDeclaresNone(
-      LogRecordExporterModel exporter, String baseUrl) {
-    if (exporter == null) {
-      return;
-    }
-    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
-      exporter.getOtlpHttp().setEndpoint(baseUrl + LOGS_PATH);
-    }
-    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
-      exporter.getOtlpGrpc().setEndpoint(baseUrl);
+      if (baseUrl == null) {
+        defaultsLeftInPlace.add(OTLP_GRPC_DEFAULT_ENDPOINT);
+      } else {
+        exporter.getOtlpGrpc().setEndpoint(baseUrl);
+      }
     }
   }
 

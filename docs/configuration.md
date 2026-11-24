@@ -271,11 +271,17 @@ exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 Setting both variables on one workload sends its telemetry to neither host.
 `OTEL_EXPORTER_OTLP_ENDPOINT` configures nothing in this mode, since the SDK
 reads no `OTEL_*` variable from a declaratively configured process, so an
-exporter the file left without an `endpoint` falls back to the specification
-default `http://localhost:4318`. The stock upstream agent 2.33.1 does the same
-with no Dash0 code involved, so this is the SDK's rule and not a choice this
-distribution makes, and the customizer logs the suppression at `WARNING`. Name
-the endpoint in the file:
+exporter the file left without an `endpoint` falls back to its own
+specification default: `http://localhost:4318` for `otlp_http` and
+`http://localhost:4317` for `otlp_grpc`. The stock upstream agent 2.33.1 does
+the same with no Dash0 code involved, so this is the SDK's rule and not a
+choice this distribution makes.
+
+The customizer logs that at `WARNING`, naming the defaults the exporters keep.
+It stays quiet when every exporter the file declares already names its
+`endpoint`, and when the file declares no OTLP exporter at all, so a host that
+sets `DASH0_OTEL_COLLECTOR_BASE_URL` for every workload does not warn the
+workloads that are configured correctly. Name the endpoint in the file:
 
 ```yaml
 tracer_provider:
