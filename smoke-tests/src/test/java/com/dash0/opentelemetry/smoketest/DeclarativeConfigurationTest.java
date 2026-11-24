@@ -111,14 +111,17 @@ class DeclarativeConfigurationTest {
 
     assertThat(exported)
         .as(
-            "a declaratively configured SDK reads no OTEL_* variable, so the exporter falls back"
-                + " to the specification default and reaches neither host. The assertions name"
-                + " the exporter's own thread, which carries the URL it opened: the customizer"
-                + " logs the value of OTEL_EXPORTER_OTLP_ENDPOINT, so a bare absence of that host"
-                + " could never hold, and a bare absence of both would pass for an agent that"
-                + " exported nothing at all. The JVM's output was:%n%s",
+            "a declaratively configured SDK reads no OTEL_* variable, so the exporter reaches"
+                + " neither host and keeps its own specification default. The presence asserted"
+                + " is the customizer's warning, which a dead agent would not print either; the"
+                + " fallback URL itself is not asserted, since the exporter names it in the log"
+                + " only when the connection fails, and port 4318 is the standard OTLP/HTTP"
+                + " receiver port that a developer may well have something listening on. The"
+                + " absences are scoped to the exporter thread, since the warning quotes the"
+                + " value of OTEL_EXPORTER_OTLP_ENDPOINT. The JVM's output was:%n%s",
             exported)
-        .contains(EXPORTER_THREAD + "http://localhost:4318/")
+        .contains("so DASH0_OTEL_COLLECTOR_BASE_URL is left unapplied")
+        .contains("http://localhost:4318")
         .doesNotContain(EXPORTER_THREAD + "http://" + DASH0_HOST)
         .doesNotContain(EXPORTER_THREAD + "http://" + OTEL_HOST);
   }
