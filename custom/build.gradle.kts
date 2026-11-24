@@ -38,6 +38,11 @@ dependencies {
   testCompileOnly(libs.autoServiceAnnotations)
 }
 
+tasks.withType<Test>().configureEach {
+  setEnvironment(
+    environment.filterKeys { !it.startsWith("OTEL_") && !it.startsWith("DASH0_") })
+}
+
 // The distribution version is reported as telemetry.distro.version, so it has to
 // reach runtime as data rather than as a compiled-in constant that drifts.
 val generateVersionResource = tasks.register<WriteProperties>("generateVersionResource") {
