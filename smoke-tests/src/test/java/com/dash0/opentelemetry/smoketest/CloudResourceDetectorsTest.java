@@ -37,7 +37,7 @@ class CloudResourceDetectorsTest {
   private static final String SERVICE_NAME = "smoke-test-service";
 
   @Test
-  void contributesNoCloudAttributeWhileNoGroupToggleIsSet() throws Exception {
+  void contributesNoCloudAttributeAndNoHostIdWhileNoGroupToggleIsSet() throws Exception {
     String exported = exportingTheResourceToTheLog(appServiceEnvironment());
 
     assertThat(exported)
