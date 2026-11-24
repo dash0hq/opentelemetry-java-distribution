@@ -105,10 +105,10 @@ absent, so the unit tests cannot catch it.
 
 ## Upstream detectors
 
-All upstream resource providers remain active and unmodified: container, host,
-OS, process, process runtime, manifest, jar service name, Spring Boot service
-name and version, and the cloud providers that upstream ships disabled by
-default. This distribution adds to that set rather than replacing it, and
+All upstream resource providers stay registered and unmodified, each keeping
+whatever default upstream gives it: container, host, host id, OS, process,
+process runtime, manifest, jar service name, Spring Boot service name and
+version, and the cloud providers that upstream ships disabled by default. This distribution adds to that set rather than replacing it, and
 `AgentPackagingTest` asserts that the merged service file still contains more
 than just the Dash0 entry.
 
