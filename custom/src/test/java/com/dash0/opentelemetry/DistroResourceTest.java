@@ -31,9 +31,6 @@ class DistroResourceTest {
   void reportsTheVersionGeneratedByTheBuild() {
     Resource resource = DistroResource.get();
 
-    // The build writes the real project version into the jar. Asserting it is
-    // not the fallback is what catches the generateVersionResource task silently
-    // not running, which would otherwise ship telemetry tagged "unknown".
     assertThat(resource.getAttribute(TELEMETRY_DISTRO_VERSION))
         .isNotNull()
         .isNotEqualTo(DistroResource.UNKNOWN_VERSION);

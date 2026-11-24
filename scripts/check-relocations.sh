@@ -3,18 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Fails when buildSrc/src/main/kotlin/Relocations.kt has drifted from upstream's
-# canonical copy at the agent version this distribution pins.
-#
-# The relocation rules decide which packages are rewritten into the agent's
-# shaded namespace. Upstream changes them when it moves a package, and a rule we
-# failed to copy produces no error: the agent starts, and whatever depended on
-# the moved package is silently never invoked. The two exclusions are the sharp
-# edge, because a relocated resource provider is simply never called.
-#
-# Comments and the licence header are ignored. Only the relocate and exclude
-# calls are compared.
-#
-#     scripts/check-relocations.sh
+# canonical copy at the agent version this distribution pins. Only the relocate
+# and exclude calls are compared.
 
 set -euo pipefail
 
@@ -45,11 +35,6 @@ rules() {
 upstream_rules="$(rules "$upstream" || true)"
 our_rules="$(rules "$OURS" || true)"
 
-# Two empty extractions compare equal, so without this the check would report a
-# match while comparing nothing. That is reachable: if upstream restructures the
-# file so the calls no longer read "shadowJar.relocate(", the diff fails, the
-# obvious repair is to copy upstream's file across, and from then on both sides
-# extract nothing and the check passes forever.
 if [ -z "$upstream_rules" ]; then
   echo "Extracted no relocation rules from upstream's copy for agent $VERSION:" >&2
   echo "  $URL" >&2

@@ -8,7 +8,9 @@ import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.ALWAY
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.COLLECTOR_BASE_URL;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.DISABLE;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.OTLP_ENDPOINT;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.PROPAGATORS;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.SDK_DISABLED;
+import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.TRACECONTEXT_BAGGAGE_XRAY;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.TRACES_SAMPLER;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.dash0Defaults;
 import static com.dash0.opentelemetry.Dash0ConfigurationCustomizerProvider.dash0Overrides;
@@ -127,6 +129,18 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void defaultsThePropagatorsToTracecontextBaggageXray() {
+    assertThat(dash0Defaults()).containsEntry(PROPAGATORS, TRACECONTEXT_BAGGAGE_XRAY);
+  }
+
+  @Test
+  void neverReturnsThePropagatorsAsAnOverride() {
+    assertThat(dash0Overrides(configOf(Collections.singletonMap(PROPAGATORS, "b3multi"))))
+        .as("a workload's own OTEL_PROPAGATORS must win over the distribution's default")
+        .doesNotContainKey(PROPAGATORS);
+  }
+
+  @Test
   void neverReturnsTheSamplerAsAnOverride() {
     Map<String, String> properties = new HashMap<>();
     properties.put(TRACES_SAMPLER, "parentbased_traceidratio");
@@ -162,12 +176,14 @@ class Dash0ConfigurationCustomizerProviderTest {
             "addPropertiesSupplier loses to both system properties and environment variables, which"
                 + " is what makes always_on a default rather than a decision taken away from the"
                 + " workload")
-        .containsEntry(TRACES_SAMPLER, ALWAYS_ON);
+        .containsEntry(TRACES_SAMPLER, ALWAYS_ON)
+        .containsEntry(PROPAGATORS, TRACECONTEXT_BAGGAGE_XRAY);
     assertThat(overridden)
         .as(
             "addPropertiesCustomizer beats both, so registering the sampler there would silently"
                 + " discard the workload's own OTEL_TRACES_SAMPLER")
-        .doesNotContainKey(TRACES_SAMPLER);
+        .doesNotContainKey(TRACES_SAMPLER)
+        .doesNotContainKey(PROPAGATORS);
   }
 
   @Test
@@ -181,14 +197,6 @@ class Dash0ConfigurationCustomizerProviderTest {
         .containsEntry(OTLP_ENDPOINT, "https://ingress.dash0.com");
   }
 
-  /**
-   * An {@link AutoConfigurationCustomizer} that keeps what was registered with it instead of
-   * configuring anything.
-   *
-   * <p>The two property hooks record what is registered with them. The four hooks this distribution
-   * does not use throw, so a change that starts customizing a sampler or a resource fails here
-   * rather than going unnoticed.
-   */
   private static final class RecordingCustomizer implements AutoConfigurationCustomizer {
 
     final List<Supplier<Map<String, String>>> suppliers = new ArrayList<>();
@@ -234,13 +242,7 @@ class Dash0ConfigurationCustomizerProviderTest {
     }
   }
 
-  /**
-   * A {@link ConfigProperties} holding exactly the given values.
-   *
-   * <p>Only {@code getString} is reachable from the code under test; every other accessor throws
-   * rather than returning a default, so a change that starts reading configuration some other way
-   * fails loudly here instead of silently seeing nothing.
-   */
+  /** A {@link ConfigProperties} holding exactly the given values. */
   private static ConfigProperties configOf(Map<String, String> values) {
     return new ConfigProperties() {
       @Override

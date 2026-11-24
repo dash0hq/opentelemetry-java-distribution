@@ -18,11 +18,8 @@ import java.util.jar.Manifest;
 import org.junit.jupiter.api.Test;
 
 /**
- * Checks the standalone extension jar, the second delivery shape.
- *
- * <p>The extension is loaded by the unmodified upstream agent via {@code
- * OTEL_JAVAAGENT_EXTENSIONS}, so its layout is the opposite of the repackaged agent's: ordinary
- * {@code .class} files at the jar root, not {@code .classdata} under {@code inst/}.
+ * Checks the standalone extension jar, which holds ordinary {@code .class} files at the jar root
+ * rather than {@code .classdata} under {@code inst/}.
  */
 class ExtensionPackagingTest {
 
@@ -46,17 +43,11 @@ class ExtensionPackagingTest {
 
   @Test
   void carriesTheLicence() throws IOException {
-    // The agent jar's copy is asserted by AgentCompositionTest. This jar is
-    // built by a different convention plugin, so it can lose the licence on its
-    // own.
     assertThat(entryNamesOf(EXTENSION_JAR)).contains("META-INF/LICENSE");
   }
 
   @Test
   void doesNotUseTheIsolatedAgentLayout() throws IOException {
-    // inst/ and .classdata belong to the repackaged agent. If they appear here
-    // the extension was built with the wrong convention plugin and the agent
-    // will load nothing from it.
     assertThat(entryNamesOf(EXTENSION_JAR))
         .noneMatch(name -> name.startsWith("inst/"))
         .noneMatch(name -> name.endsWith(".classdata"));
