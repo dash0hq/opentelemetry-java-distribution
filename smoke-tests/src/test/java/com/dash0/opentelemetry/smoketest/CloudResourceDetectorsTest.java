@@ -11,7 +11,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts that no cloud resource detector contributes an attribute unless its group toggle is set.
+ * Asserts that no detector upstream ships disabled contributes an attribute unless its group toggle
+ * is set.
  *
  * <p>The toggles and the detectors each one covers are documented in {@code
  * docs/resource-detection.md}.
@@ -36,6 +37,7 @@ class CloudResourceDetectorsTest {
         .doesNotContain("cloud.provider=")
         .doesNotContain("cloudfoundry.app.name=")
         .doesNotContain("faas.name=")
+        .doesNotContain("host.id=")
         .doesNotContain("service.name=\"" + SITE_NAME + "\"")
         .contains("service.name=\"" + SPRING_APPLICATION_NAME + "\"");
   }
@@ -64,6 +66,19 @@ class CloudResourceDetectorsTest {
         .as("exported resource attributes were:%n%s", exported)
         .contains("telemetry.distro.name=\"dash0-java\"")
         .contains("cloudfoundry.app.name=\"" + APPLICATION_NAME + "\"");
+  }
+
+  @Test
+  void contributesTheHostIdOnceTheHostIdToggleIsSet() throws Exception {
+    Map<String, String> environment = appServiceEnvironment();
+    environment.put("OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED", "true");
+
+    String exported = exportingTheResourceToTheLog(environment);
+
+    assertThat(exported)
+        .as("exported resource attributes were:%n%s", exported)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .contains("host.id=");
   }
 
   @Test
