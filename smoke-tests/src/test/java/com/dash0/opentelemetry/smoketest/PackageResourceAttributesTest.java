@@ -74,6 +74,37 @@ class PackageResourceAttributesTest {
         .doesNotContain("from-the-package-file");
   }
 
+  @Test
+  void exportsThoseAttributesUnderTheConfigFileToo() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\ndash0.package.version=1.2.3\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported =
+        InstrumentedJvm.runningTheTestApplication()
+            .attaching(agentJar)
+            .withEnvironmentVariable(
+                "OTEL_CONFIG_FILE",
+                Paths.get(
+                        PackageResourceAttributesTest.class
+                            .getResource("/declarative-config.yaml")
+                            .toURI())
+                    .toString())
+            .exitingAfter(4000)
+            .run();
+
+    assertThat(exported)
+        .as(
+            "Dash0DeclarativeConfigurationCustomizerProvider merges Dash0PackageResource into the"
+                + " attributes it writes, and no other test holds it there. Exported resource"
+                + " attributes were:%n%s",
+            exported)
+        .contains("dash0.package.name=\"dash0-java-autoinstrumentation\"")
+        .contains("dash0.package.version=\"1.2.3\"");
+  }
+
   private Path copyAgentJar() throws IOException {
     Path agentJar = installDirectory.resolve("opentelemetry-javaagent.jar");
     Files.copy(

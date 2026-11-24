@@ -48,6 +48,7 @@ class DeclarativeConfigurationTest {
                 + " loses. The JVM's output was:%n%s",
             exported)
         .contains("telemetry.distro.name=\"dash0-java\"")
+        .contains("telemetry.distro.version=")
         .doesNotContain("telemetry.distro.name=\"opentelemetry-javaagent\"");
   }
 
