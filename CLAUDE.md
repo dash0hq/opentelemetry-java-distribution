@@ -74,6 +74,17 @@ does less than it should.
    the agent loads from `inst/` as a `.classdata` entry rather than as an
    ordinary class file. When that resolution breaks the agent starts normally
    and the package attributes are simply absent.
+9. **Declarative configuration.** Setting `OTEL_CONFIG_FILE` makes the SDK
+   skip every `ResourceProvider` and every `AutoConfigurationCustomizerProvider`,
+   which is items 1, 6, 7 and 8 at once.
+   `Dash0DeclarativeConfigurationCustomizerProvider` puts them back through the
+   SPI that mode does consult. Two traps live inside it.
+   `ResourceModel.setExtensionProperty` stores a Jackson copy of the value, so
+   mutating a detection model after handing it over throws the change away.
+   And a detector name written into `resource.detection/development` has to
+   match a registered `ComponentProvider`, or the SDK fails to build.
+   `DeclarativeConfigurationTest` and
+   `Dash0DeclarativeConfigurationCustomizerProviderTest` guard this one.
 
 The smoke tests in `smoke-tests/` exist specifically to catch all nine. They
 assert on the shape of the built jars and on what a real instrumented JVM
@@ -99,18 +110,6 @@ any assertion phrased as "does not contain", which is exactly how a provider
 that stopped the agent from starting went unnoticed while its test passed.
 And never let a resource provider throw, because SDK autoconfiguration aborts
 and takes the whole agent with it.
-
-9. **Declarative configuration.** Setting `OTEL_CONFIG_FILE` makes the SDK
-   skip every `ResourceProvider` and every `AutoConfigurationCustomizerProvider`,
-   which is items 1, 6, 7 and 8 at once.
-   `Dash0DeclarativeConfigurationCustomizerProvider` puts them back through the
-   SPI that mode does consult. Two traps live inside it.
-   `ResourceModel.setExtensionProperty` stores a Jackson copy of the value, so
-   mutating a detection model after handing it over throws the change away.
-   And a detector name written into `resource.detection/development` has to
-   match a registered `ComponentProvider`, or the SDK fails to build.
-   `DeclarativeConfigurationTest` and
-   `Dash0DeclarativeConfigurationCustomizerProviderTest` guard this one.
 
 ## Coding conventions
 
