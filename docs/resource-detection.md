@@ -267,10 +267,11 @@ Foundry, the absent attributes are plain in the exported resource, and one
 variable turns the group on. The upstream parity at the end of this section is
 the other, and it reaches this group as much as it reaches the other nine.
 
-Against that stands a startup cost the experiment above puts in seconds, paid by
-every JVM that is not on the cloud in question, in an amount that depends on a
-network property the distribution cannot observe. Four further reasons make
-enabling a group by default worse than it looks.
+What enabling a group buys is therefore small. What it costs is a startup
+penalty the experiment above puts in seconds, paid by every JVM that is not on
+the cloud in question, in an amount that depends on a network property the
+distribution cannot observe. Four further reasons make enabling a group by
+default worse than it looks.
 
 Every detector except the Cloud Foundry one carries the same guard:
 
