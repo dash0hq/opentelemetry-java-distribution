@@ -178,10 +178,12 @@ Declarative configuration does not apply this default either.
 ### The cloud resource detector toggles
 
 Agent 2.33.1 ships ten cloud resource detectors and starts all ten disabled.
-This distribution changes nothing about that, so the five group toggles below
-behave exactly as they do with the upstream agent. They are listed here because
-a missing `cloud.region` or `host.id` sends people looking for a Dash0 setting
-that does not exist.
+This distribution changes nothing about that, so the group toggles below behave
+exactly as they do with the upstream agent. Four of the five cover the ten cloud
+detectors. The fifth covers `HostIdResourceProvider`, which is not a cloud
+detector and is off by default through the same mechanism. They are listed here
+because a missing `cloud.region` or `host.id` sends people looking for a Dash0
+setting that does not exist.
 
 | Variable | Covers |
 |---|---|
