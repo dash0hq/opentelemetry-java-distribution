@@ -195,8 +195,10 @@ setting that does not exist.
 
 Three of the detectors open a socket to a metadata endpoint, so the `aws`,
 `azure` and `gcp` groups are not free to enable on a host that is somewhere
-else. The `cloudfoundry` and `host-id` groups read an environment variable or a
-local file and open nothing. On a Linux host where traffic
+else. The `cloudfoundry` and `host-id` groups open no socket: `cloudfoundry`
+reads `VCAP_APPLICATION`, and `host-id` reads a local file on Linux and runs a
+local command with a 2 s bound on macOS, Windows and BSD. On a Linux host where
+traffic
 to `169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and
 `azure` adds 5.18 s to JVM startup. `docs/resource-detection.md` has the full
 table, the experiment behind those two figures, the attributes each detector
