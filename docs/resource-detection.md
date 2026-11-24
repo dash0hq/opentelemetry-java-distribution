@@ -224,13 +224,16 @@ of the three it lands on.
 ### Why they stay off
 
 A default is worth changing when the upstream default loses data that cannot be
-recovered later. That is the case for `OTEL_TRACES_SAMPLER`, where an incoming
-`traceparent` silently deletes spans that no downstream processing can bring
-back, which is why `docs/configuration.md` documents a different default there.
-Cloud attributes are not in that category. They can be supplied out of process,
-once per host, by the Dash0 operator or by the `resourcedetection` processor in
-a collector, and a workload that wants them from the JVM gets them by setting
-one variable.
+recovered later. Both of the defaults `docs/configuration.md` records are of
+that kind. Under `OTEL_TRACES_SAMPLER`, an incoming `traceparent` silently
+deletes spans that no downstream processing can bring back. Under
+`OTEL_PROPAGATORS`, a caller that sends only `X-Amzn-Trace-Id`, such as an AWS
+service with X-Ray active tracing, leaves `tracecontext,baggage` with no context
+to extract, so this JVM starts a second trace that nothing downstream can join
+to the first. Cloud attributes are not in that category. They can be supplied
+out of process, once per host, by the Dash0 operator or by the
+`resourcedetection` processor in a collector, and a workload that wants them
+from the JVM gets them by setting one variable.
 
 Against that stands a startup cost measured in seconds, paid by every JVM that
 is not on the cloud in question, in an amount that depends on a network property
