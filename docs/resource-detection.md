@@ -315,8 +315,10 @@ Shipping it as a distribution default is harder than it looks. An
 name overrides, so a workload that sets `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`
 for a reason of its own would silently bring the probing detector back. An
 `addPropertiesCustomizer` avoids that, by reading the workload's value and
-returning the union, which is the shape `Dash0ConfigurationCustomizerProvider`
-already uses for the OTLP endpoint. What it cannot do is tell apart a workload
+returning the union. `Dash0ConfigurationCustomizerProvider` already registers
+one, though what it does there with the OTLP endpoint is yield to a workload
+that set its own rather than merge with it. What it cannot do is tell apart a
+workload
 that enabled `aws` without thinking about EC2 from one that enabled it wanting
 EC2 detection, so the union would take `Ec2ResourceProvider` away from the
 second of those, leaving `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` and its own
@@ -366,8 +368,10 @@ list it builds itself, so nothing else is lost by setting it.
 `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` is the opposite and is a trap here. It is
 an allowlist over every resource provider rather than over the cloud ones, so
 setting it to a cloud detector turns off every other entry in the merged service
-file: the container, host, OS, process, jar service name and Spring Boot
-detectors, both Dash0 providers, and `EnvironmentResourceProvider`.
+file, among them the container, host, host id, OS, process, process runtime,
+manifest, jar service name and Spring Boot detectors, both Dash0 providers,
+upstream's own `DistroResourceProvider`, `ServiceInstanceIdResourceProvider` and
+`EnvironmentResourceProvider`.
 
 Losing that last one is the expensive part, since it is what reads
 `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Running this agent with
