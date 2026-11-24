@@ -131,6 +131,23 @@ class ServiceNameDetectionTest {
   }
 
   @Test
+  void takesTheVersionFromTheManifestImplementationVersion(@TempDir Path workingDirectory)
+      throws Exception {
+    Path jar =
+        executableJar(workingDirectory, "my-payments-service.jar", null, "9.9.9-manifest", null);
+
+    String exported =
+        exportingTheResourceToTheLog()
+            .inWorkingDirectory(workingDirectory)
+            .launchedFromTheExecutableJar(jar)
+            .run();
+
+    assertThat(exported)
+        .as("exported resource attributes were:%n%s", exported)
+        .contains("service.version=\"9.9.9-manifest\"");
+  }
+
+  @Test
   void prefersTheSpringBuildInfoVersionOverTheManifestImplementationVersion(
       @TempDir Path workingDirectory) throws Exception {
     Path jar =
