@@ -161,7 +161,7 @@ of leaving this table wrong.
 | `Ec2ResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `host.id`, `host.type`, `host.image.id`, `host.name` | two HTTP calls to `169.254.169.254`, 2 s timeout each |
 | `AzureVmResourceProvider` | `azure` | `cloud.provider`, `cloud.platform`, `cloud.region`, `cloud.resource_id`, `host.id`, `host.name`, `host.type`, `os.type`, `os.version`, `azure.vm.scaleset.name`, `azure.vm.sku` | one HTTP call to `169.254.169.254`, 5 s timeout |
 | `GCPResourceProvider` | `gcp` | `cloud.*` plus GCE, GKE, Cloud Run, Cloud Functions and App Engine specifics | one HTTP call to `metadata.google.internal`, no timeout set |
-| `EksResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `k8s.cluster.name`, `container.id` | free off Kubernetes; inside any pod, one HTTPS call to `kubernetes.default.svc`, 2 s timeout |
+| `EksResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `k8s.cluster.name`, `container.id` | free off Kubernetes; inside a pod that mounts the default service account, one HTTPS call to `kubernetes.default.svc`, 2 s timeout |
 | `EcsResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `cloud.resource_id`, `aws.ecs.*`, `aws.log.*`, `container.id`, `container.name`, `container.image.name`, `container.image.tags` | free, gated on `ECS_CONTAINER_METADATA_URI_V4` or `ECS_CONTAINER_METADATA_URI` |
 | `BeanstalkResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `service.instance.id`, `service.version`, `service.namespace` | free, gated on `/var/elasticbeanstalk/xray/environment.conf` |
 | `LambdaResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.region`, `faas.name`, `faas.version` | free, gated on `AWS_LAMBDA_FUNCTION_NAME` or `AWS_LAMBDA_FUNCTION_VERSION` |
@@ -172,7 +172,9 @@ of leaving this table wrong.
 Six of the ten read an environment variable or a local file and stop. Three
 open a socket: `Ec2ResourceProvider`, `AzureVmResourceProvider` and
 `GCPResourceProvider`. `EksResourceProvider` is the awkward tenth, free on a
-host and not free in a pod.
+host and free in a pod that mounts no service account, since `EksResource.isK8s`
+requires both the token and the CA certificate to exist before it calls
+anything.
 
 Both free Azure detectors set `cloud.provider` themselves, which the guard below
 reads, so on an Azure App Service or Azure Functions host
