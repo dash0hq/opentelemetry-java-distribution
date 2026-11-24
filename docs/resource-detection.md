@@ -52,17 +52,20 @@ other way, since each is guarded on the name still being `unknown_service:java`.
 A `service.name` in the package file is already a name, so none of the three
 contributes one: a JVM started with `-Dspring.application.name=my-spring-app`
 beside a package file carrying `service.name=from-package` exports
-`from-package`. `ManifestResourceProvider` still runs and still contributes
-`service.version`, since `AttributeResourceProvider` applies the guard to each
-key separately.
+`from-package`. In a `java -jar` launch whose manifest carries
+`Implementation-Version`, `ManifestResourceProvider` still contributes
+`service.version`, since `AttributeResourceProvider` tests each key on its own:
+`service.name` against being `unknown_service:java`, and every other key against
+being absent.
 
 Losing a key to an unguarded provider costs nothing today because the two keys
 below are ones nothing else sets, and `DistroResourceProvider` takes the
 opposite choice with an order of `200` precisely because its job is to overwrite
 the agent's own value.
 
-Two different mechanisms produce that, and the doc used to credit the wrong one
-for both. Providers are applied in ascending `Ordered.order()` and later ones
+Two different mechanisms produce the environment beating the package file and
+the package file losing to every unguarded detector, and the doc used to credit
+the wrong one for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
 `EnvironmentResourceProvider`, which declares an order of `2147483646`, so the
 environment is applied last whatever anything else does. The container, host,
@@ -161,6 +164,13 @@ at 2.33.1, which matters to anything naming it in
 | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` | `0` | AWS attributes | no, group `aws` |
 | `GCPResourceProvider` | `0` | Google Cloud attributes | no, group `gcp` |
 | `CloudFoundryResourceProvider` | `0` | Cloud Foundry attributes | no, group `cloudfoundry` |
+
+`service.version` is the one key in the table whose winner the ascending-order
+rule predicts wrongly. `ManifestResourceProvider` fills it only when it is still
+absent, so `SpringBootServiceVersionDetector` at order `0` beats the manifest at
+order `300` whenever the jar carries `META-INF/build-info.properties`. A jar
+carrying both `build.version=1.0.0` there and `Implementation-Version: 9.9.9` in
+its manifest exports `service.version="1.0.0"`.
 
 Eleven of the 23 are off by default, and ten of those eleven are cloud
 detectors. `HostIdResourceProvider` is the only non-cloud one. The five group
