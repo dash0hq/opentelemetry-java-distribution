@@ -325,9 +325,12 @@ that set its own rather than merge with it. What it cannot do is tell apart a
 workload
 that enabled `aws` without thinking about EC2 from one that enabled it wanting
 EC2 detection, so the union would take `Ec2ResourceProvider` away from the
-second of those, leaving `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` and its own
-trap as the only way back. That is machinery to maintain for a group this
-distribution has decided not to enable.
+second of those with no way back. `ResourceConfiguration.configureResource`
+checks the enabled list first and then skips any provider the disabled list
+names, whatever the enabled list says, so `OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS`
+does not undo a name the union put in `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`.
+That is machinery to maintain for a group this distribution has decided not to
+enable.
 
 Leaving them off also keeps one sentence true, that this distribution enables
 no detector upstream ships disabled. Every upstream troubleshooting document
