@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Asserts which value a real instrumented JVM reports as {@code service.name} for each way of
- * launching an application.
+ * Asserts which value a real instrumented JVM reports as {@code service.name}, and as {@code
+ * service.version} where two providers supply one, for each way of launching an application.
  */
 class ServiceNameDetectionTest {
 
@@ -130,6 +130,23 @@ class ServiceNameDetectionTest {
     assertServiceName(exported, "from-otel-service-name");
   }
 
+  @Test
+  void prefersTheSpringBuildInfoVersionOverTheManifestImplementationVersion(
+      @TempDir Path workingDirectory) throws Exception {
+    Path jar =
+        executableJar(workingDirectory, "my-payments-service.jar", null, "9.9.9-manifest", "1.0.0");
+
+    String exported =
+        exportingTheResourceToTheLog()
+            .inWorkingDirectory(workingDirectory)
+            .launchedFromTheExecutableJar(jar)
+            .run();
+
+    assertThat(exported)
+        .as("exported resource attributes were:%n%s", exported)
+        .contains("service.version=\"1.0.0\"");
+  }
+
   private static void assertServiceName(String exported, String expected) {
     assertThat(exported)
         .as("exported resource attributes were:%n%s", exported)
@@ -146,14 +163,24 @@ class ServiceNameDetectionTest {
         .exitingAfter(4000);
   }
 
+  private static Path executableJar(Path directory, String fileName, String implementationTitle)
+      throws IOException {
+    return executableJar(directory, fileName, implementationTitle, null, null);
+  }
+
   /**
    * Writes an executable jar named {@code fileName} into {@code directory}, holding {@link
-   * TestApplication} and, when {@code implementationTitle} is not null, that {@code
-   * Implementation-Title} manifest attribute.
+   * TestApplication}, each manifest attribute whose argument is not null, and a {@code
+   * META-INF/build-info.properties} naming {@code buildInfoVersion} when that is not null.
    *
    * @return the path of the jar that was written
    */
-  private static Path executableJar(Path directory, String fileName, String implementationTitle)
+  private static Path executableJar(
+      Path directory,
+      String fileName,
+      String implementationTitle,
+      String implementationVersion,
+      String buildInfoVersion)
       throws IOException {
     Manifest manifest = new Manifest();
     Attributes attributes = manifest.getMainAttributes();
@@ -161,6 +188,9 @@ class ServiceNameDetectionTest {
     attributes.put(Attributes.Name.MAIN_CLASS, TestApplication.class.getName());
     if (implementationTitle != null) {
       attributes.put(Attributes.Name.IMPLEMENTATION_TITLE, implementationTitle);
+    }
+    if (implementationVersion != null) {
+      attributes.put(Attributes.Name.IMPLEMENTATION_VERSION, implementationVersion);
     }
 
     Path jar = directory.resolve(fileName);
@@ -182,6 +212,11 @@ class ServiceNameDetectionTest {
           Files.copy(classFile, out);
           out.closeEntry();
         }
+      }
+      if (buildInfoVersion != null) {
+        out.putNextEntry(new JarEntry("META-INF/build-info.properties"));
+        out.write(("build.version=" + buildInfoVersion + "\n").getBytes(StandardCharsets.UTF_8));
+        out.closeEntry();
       }
     }
     return jar;
