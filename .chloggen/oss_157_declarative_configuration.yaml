@@ -35,10 +35,14 @@ subtext: |
   processors of all three signals and both the HTTP and gRPC exporters. It adds
   no exporter and no provider the file did not declare, since the file is the
   whole configuration under ``OTEL_CONFIG_FILE``.
-  ``OTEL_EXPORTER_OTLP_ENDPOINT`` still beats it, and setting it leaves the
-  file untouched. Both Dash0 settings are read from the system property first
-  and the environment variable second, the precedence the autoconfigure SPI
-  gives the same two names.
+  A set ``OTEL_EXPORTER_OTLP_ENDPOINT`` suppresses that mapping and leaves the
+  file untouched, and configures nothing itself in this mode, so an exporter
+  the file left without an ``endpoint`` keeps its own specification default,
+  ``http://localhost:4318`` for ``otlp_http`` and ``http://localhost:4317`` for
+  ``otlp_grpc``. The customizer logs that at ``WARNING``.
+  Both Dash0 settings are read from the system property first and the
+  environment variable second, the precedence the autoconfigure SPI gives the
+  same two names.
   An existing deployment that sets ``OTEL_CONFIG_FILE`` is affected without
   changing its configuration, and three of the changes are visible. A process
   with ``DASH0_DISABLE=true`` stops exporting. Telemetry is attributed to
