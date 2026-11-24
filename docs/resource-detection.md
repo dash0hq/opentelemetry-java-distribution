@@ -165,23 +165,25 @@ at 2.33.1, which matters to anything naming it in
 | `GCPResourceProvider` | `0` | Google Cloud attributes | no, group `gcp` |
 | `CloudFoundryResourceProvider` | `0` | Cloud Foundry attributes | no, group `cloudfoundry` |
 
-A `ConditionalResourceProvider` breaks the ascending-order rule: it declines to
-write a key that already has a value, so an earlier writer keeps it.
-`service.name`, `service.version` and `host.id` each behave that way. The
-provider that defers is the one the rule names as the winner; the others write
-regardless. `SpringBootServiceVersionDetector` at order `0` and
-`EnvironmentResourceProvider` at order `2147483646` are plain
-`ResourceProvider`s and overwrite whatever is already there.
+Several providers in the table are `ConditionalResourceProvider`s, and each
+declares its own condition instead of sharing one. The three `service.name`
+detectors write only while the name is still `unknown_service:java`, which the
+`service.name` section below sets out in full. `ManifestResourceProvider` writes
+each of its other keys only while that key is absent. `HostIdResourceProvider`
+writes `host.id` only while `host.id` is absent, so a value a Dash0 package file
+or an enabled cloud detector already set survives it. Each cloud provider tests
+`cloud.provider` being absent, which is not one of the keys it writes, so it can
+overwrite a key another provider already set. `SpringBootServiceVersionDetector`
+at order `0` and `EnvironmentResourceProvider` at order `2147483646` declare no
+condition and overwrite whatever is there.
 
-The `service.name` section below gives that chain in full. For
-`service.version`, `ManifestResourceProvider` fills the key only when it is
-still absent, so `SpringBootServiceVersionDetector` at order `0` beats the
-manifest at order `300` whenever a `META-INF/build-info.properties` on the class
-path carries a `build.version` property. A jar carrying both `build.version=1.0.0`
+Reading the `order()` column alone therefore predicts the wrong winner wherever
+one of those conditions applies. For `service.version`,
+`SpringBootServiceVersionDetector` at order `0` beats `ManifestResourceProvider`
+at order `300` whenever a `META-INF/build-info.properties` on the class path
+carries a `build.version` property. A jar carrying both `build.version=1.0.0`
 there and `Implementation-Version: 9.9.9` in its manifest exports
-`service.version="1.0.0"`. For `host.id`, `HostIdResourceProvider` at order
-`2147483646` declines when the key already has a value, which a Dash0 package
-file or an enabled cloud detector can have set.
+`service.version="1.0.0"`.
 
 Eleven of the 23 are off by default, and ten of those eleven are cloud
 detectors. `HostIdResourceProvider` is the only non-cloud one. The five group
