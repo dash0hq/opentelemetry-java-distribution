@@ -317,15 +317,18 @@ service it talks to starts a new trace.
 The customizer writes `composite_list: tracecontext,baggage,xray`, the same
 value `Dash0ConfigurationCustomizerProvider` supplies as `otel.propagators`. It
 writes nothing when the file declares either a `composite` or a
-`composite_list` naming at least one propagator, so a file that asks for
-`b3multi` gets `b3multi` alone.
+`composite_list` that is not blank, so a file that asks for `b3multi` gets
+`b3multi` alone.
 
-A `composite_list` that is blank counts as naming none, and the default is
-written over it. `PropagatorFactory` drops every empty entry, so a blank value
-reaches the same zero-propagator state as a missing `propagator` node, and
+A blank `composite_list` is the one case the default is written over.
+`PropagatorFactory` drops every empty entry, so a blank value reaches the same
+zero-propagator state as a missing `propagator` node, and
 `composite_list: "${OTEL_PROPAGATORS}"` with the variable unset renders blank.
-A file that wants no propagation at all says so with `composite: []`, which the
-customizer leaves alone.
+
+A file that wants no propagation at all has two spellings and the customizer
+leaves both alone: `composite: []`, and `composite_list: none`, which
+`PropagatorFactory` filters out the same way `OTEL_PROPAGATORS=none` is filtered
+on the environment path.
 
 `tracecontext` and `baggage` are built into `TextMapPropagatorFactory`. Every
 other name in a `composite_list`, `xray` included, is resolved against a

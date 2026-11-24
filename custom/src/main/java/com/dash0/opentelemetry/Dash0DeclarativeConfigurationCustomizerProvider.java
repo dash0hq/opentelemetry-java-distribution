@@ -235,7 +235,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code propagator.composite_list} to {@value
    * Dash0ConfigurationCustomizerProvider#TRACECONTEXT_BAGGAGE_XRAY} unless the file declares a
-   * {@code composite} or a {@code composite_list} that names at least one propagator.
+   * {@code composite} or a {@code composite_list} that is not blank.
    */
   static void defaultThePropagatorsToTracecontextBaggageXray(
       OpenTelemetryConfigurationModel model) {

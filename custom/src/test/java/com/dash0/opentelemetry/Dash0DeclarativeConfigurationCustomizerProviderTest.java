@@ -328,9 +328,24 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
     assertThat(model.getPropagator().getCompositeList()).isEqualTo("b3multi");
   }
 
+  @Test
+  void keepsACompositeListOfNone() {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setPropagator(new PropagatorModel().setCompositeList("none"));
+
+    defaultThePropagatorsToTracecontextBaggageXray(model);
+
+    assertThat(model.getPropagator().getCompositeList())
+        .as(
+            "PropagatorFactory filters the entry none out, which is how a file asks for no"
+                + " propagation in the spelling OTEL_PROPAGATORS=none uses")
+        .isEqualTo("none");
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"", "  "})
-  void defaultsThePropagatorsWhenTheCompositeListNamesNone(String compositeList) {
+  void defaultsThePropagatorsWhenTheCompositeListIsBlank(String compositeList) {
     OpenTelemetryConfigurationModel model =
         new OpenTelemetryConfigurationModel()
             .setPropagator(new PropagatorModel().setCompositeList(compositeList));
