@@ -48,6 +48,21 @@ nothing today because the two keys below are ones nothing else sets, and
 `DistroResourceProvider` takes the opposite choice with an order of `100`
 precisely because its job is to overwrite the agent's own value.
 
+That exception is inverted under `OTEL_CONFIG_FILE`, and the inversion is a
+consequence of the declarative model rather than a second decision.
+`Dash0DeclarativeConfigurationCustomizerProvider` writes every key of the file
+into `resource.attributes`, which `ResourceFactory` applies after every
+detector, and the declarative model offers no node that loses to a detector.
+So the same install with `host.name=from-the-package-file` in
+`dash0-resource-attributes.properties` exports the real host name with
+`OTEL_CONFIG_FILE` unset and `from-the-package-file` with it set.
+`thePackageFileBeatsADetectorUnderTheConfigFile` in
+`PackageResourceAttributesTest` holds that, beside
+`losesEveryKeyAnUpstreamDetectorAlsoSets` which holds the environment rule.
+Only the two `dash0.package.*` keys below are written by any Dash0 package
+today, and nothing else sets either of them, so no package currently reaches
+the difference.
+
 Two different mechanisms produce that, and the doc used to credit the wrong one
 for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by

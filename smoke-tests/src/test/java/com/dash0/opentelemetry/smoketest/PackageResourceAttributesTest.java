@@ -82,18 +82,7 @@ class PackageResourceAttributesTest {
         ("dash0.package.name=dash0-java-autoinstrumentation\ndash0.package.version=1.2.3\n")
             .getBytes(StandardCharsets.UTF_8));
 
-    String exported =
-        InstrumentedJvm.runningTheTestApplication()
-            .attaching(agentJar)
-            .withEnvironmentVariable(
-                "OTEL_CONFIG_FILE",
-                Paths.get(
-                        PackageResourceAttributesTest.class
-                            .getResource("/declarative-config.yaml")
-                            .toURI())
-                    .toString())
-            .exitingAfter(4000)
-            .run();
+    String exported = exportingTheResourceUnderTheConfigFile(agentJar);
 
     assertThat(exported)
         .as(
@@ -103,6 +92,41 @@ class PackageResourceAttributesTest {
             exported)
         .contains("dash0.package.name=\"dash0-java-autoinstrumentation\"")
         .contains("dash0.package.version=\"1.2.3\"");
+  }
+
+  @Test
+  void thePackageFileBeatsADetectorUnderTheConfigFile() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\nhost.name=from-the-package-file\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported = exportingTheResourceUnderTheConfigFile(agentJar);
+
+    assertThat(exported)
+        .as(
+            "the opposite of losesEveryKeyAnUpstreamDetectorAlsoSets, and not a second decision:"
+                + " resource.attributes is applied after every detector and the declarative model"
+                + " offers no node that loses to one. Recorded here so the difference between the"
+                + " two modes is known rather than discovered. Exported resource attributes"
+                + " were:%n%s",
+            exported)
+        .contains("host.name=\"from-the-package-file\"");
+  }
+
+  private static String exportingTheResourceUnderTheConfigFile(Path agentJar) throws Exception {
+    return InstrumentedJvm.runningTheTestApplication()
+        .attaching(agentJar)
+        .withEnvironmentVariable(
+            "OTEL_CONFIG_FILE",
+            Paths.get(
+                    PackageResourceAttributesTest.class
+                        .getResource("/declarative-config.yaml")
+                        .toURI())
+                .toString())
+        .exitingAfter(4000)
+        .run();
   }
 
   private Path copyAgentJar() throws IOException {
