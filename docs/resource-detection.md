@@ -47,21 +47,6 @@ have regardless of what is already there. This is deliberate rather than
 inherited: a value the operator set on the workload should beat one the package
 baked in.
 
-That exception is inverted under `OTEL_CONFIG_FILE`, and the inversion is a
-consequence of the declarative model rather than a second decision.
-`Dash0DeclarativeConfigurationCustomizerProvider` writes every key of the file
-into `resource.attributes`, which `ResourceFactory` applies after every
-detector, and the declarative model offers no node that loses to a detector.
-So the same install with `host.name=from-the-package-file` in
-`dash0-resource-attributes.properties` exports the real host name with
-`OTEL_CONFIG_FILE` unset and `from-the-package-file` with it set.
-`thePackageFileBeatsADetectorUnderTheConfigFile` in
-`PackageResourceAttributesTest` holds that, beside
-`losesEveryKeyAnUpstreamDetectorAlsoSets` which holds the environment rule.
-Only the two `dash0.package.*` keys below are written by any Dash0 package
-today, and nothing else sets either of them, so no package currently reaches
-the difference.
-
 The three `service.name` detectors in the table under `service.name` go the
 other way, since each is guarded on the name still being `unknown_service:java`.
 A `service.name` in the package file is already a name, so none of the three
@@ -77,6 +62,22 @@ Losing a key to an unguarded provider costs nothing today because the two keys
 below are ones nothing else sets, and `DistroResourceProvider` takes the
 opposite choice with an order of `200` precisely because its job is to overwrite
 the agent's own value.
+
+The rule that the package file loses to an unguarded provider is inverted under
+`OTEL_CONFIG_FILE`, and the inversion is a consequence of the declarative model
+rather than a second decision.
+`Dash0DeclarativeConfigurationCustomizerProvider` writes every key of the file
+into `resource.attributes`, which `ResourceFactory` applies after every
+detector, and the declarative model offers no node that loses to a detector.
+So the same install with `host.name=from-the-package-file` in
+`dash0-resource-attributes.properties` exports the real host name with
+`OTEL_CONFIG_FILE` unset and `from-the-package-file` with it set.
+`thePackageFileBeatsADetectorUnderTheConfigFile` in
+`PackageResourceAttributesTest` holds that, beside
+`losesEveryKeyAnUpstreamDetectorAlsoSets` which holds the environment rule.
+Only the two `dash0.package.*` keys below are written by any Dash0 package
+today, and nothing else sets either of them, so no package currently reaches
+the difference.
 
 Two different mechanisms produce the environment beating the package file and
 the package file losing to every unguarded detector, and the doc used to credit
