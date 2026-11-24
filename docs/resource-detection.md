@@ -235,10 +235,10 @@ out of process, once per host, by the Dash0 operator or by the
 `resourcedetection` processor in a collector, and a workload that wants them
 from the JVM gets them by setting one variable.
 
-Against that stands a startup cost measured in seconds, paid by every JVM that
-is not on the cloud in question, in an amount that depends on a network property
-the distribution cannot observe. Four further reasons make enabling a group by
-default worse than it looks.
+Against that stands a startup cost the experiment above puts in seconds, paid by
+every JVM that is not on the cloud in question, in an amount that depends on a
+network property the distribution cannot observe. Four further reasons make
+enabling a group by default worse than it looks.
 
 Every detector except the Cloud Foundry one carries the same guard:
 
