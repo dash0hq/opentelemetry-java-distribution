@@ -193,8 +193,10 @@ setting that does not exist.
 | `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | Cloud Foundry |
 | `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` | `host.id` from `/etc/machine-id` and its per-platform equivalents |
 
-Three of the detectors open a socket to a metadata endpoint, so a group is not
-free to enable on a host that is somewhere else. On a Linux host where traffic
+Three of the detectors open a socket to a metadata endpoint, so the `aws`,
+`azure` and `gcp` groups are not free to enable on a host that is somewhere
+else. The `cloudfoundry` and `host-id` groups read an environment variable or a
+local file and open nothing. On a Linux host where traffic
 to `169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and
 `azure` adds 5.18 s to JVM startup. `docs/resource-detection.md` has the full
 table, the experiment behind those two figures, the attributes each detector
