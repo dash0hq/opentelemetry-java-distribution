@@ -153,7 +153,7 @@ class Dash0ConfigurationTest {
   }
 
   @Test
-  void theSuppliedSemconvStabilityOptInReachesTheInstrumentation() throws Exception {
+  void theSemconvStabilityOptInThisDistributionSetsReachesTheInstrumentation() throws Exception {
     String output = recordingAMethodSpan().run();
 
     assertThat(output)
@@ -169,7 +169,7 @@ class Dash0ConfigurationTest {
   }
 
   @Test
-  void anEnvironmentVariableSemconvStabilityOptInBeatsTheSuppliedOne() throws Exception {
+  void anEnvironmentVariableSemconvStabilityOptInBeatsTheDistributionDefault() throws Exception {
     String output =
         recordingAMethodSpan()
             .withEnvironmentVariable("OTEL_SEMCONV_STABILITY_OPT_IN", "database")
@@ -178,8 +178,8 @@ class Dash0ConfigurationTest {
     assertThat(output)
         .as(
             "naming only database leaves code on the old conventions, which is what proves the"
-                + " workload's own value replaced the supplied one rather than being merged into"
-                + " it. The JVM's output was:%n%s",
+                + " workload's own value replaced the one this distribution sets rather than being"
+                + " merged into it. The JVM's output was:%n%s",
             output)
         .contains(OLD_CODE_ATTRIBUTE)
         .doesNotContain(STABLE_CODE_ATTRIBUTE);
@@ -223,7 +223,7 @@ class Dash0ConfigurationTest {
   }
 
   @Test
-  void aSystemPropertySemconvStabilityOptInBeatsTheSuppliedOne() throws Exception {
+  void aSystemPropertySemconvStabilityOptInBeatsTheDistributionDefault() throws Exception {
     String output =
         recordingAMethodSpan().withJvmArguments("-Dotel.semconv-stability.opt-in=database").run();
 

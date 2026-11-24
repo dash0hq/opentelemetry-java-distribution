@@ -80,7 +80,7 @@ class ExtensionRuntimeTest {
   }
 
   @Test
-  void suppliesTheSemconvStabilityOptIn() throws Exception {
+  void setsTheSemconvStabilityOptIn() throws Exception {
     String exported =
         InstrumentedJvm.runningTheTestApplication()
             .attaching(Paths.get(System.getProperty("dash0.upstream.agent.jar")))
