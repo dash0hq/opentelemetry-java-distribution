@@ -373,9 +373,9 @@ left alone when it already has a value, and nothing is set at all when
 would shadow the variable the agent reads next.
 
 Declarative configuration does not apply this default either, for the reason the
-next section gives. A file expresses the same choice as `stability_opt_in_list`
-under `general`, which `general.db.semconv.version` and its siblings then beat
-per domain.
+Declarative configuration section below gives. A file expresses the same choice
+as `stability_opt_in_list` under `general`, which `general.db.semconv.version`
+and its siblings then beat per domain.
 
 ## Declarative configuration
 
