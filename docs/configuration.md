@@ -294,11 +294,16 @@ JDBC span carries `db.statement`, `db.system`, `db.name`, `db.operation`,
 
 Three of those seven have no replacement, so no rewritten query recovers them:
 `db.user` and `db.connection_string` are gone from the stable conventions, and
-`db.sql.table` is dropped without `db.collection.name` taking its place, because
-the agent emits the operation and collection pair only for Cassandra. The
-operation survives inside `db.query.summary`, which holds `SELECT customers` for
-a query against one table, and not as `db.operation.name`, which a JDBC span
-does not carry under this default.
+`db.sql.table` is dropped without `db.collection.name` taking its place, since
+Cassandra is the only SQL client whose instrumentation asks for the operation
+and collection pair. On a JDBC span the operation survives inside
+`db.query.summary`, which holds `SELECT customers` for a query against one
+table, and not as `db.operation.name`.
+
+A non-SQL database span is the other way round. MongoDB, Redis, Elasticsearch
+and the rest carry `db.operation.name` and `db.collection.name` with the opt-in,
+so a filter on `db.operation` becomes a filter on `db.operation.name` there and
+a filter on `db.query.summary` matches nothing.
 
 Attribute names are not the only thing that changes. Span names, span kinds,
 metric names and one metric unit change with them, and a dashboard, query or
