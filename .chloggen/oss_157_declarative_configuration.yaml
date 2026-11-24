@@ -27,9 +27,12 @@ subtext: |
   and ``process.pid`` come back. ``tracer_provider.sampler`` is set to
   ``always_on`` when the file declares no sampler, and
   ``propagator.composite_list`` to ``tracecontext,baggage,xray`` when the file
-  declares neither a ``composite`` nor a ``composite_list``. A file with no
-  ``propagator`` node left the SDK on its noop propagators, so an outgoing
-  request carried no ``traceparent`` at all.
+  declares neither a ``composite`` nor a ``composite_list`` that is not blank.
+  A file with no ``propagator`` node left the SDK on its noop propagators, so
+  an outgoing request carried no ``traceparent`` at all, and a blank
+  ``composite_list`` leaves it with zero propagators for the same outcome.
+  ``composite: []`` and ``composite_list: none`` ask for no propagation and are
+  left alone.
   ``DASH0_OTEL_COLLECTOR_BASE_URL`` fills in the ``endpoint`` of an OTLP
   exporter the file declared and left without one, across the batch and simple
   processors of all three signals and both the HTTP and gRPC exporters. It adds
