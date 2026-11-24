@@ -161,10 +161,10 @@ of leaving this table wrong.
 | `AzureFunctionsResourceProvider` | `azure` | `cloud.provider`, `cloud.platform`, **`service.name`**, `faas.name`, `faas.version`, `faas.instance`, `faas.max_memory`, `cloud.region`, `cloud.account.id`, `deployment.environment.name`, `azure.resource_group.name` | free, gated on `WEBSITE_SITE_NAME` together with `FUNCTIONS_EXTENSION_VERSION` |
 | `CloudFoundryResourceProvider` | `cloudfoundry` | `cloudfoundry.app.*`, `cloudfoundry.org.*`, `cloudfoundry.space.*`, `cloudfoundry.process.*` | free, gated on `VCAP_APPLICATION` |
 
-Seven of the ten read an environment variable or a local file and stop. Three
+Six of the ten read an environment variable or a local file and stop. Three
 open a socket: `Ec2ResourceProvider`, `AzureVmResourceProvider` and
-`GCPResourceProvider`. `EksResourceProvider` is the awkward one, free on a host
-and not free in a pod.
+`GCPResourceProvider`. `EksResourceProvider` is the awkward tenth, free on a
+host and not free in a pod.
 
 Both free Azure detectors set `cloud.provider` themselves, which the guard below
 reads, so on an Azure App Service or Azure Functions host
@@ -277,8 +277,9 @@ from the jar file name. `OTEL_SERVICE_NAME` still beats it, because
 absent with the group off and present with it on.
 
 The group toggles do not offer a "free detectors only" position. `aws` covers
-`Ec2ResourceProvider` together with four free ones, and `azure` covers
-`AzureVmResourceProvider` together with two. An operator reaches that split by
+`Ec2ResourceProvider` and `EksResourceProvider` together with three free ones,
+and `azure` covers `AzureVmResourceProvider` together with two. An operator
+reaches that split by
 pairing the group toggle with `OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS`, which is
 shown below.
 
@@ -314,13 +315,22 @@ spellings reach the same setting: the SDK lowercases a property name and
 replaces `-` with `.`, and lowercases an environment variable name and replaces
 `_` with `.`, so both arrive as `otel.resource.providers.aws.enabled`.
 
-To take the four free AWS detectors without the IMDS probe, name the one
+To take the three free AWS detectors without the IMDS probe, name the one
 provider to leave out:
 
 ```bash
 export OTEL_RESOURCE_PROVIDERS_AWS_ENABLED=true
 export OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS=io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider
 ```
+
+`EksResourceProvider` is the fourth AWS detector that is not the IMDS probe, and
+it is free only outside a pod. In any pod that mounts the default service
+account, `EksResource` finds
+`/var/run/secrets/kubernetes.io/serviceaccount/token` and its CA certificate and
+issues an HTTPS GET to
+`https://kubernetes.default.svc/api/v1/namespaces/kube-system/configmaps/aws-auth`
+with a 2 s timeout. A workload that runs in Kubernetes and is not on EKS adds
+`io.opentelemetry.contrib.aws.resource.EksResourceProvider` to the same list.
 
 `io.opentelemetry.contrib.azure.resource.AzureVmResourceProvider` is the
 equivalent name for the `azure` group. The customizer merges the value with the
