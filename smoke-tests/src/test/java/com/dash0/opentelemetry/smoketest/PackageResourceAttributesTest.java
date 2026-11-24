@@ -115,6 +115,28 @@ class PackageResourceAttributesTest {
         .contains("host.name=\"from-the-package-file\"");
   }
 
+  @Test
+  void theDistroAttributesBeatThePackageFileUnderTheConfigFileToo() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\n"
+                + "telemetry.distro.name=from-the-package-file\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported = exportingTheResourceUnderTheConfigFile(agentJar);
+
+    assertThat(exported)
+        .as(
+            "Dash0DeclarativeConfigurationCustomizerProvider merges the two Dash0 resources into"
+                + " one block of resource.attributes, and Resource.merge gives its argument"
+                + " precedence, so the argument has to be the distro resource for the environment"
+                + " ordering to hold. Exported resource attributes were:%n%s",
+            exported)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .doesNotContain("from-the-package-file");
+  }
+
   private static String exportingTheResourceUnderTheConfigFile(Path agentJar) throws Exception {
     return InstrumentedJvm.runningTheTestApplication()
         .attaching(agentJar)

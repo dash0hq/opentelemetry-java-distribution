@@ -104,7 +104,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
 
     addResourceAttributesTheFileDoesNotDeclare(
-        model, DistroResource.get().merge(Dash0PackageResource.get()));
+        model, Dash0PackageResource.get().merge(DistroResource.get()));
     enableTheHostAndProcessDetectors(model);
     defaultTheSamplerToAlwaysOn(model);
     defaultThePropagatorsToTracecontextBaggageXray(model);
