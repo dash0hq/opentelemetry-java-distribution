@@ -324,8 +324,11 @@ right-hand cell has two fallbacks. An instrumentation reporting no collection is
 named after its namespace, and one reporting neither after `<host>:<port>`,
 which is where Redis and Elasticsearch land: a Redis span named `GET` today is
 named `GET redis.example:6379` after the upgrade, one name per node rather than
-one for the cluster. The messaging row covers every messaging instrumentation,
-Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS among them.
+one for the cluster. MongoDB is the other way round. Its name already carries
+the collection, as `insert mydb.mycollection`, so the rename drops the database
+and leaves `insert mycollection`. The messaging row covers every messaging
+instrumentation, Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS among
+them.
 
 On a messaging span the operation word changes as well as its position: a Kafka
 producer span named `orders publish` becomes `send orders`, and a consumer span
