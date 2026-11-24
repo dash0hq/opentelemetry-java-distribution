@@ -20,14 +20,18 @@ subtext: |
   again. ``http`` is not a value at all: HTTP semantic conventions are stable and
   the agent emits them whatever this setting says.
   Attribute names are not the only thing that changes. A JDBC span is named after
-  a summary of the query rather than ``<operation> <database>.<table>``, and
-  every other database instrumentation, MongoDB and Cassandra and Redis among
-  them, is named after the operation and the collection rather than the
-  operation and the database. A messaging span is named after the operation and
+  a summary of the query rather than ``<operation> <database>.<table>``, and so
+  is a Cassandra span. Every other database instrumentation, MongoDB and Redis
+  and Elasticsearch among them, is named after the operation and the collection
+  rather than the operation and the database, falling back to the namespace and
+  then to ``<host>:<port>`` where there is no collection. The AWS SDK is the
+  exception: it names its own client spans ``<service>.<operation>`` and reads
+  none of this setting, so a DynamoDB or an S3 span is unaffected. A messaging
+  span is named after the operation and
   the destination rather than the destination and the operation, and the
   operation word changes with the order: a Kafka producer span named
-  ``orders publish`` becomes ``send orders`` and a consumer poll named
-  ``orders receive`` becomes ``poll orders``. An RPC
+  ``orders publish`` becomes ``send orders`` and a consumer span named
+  ``orders process`` becomes ``process orders``. An RPC
   span is named ``<method>`` rather than ``<service>/<method>``, except under
   gRPC, which always uses the full method name. A messaging receive span has kind
   ``CLIENT`` rather than ``CONSUMER``, and a send span whose context is not

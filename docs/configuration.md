@@ -298,8 +298,8 @@ alert written against any of these stops matching with no error anywhere:
 
 | What changes | Without the opt-in | With it |
 |---|---|---|
-| Database span name, JDBC | `<operation> <database>.<table>` | a summary of the query |
-| Database span name, everything else | `<operation> <database>` | `<operation> <collection>` |
+| Database span name, JDBC and Cassandra | `<operation> <database>.<table>` | a summary of the query |
+| Database span name, everything else | `<operation> <database>.<collection>` | `<operation> <collection>` |
 | RPC span name, except gRPC | `<service>/<method>` | `<method>` |
 | Messaging span name | `<destination> <operation>`, as in `orders publish` | `<operation> <destination>`, as in `send orders` |
 | Messaging receive span kind | `CONSUMER` | `CLIENT` |
@@ -317,12 +317,17 @@ The unit change is the one to check first. A threshold written against
 `db.client.connection.wait_time` in seconds is a thousand times too high, so the
 alert stops firing rather than failing.
 
-The span name rows cover every instrumentation of their kind, not only the two
-named in them. MongoDB, Cassandra, Redis, Elasticsearch and DynamoDB are renamed
-alongside JDBC, and Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS are
-renamed alongside each other. On a messaging span the operation word changes as
-well as its position: a Kafka producer span named `orders publish` becomes `send
-orders`, and a consumer poll named `orders receive` becomes `poll orders`.
+The second database row covers MongoDB, Redis and Elasticsearch among others,
+and its right-hand cell has two fallbacks: an instrumentation reporting no
+collection is named after its namespace, and one reporting neither after
+`<host>:<port>`, which is where a Redis and an Elasticsearch span land. The
+messaging row covers Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS.
+
+On a messaging span the operation word changes as well as its position: a Kafka
+producer span named `orders publish` becomes `send orders`, and a consumer span
+named `orders process` becomes `process orders`. Kafka's `poll` span is the one
+to leave out while sizing the work: a default agent never records it, as the
+Kafka bullet below explains.
 
 Log records change too, in one case. The Logback and Log4j appenders write
 `code` attributes on a log record only when the appender's experimental
@@ -331,8 +336,11 @@ those records carry `code.file.path`, `code.function.name` and
 `code.line.number` in place of `code.filepath`, `code.namespace`,
 `code.function` and `code.lineno`.
 
-Three instrumentations differ from the table:
+Four instrumentations differ from the table:
 
+- The AWS SDK names its client spans itself, as `<service>.<operation>`, and
+reads none of this setting to do it, so a DynamoDB or an S3 span keeps the name
+it has. Its SQS messaging spans are renamed like every other messaging span.
 - gRPC span names never change. gRPC does not use the shared RPC span name
   extractor, and its spans carry the full method name whatever this setting
   says.
