@@ -49,13 +49,17 @@ baked in.
 
 The three `service.name` detectors in the table under `service.name` go the
 other way, since each is guarded on the name still being `unknown_service:java`.
-A `service.name` in the package file is already a name, so all three decline to
-run: a JVM started with `-Dspring.application.name=my-spring-app` beside a
-package file carrying `service.name=from-package` exports `from-package`.
+A `service.name` in the package file is already a name, so none of the three
+contributes one: a JVM started with `-Dspring.application.name=my-spring-app`
+beside a package file carrying `service.name=from-package` exports
+`from-package`. `ManifestResourceProvider` still runs and still contributes
+`service.version`, since `AttributeResourceProvider` applies the guard to each
+key separately.
 
-It costs nothing today because the two keys below are ones nothing else sets,
-and `DistroResourceProvider` takes the opposite choice with an order of `200`
-precisely because its job is to overwrite the agent's own value.
+Losing a key to an unguarded provider costs nothing today because the two keys
+below are ones nothing else sets, and `DistroResourceProvider` takes the
+opposite choice with an order of `200` precisely because its job is to overwrite
+the agent's own value.
 
 Two different mechanisms produce that, and the doc used to credit the wrong one
 for both. Providers are applied in ascending `Ordered.order()` and later ones
