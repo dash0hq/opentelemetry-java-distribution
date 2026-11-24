@@ -247,6 +247,7 @@ nowhere else to go: `defaultTheSamplerToAlwaysOn` creates a `tracer_provider`
 when the file declares none, and `defaultThePropagatorsToTracecontextBaggageXray`
 creates a `propagator`. Neither adds a processor or an exporter, so neither
 starts an export the file did not ask for.
+
 Declare the exporter in the file and leave the `endpoint` out to have the
 variable fill it in:
 
