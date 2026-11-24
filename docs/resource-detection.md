@@ -259,10 +259,11 @@ collector's `resourcedetection` processor ships no Cloud Foundry detector, so
 `cloudfoundry.app.name` and its siblings are lost for as long as the group is
 off. `CloudFoundryResourceProvider` is also free, is the only member of its
 group, carries no `cloud.provider` guard and writes no `service.name`, so none
-of the four reasons below reaches it. What keeps it off is the second condition
-on its own: a workload on Cloud Foundry knows it is on Cloud Foundry, the absent
-attributes are plain in the exported resource, and one variable turns the group
-on.
+of the four reasons below reaches it. Two things keep it off. The second
+condition holds: a workload on Cloud Foundry knows it is on Cloud Foundry, the
+absent attributes are plain in the exported resource, and one variable turns the
+group on. So does the upstream parity at the end of this section, which reaches
+this group as much as it reaches the other nine.
 
 Against that stands a startup cost the experiment above puts in seconds, paid by
 every JVM that is not on the cloud in question, in an amount that depends on a
