@@ -298,8 +298,10 @@ alert written against any of these stops matching with no error anywhere:
 
 | What changes | Without the opt-in | With it |
 |---|---|---|
-| JDBC span name | `<operation> <database>.<table>` | a summary of the query |
+| Database span name, JDBC | `<operation> <database>.<table>` | a summary of the query |
+| Database span name, everything else | `<operation> <database>` | `<operation> <collection>` |
 | RPC span name, except gRPC | `<service>/<method>` | `<method>` |
+| Messaging span name | `<destination> <operation>`, as in `orders publish` | `<operation> <destination>`, as in `send orders` |
 | Messaging receive span kind | `CONSUMER` | `CLIENT` |
 | Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
 | RabbitMQ `basicGet` receive span | not recorded | recorded |
@@ -314,6 +316,20 @@ The unit change is the one to check first. A threshold written against
 `db.client.connections.wait_time` in milliseconds carried over to
 `db.client.connection.wait_time` in seconds is a thousand times too high, so the
 alert stops firing rather than failing.
+
+The span name rows cover every instrumentation of their kind, not only the two
+named in them. MongoDB, Cassandra, Redis, Elasticsearch and DynamoDB are renamed
+alongside JDBC, and Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS are
+renamed alongside each other. On a messaging span the operation word changes as
+well as its position: a Kafka producer span named `orders publish` becomes `send
+orders`, and a consumer poll named `orders receive` becomes `poll orders`.
+
+Log records change too, in one case. The Logback and Log4j appenders write
+`code` attributes on a log record only when the appender's experimental
+code-attribute capture is turned on, which is off by default. Where it is on,
+those records carry `code.file.path`, `code.function.name` and
+`code.line.number` in place of `code.filepath`, `code.namespace`,
+`code.function` and `code.lineno`.
 
 Three instrumentations differ from the table:
 

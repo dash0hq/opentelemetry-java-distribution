@@ -20,13 +20,24 @@ subtext: |
   again. ``http`` is not a value at all: HTTP semantic conventions are stable and
   the agent emits them whatever this setting says.
   Attribute names are not the only thing that changes. A JDBC span is named after
-  a summary of the query rather than ``<operation> <database>.<table>``. An RPC
+  a summary of the query rather than ``<operation> <database>.<table>``, and
+  every other database instrumentation, MongoDB and Cassandra and Redis among
+  them, is named after the operation and the collection rather than the
+  operation and the database. A messaging span is named after the operation and
+  the destination rather than the destination and the operation, and the
+  operation word changes with the order: a Kafka producer span named
+  ``orders publish`` becomes ``send orders`` and a consumer poll named
+  ``orders receive`` becomes ``poll orders``. An RPC
   span is named ``<method>`` rather than ``<service>/<method>``, except under
   gRPC, which always uses the full method name. A messaging receive span has kind
   ``CLIENT`` rather than ``CONSUMER``, and a send span whose context is not
   propagated has kind ``CLIENT`` rather than ``PRODUCER``. RabbitMQ starts
   recording a receive span for every ``basicGet``, which it did not record at
-  all before.
+  all before. A log record carrying ``code`` attributes, which the Logback and
+  Log4j appenders write only where their experimental code-attribute capture is
+  turned on, carries ``code.file.path``, ``code.function.name`` and
+  ``code.line.number`` rather than ``code.filepath``, ``code.namespace``,
+  ``code.function`` and ``code.lineno``.
   The metrics change too. The agent starts recording
   ``db.client.operation.duration``, ``messaging.client.operation.duration``,
   ``messaging.client.sent.messages``, ``messaging.process.duration`` and
