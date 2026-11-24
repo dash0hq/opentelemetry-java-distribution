@@ -10,6 +10,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,6 +21,11 @@ class DeclarativeConfigurationTest {
 
   private static final String DASH0_HOST = "declarative-collector-base-url.invalid";
   private static final String OTEL_HOST = "declarative-exporter-endpoint.invalid";
+  private static final String TRACEPARENT = TestApplication.RECEIVED_HEADER + "traceparent: 00-";
+  private static final Pattern XRAY_WITH_PARENT =
+      Pattern.compile(
+          Pattern.quote(TestApplication.RECEIVED_HEADER)
+              + "X-Amzn-Trace-Id: Root=1-[0-9a-f]{8}-[0-9a-f]{24};Parent=[0-9a-f]{16};Sampled=1");
 
   @Test
   void theAgentStartsAndExportsWhatTheFileAsksFor() throws Exception {
@@ -109,6 +115,33 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
+  void thePropagatorsDefaultToTracecontextBaggageAndXray() throws Exception {
+    String output = sendingARequestConfiguredFrom("/declarative-config-traces.yaml").run();
+
+    assertThat(output)
+        .as(
+            "a file that declares no propagator leaves OpenTelemetrySdkBuilder on its noop"
+                + " default, which writes no trace header at all. The JVM's output was:%n%s",
+            output)
+        .contains(TRACEPARENT)
+        .containsPattern(XRAY_WITH_PARENT);
+  }
+
+  @Test
+  void thePropagatorsTheFileDeclaresAreKept() throws Exception {
+    String output = sendingARequestConfiguredFrom("/declarative-config-propagator.yaml").run();
+
+    assertThat(output)
+        .as(
+            "the file is the configuration under OTEL_CONFIG_FILE, so a declared composite wins"
+                + " over the Dash0 default. The JVM's output was:%n%s",
+            output)
+        .contains(TestApplication.RECEIVED_HEADER + "X-B3-TraceId: ")
+        .doesNotContain(TRACEPARENT)
+        .doesNotContain("X-Amzn-Trace-Id");
+  }
+
+  @Test
   void theExtensionJarContributesTheSameThingsAsTheAgent() throws Exception {
     String exported =
         InstrumentedJvm.runningTheTestApplication()
@@ -133,6 +166,11 @@ class DeclarativeConfigurationTest {
     return InstrumentedJvm.runningTheTestApplication()
         .withEnvironmentVariable("OTEL_CONFIG_FILE", fixture(fixture))
         .exitingAfter(3000);
+  }
+
+  private static InstrumentedJvm sendingARequestConfiguredFrom(String fixture)
+      throws URISyntaxException {
+    return configuredFrom(fixture).withJvmArguments("-D" + TestApplication.SEND_REQUEST + "=true");
   }
 
   private static String fixture(String name) throws URISyntaxException {

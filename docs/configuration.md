@@ -173,7 +173,8 @@ the request. That means it is written to the outgoing W3C `baggage` header as
 well as `X-Amzn-Trace-Id`, and it appears wherever baggage is copied onto spans
 or logs.
 
-Declarative configuration does not apply this default either.
+Declarative configuration applies this default too, as
+`propagator.composite_list`. The next section describes the mechanism.
 
 ## Declarative configuration
 
@@ -200,6 +201,7 @@ from whatever it returns.
 | `DASH0_DISABLE=true` | `disabled: true`, which builds an SDK with no providers at all |
 | `DASH0_OTEL_COLLECTOR_BASE_URL` | the `endpoint` of every OTLP exporter the file declared without one |
 | the `always_on` sampler default | `tracer_provider.sampler`, unless the file declares a sampler |
+| the `tracecontext,baggage,xray` propagators default | `propagator.composite_list`, unless the file declares a `composite` or a `composite_list` |
 | `telemetry.distro.name` and `telemetry.distro.version` | `resource.attributes`, unless the file declares that name |
 | `dash0.package.*`, read from beside the agent jar | `resource.attributes`, unless the file declares that name |
 | the upstream `host` and `process` detectors | `resource.detection/development`, unless the file names them |
@@ -260,6 +262,29 @@ base URL unchanged.
 exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 The variable itself configures nothing in this mode, since the SDK reads no
 `OTEL_*` variable from a declaratively configured process.
+
+### What the propagators default replaces
+
+A file that declares no `propagator` node gets no propagation at all, not the
+`tracecontext,baggage` the environment path would give it.
+`OpenTelemetryConfigurationFactory` calls `OpenTelemetrySdkBuilder.setPropagators`
+only when the parsed model carries a `propagator`, and the builder's own initial
+value is `ContextPropagators.noop()`. An agent in that state writes no
+`traceparent` on an outgoing request and reads none on an incoming one, so every
+service it talks to starts a new trace.
+
+The customizer writes `composite_list: tracecontext,baggage,xray`, the same
+value `Dash0ConfigurationCustomizerProvider` supplies as `otel.propagators`. It
+writes nothing when the file declares either a `composite` or a
+`composite_list`, so a file that asks for `b3multi` gets `b3multi` alone.
+
+`tracecontext` and `baggage` are built into `TextMapPropagatorFactory`. Every
+other name in a `composite_list`, `xray` included, is resolved against a
+registered `ComponentProvider`, and a name with no provider stops the SDK from
+building. The upstream agent bundles
+`io.opentelemetry.contrib.awsxray.propagator.internal.AwsXrayComponentProvider`,
+which registers under the name `xray`, so the name resolves for the repackaged
+agent jar and for the standalone extension jar alike.
 
 ### The file format warning
 

@@ -16,6 +16,7 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.LoggerProvider
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.MeterProviderModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.MetricReaderModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OpenTelemetryConfigurationModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.PropagatorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.PushMetricExporterModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.ResourceModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SamplerModel;
@@ -102,6 +103,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
         model, DistroResource.get().merge(Dash0PackageResource.get()));
     enableTheHostAndProcessDetectors(model);
     defaultTheSamplerToAlwaysOn(model);
+    defaultThePropagatorsToTracecontextBaggageXray(model);
     useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
         model, collectorBaseUrl, configuredOtlpEndpoint);
     return model;
@@ -196,6 +198,23 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
     if (tracerProvider.getSampler() == null) {
       tracerProvider.setSampler(new SamplerModel().setAlwaysOn(new AlwaysOnSamplerModel()));
+    }
+  }
+
+  /**
+   * Sets {@code propagator.composite_list} to {@value
+   * Dash0ConfigurationCustomizerProvider#TRACECONTEXT_BAGGAGE_XRAY} unless the file declares a
+   * {@code composite} or a {@code composite_list}.
+   */
+  static void defaultThePropagatorsToTracecontextBaggageXray(
+      OpenTelemetryConfigurationModel model) {
+    PropagatorModel propagator = model.getPropagator();
+    if (propagator == null) {
+      propagator = new PropagatorModel();
+      model.setPropagator(propagator);
+    }
+    if (propagator.getComposite() == null && propagator.getCompositeList() == null) {
+      propagator.setCompositeList(Dash0ConfigurationCustomizerProvider.TRACECONTEXT_BAGGAGE_XRAY);
     }
   }
 

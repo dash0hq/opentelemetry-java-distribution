@@ -9,6 +9,7 @@ import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerPro
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.addResourceAttributesTheFileDoesNotDeclare;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.applyDash0Settings;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.dash0DisableIsTrue;
+import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.defaultThePropagatorsToTracecontextBaggageXray;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.defaultTheSamplerToAlwaysOn;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.enableTheHostAndProcessDetectors;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable;
@@ -19,6 +20,7 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.AlwaysOffSamplerModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.AttributeNameValueModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.B3MultiPropagatorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.BatchLogRecordProcessorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.BatchSpanProcessorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.ConsoleExporterModel;
@@ -33,6 +35,7 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OtlpGrpcMetric
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OtlpHttpExporterModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OtlpHttpMetricExporterModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.PeriodicMetricReaderModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.PropagatorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.PushMetricExporterModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.ResourceModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SamplerModel;
@@ -40,6 +43,7 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SimpleLogRecor
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SimpleSpanProcessorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SpanExporterModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.SpanProcessorModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.TextMapPropagatorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.TracerProviderModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalContainerResourceDetectorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalHostResourceDetectorModel;
@@ -116,6 +120,7 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
 
     assertThat(model.getResource()).isNull();
     assertThat(model.getTracerProvider()).isNull();
+    assertThat(model.getPropagator()).isNull();
   }
 
   @Test
@@ -226,6 +231,43 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
     defaultTheSamplerToAlwaysOn(model);
 
     assertThat(model.getTracerProvider().getSampler()).isSameAs(alwaysOff);
+  }
+
+  @Test
+  void defaultsThePropagatorsToTracecontextBaggageXray() {
+    OpenTelemetryConfigurationModel model = new OpenTelemetryConfigurationModel();
+
+    defaultThePropagatorsToTracecontextBaggageXray(model);
+
+    assertThat(model.getPropagator().getCompositeList())
+        .as("the same value Dash0ConfigurationCustomizerProvider supplies as otel.propagators")
+        .isEqualTo(Dash0ConfigurationCustomizerProvider.TRACECONTEXT_BAGGAGE_XRAY);
+  }
+
+  @Test
+  void keepsTheCompositeTheFileDeclares() {
+    List<TextMapPropagatorModel> composite =
+        Collections.singletonList(
+            new TextMapPropagatorModel().setB3multi(new B3MultiPropagatorModel()));
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setPropagator(new PropagatorModel().setComposite(composite));
+
+    defaultThePropagatorsToTracecontextBaggageXray(model);
+
+    assertThat(model.getPropagator().getComposite()).isSameAs(composite);
+    assertThat(model.getPropagator().getCompositeList()).isNull();
+  }
+
+  @Test
+  void keepsTheCompositeListTheFileDeclares() {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setPropagator(new PropagatorModel().setCompositeList("b3multi"));
+
+    defaultThePropagatorsToTracecontextBaggageXray(model);
+
+    assertThat(model.getPropagator().getCompositeList()).isEqualTo("b3multi");
   }
 
   @Test
