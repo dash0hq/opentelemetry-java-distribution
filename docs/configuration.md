@@ -201,7 +201,7 @@ from whatever it returns.
 | `DASH0_DISABLE=true` | `disabled: true`, which builds an SDK with no providers at all |
 | `DASH0_OTEL_COLLECTOR_BASE_URL` | the `endpoint` of every OTLP exporter the file declared without one |
 | the `always_on` sampler default | `tracer_provider.sampler`, unless the file declares a sampler |
-| the `tracecontext,baggage,xray` propagators default | `propagator.composite_list`, unless the file declares a `composite` or a `composite_list` |
+| the `tracecontext,baggage,xray` propagators default | `propagator.composite_list`, unless the file declares a `composite` or a non-blank `composite_list` |
 | `telemetry.distro.name` and `telemetry.distro.version` | `resource.attributes`, unless the file declares that name |
 | `dash0.package.*`, read from beside the agent jar | `resource.attributes`, unless the file declares that name |
 | the upstream `host` and `process` detectors | `resource.detection/development`, unless the file names them |
@@ -317,7 +317,15 @@ service it talks to starts a new trace.
 The customizer writes `composite_list: tracecontext,baggage,xray`, the same
 value `Dash0ConfigurationCustomizerProvider` supplies as `otel.propagators`. It
 writes nothing when the file declares either a `composite` or a
-`composite_list`, so a file that asks for `b3multi` gets `b3multi` alone.
+`composite_list` naming at least one propagator, so a file that asks for
+`b3multi` gets `b3multi` alone.
+
+A `composite_list` that is blank counts as naming none, and the default is
+written over it. `PropagatorFactory` drops every empty entry, so a blank value
+reaches the same zero-propagator state as a missing `propagator` node, and
+`composite_list: "${OTEL_PROPAGATORS}"` with the variable unset renders blank.
+A file that wants no propagation at all says so with `composite: []`, which the
+customizer leaves alone.
 
 `tracecontext` and `baggage` are built into `TextMapPropagatorFactory`. Every
 other name in a `composite_list`, `xray` included, is resolved against a

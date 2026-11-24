@@ -328,6 +328,36 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
     assertThat(model.getPropagator().getCompositeList()).isEqualTo("b3multi");
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"", "  "})
+  void defaultsThePropagatorsWhenTheCompositeListNamesNone(String compositeList) {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setPropagator(new PropagatorModel().setCompositeList(compositeList));
+
+    defaultThePropagatorsToTracecontextBaggageXray(model);
+
+    assertThat(model.getPropagator().getCompositeList())
+        .as(
+            "PropagatorFactory drops every empty entry, so a blank composite_list builds zero"
+                + " propagators and an outgoing request carries no trace header at all. An"
+                + " undefined variable in composite_list: \"${OTEL_PROPAGATORS}\" renders blank")
+        .isEqualTo(Dash0ConfigurationCustomizerProvider.TRACECONTEXT_BAGGAGE_XRAY);
+  }
+
+  @Test
+  void keepsAnEmptyCompositeTheFileDeclares() {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setPropagator(new PropagatorModel().setComposite(new ArrayList<>()));
+
+    defaultThePropagatorsToTracecontextBaggageXray(model);
+
+    assertThat(model.getPropagator().getCompositeList())
+        .as("composite: [] is how the configuration schema asks for no propagation at all")
+        .isNull();
+  }
+
   @Test
   void setsTheSignalPathOnEveryHttpExporterTheFileDeclares() {
     OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();

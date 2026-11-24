@@ -235,7 +235,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code propagator.composite_list} to {@value
    * Dash0ConfigurationCustomizerProvider#TRACECONTEXT_BAGGAGE_XRAY} unless the file declares a
-   * {@code composite} or a {@code composite_list}.
+   * {@code composite} or a {@code composite_list} that names at least one propagator.
    */
   static void defaultThePropagatorsToTracecontextBaggageXray(
       OpenTelemetryConfigurationModel model) {
@@ -244,7 +244,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       propagator = new PropagatorModel();
       model.setPropagator(propagator);
     }
-    if (propagator.getComposite() == null && propagator.getCompositeList() == null) {
+    String compositeList = propagator.getCompositeList();
+    if (propagator.getComposite() == null
+        && (compositeList == null || compositeList.trim().isEmpty())) {
       propagator.setCompositeList(Dash0ConfigurationCustomizerProvider.TRACECONTEXT_BAGGAGE_XRAY);
     }
   }
