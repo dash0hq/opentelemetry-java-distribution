@@ -286,6 +286,32 @@ building. The upstream agent bundles
 which registers under the name `xray`, so the name resolves for the repackaged
 agent jar and for the standalone extension jar alike.
 
+### Naming the Dash0 contributions in a file of your own
+
+The Dash0 Python, Ruby and Node.js distributions ship an `otel-config.yaml`
+that names their detectors, with entries such as `- dash0_distribution: {}`
+under `resource.detection/development`. A Java file cannot do that. This
+distribution contributes its attributes through `resource.attributes` rather
+than through a named detector, and registers no `ComponentProvider` under any
+`dash0_` name.
+
+A detector name the component loader cannot resolve is not ignored. The SDK
+fails to build, the agent logs `OpenTelemetry Javaagent failed to start` with
+the stack trace below, and the application then runs with no instrumentation
+and exports nothing at all. The JVM itself exits zero, so a process in this
+state looks healthy to everything watching it:
+
+```
+io.opentelemetry.sdk.autoconfigure.spi.ConfigurationException: No component
+provider detected for io.opentelemetry.sdk.resources.Resource with name
+"dash0_distribution".
+```
+
+That is what agent 2.33.1 printed for a file whose
+`resource.detection/development` named `dash0_distribution`. Write the file
+with no `dash0_` entry and the Dash0 attributes still arrive, since the
+customizer adds them to every parsed model.
+
 ### The file format warning
 
 The agent logs this for a file declaring `file_format: "1.0"`:
