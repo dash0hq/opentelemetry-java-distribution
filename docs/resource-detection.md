@@ -165,8 +165,8 @@ at 2.33.1, which matters to anything naming it in
 | `GCPResourceProvider` | `0` | Google Cloud attributes | no, group `gcp` |
 | `CloudFoundryResourceProvider` | `0` | Cloud Foundry attributes | no, group `cloudfoundry` |
 
-Several providers in the table are `ConditionalResourceProvider`s, and each
-declares its own condition instead of sharing one. The three `service.name`
+Several providers in the table are `ConditionalResourceProvider`s, and they do
+not all apply the same condition. The three `service.name`
 detectors write only while the name is still `unknown_service:java`, which the
 `service.name` section below sets out in full. `ManifestResourceProvider` writes
 its only other key, `service.version`, only while that key is absent.
