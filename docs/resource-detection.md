@@ -265,7 +265,8 @@ of the four reasons below reaches it. Two things keep it off. The second
 condition fails here too: a workload on Cloud Foundry knows it is on Cloud
 Foundry, the absent attributes are plain in the exported resource, and one
 variable turns the group on. The upstream parity at the end of this section is
-the other, and it reaches this group as much as it reaches the other nine.
+the other, and it reaches this group as much as it reaches the other nine
+detectors.
 
 For the `aws`, `azure` and `gcp` groups what enabling buys is therefore small.
 What it costs is a startup penalty the experiment above puts in seconds for
