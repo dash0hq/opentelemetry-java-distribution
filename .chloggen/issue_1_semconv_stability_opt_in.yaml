@@ -18,8 +18,9 @@ subtext: |
   since Cassandra is the only SQL client whose instrumentation asks for the
   operation and collection pair. On a JDBC span the operation survives inside
   ``db.query.summary`` and not as ``db.operation.name``. A non-SQL database span
-  is the other way round: MongoDB, Redis and Elasticsearch carry
-  ``db.operation.name`` and ``db.collection.name`` and no ``db.query.summary``.
+  is the other way round: it carries ``db.operation.name``, and it carries
+  ``db.collection.name`` only where the instrumentation reports a collection,
+  which MongoDB, Geode and HBase do and Redis and Elasticsearch do not.
   ``database`` and ``code`` select conventions the semantic conventions working
   group has declared stable. ``rpc`` and ``messaging`` select experimental ones,
   included because the working group considers their current shape close to
