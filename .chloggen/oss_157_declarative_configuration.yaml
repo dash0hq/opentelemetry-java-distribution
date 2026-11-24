@@ -1,6 +1,6 @@
 change_type: enhancement
 
-component: config
+component: custom
 
 note: Honour the Dash0 settings and contribute the Dash0 attributes under OTEL_CONFIG_FILE
 
