@@ -158,7 +158,7 @@ of leaving this table wrong.
 
 | Detector | Group | Attributes | Cost when the process is elsewhere |
 |---|---|---|---|
-| `Ec2ResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `host.id`, `host.type`, `host.image_id`, `host.name` | two HTTP calls to `169.254.169.254`, 2 s timeout each |
+| `Ec2ResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `cloud.account.id`, `cloud.region`, `cloud.availability_zone`, `host.id`, `host.type`, `host.image.id`, `host.name` | two HTTP calls to `169.254.169.254`, 2 s timeout each |
 | `AzureVmResourceProvider` | `azure` | `cloud.provider`, `cloud.platform`, `cloud.region`, `cloud.resource_id`, `host.id`, `host.name`, `host.type`, `os.type`, `os.version`, `azure.vm.scaleset.name`, `azure.vm.sku` | one HTTP call to `169.254.169.254`, 5 s timeout |
 | `GCPResourceProvider` | `gcp` | `cloud.*` plus GCE, GKE, Cloud Run, Cloud Functions and App Engine specifics | one HTTP call to `metadata.google.internal`, no timeout set |
 | `EksResourceProvider` | `aws` | `cloud.provider`, `cloud.platform`, `k8s.cluster.name`, `container.id` | free off Kubernetes; inside any pod, one HTTPS call to `kubernetes.default.svc`, 2 s timeout |
