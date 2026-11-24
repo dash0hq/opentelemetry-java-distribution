@@ -186,6 +186,24 @@ class Dash0ConfigurationTest {
   }
 
   @Test
+  void aBlankEnvironmentVariableSemconvStabilityOptInStillGetsTheDefault() throws Exception {
+    String output =
+        recordingAMethodSpan().withEnvironmentVariable("OTEL_SEMCONV_STABILITY_OPT_IN", "").run();
+
+    assertThat(output)
+        .as(
+            "a blank value counts as unset, which is what docs/configuration.md and the changelog"
+                + " entry tell an operator when they say that clearing the variable is not the way"
+                + " back to the superseded names. The system property the distribution writes has"
+                + " to win over an empty environment variable inside the agent's own"
+                + " SystemProperty.getString for that sentence to stay true. The JVM's output"
+                + " was:%n%s",
+            output)
+        .contains(STABLE_CODE_ATTRIBUTE)
+        .doesNotContain(OLD_CODE_ATTRIBUTE);
+  }
+
+  @Test
   void aSemconvStabilityOptInNamingNoDomainKeepsTheSupersededNames() throws Exception {
     String output =
         recordingAMethodSpan()
