@@ -268,6 +268,18 @@ class Dash0ConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void customizeSetsTheSemconvStabilityOptInSystemProperty() {
+    new Dash0ConfigurationCustomizerProvider().customize(new RecordingCustomizer());
+
+    assertThat(System.getProperty(SEMCONV_STABILITY_OPT_IN))
+        .as(
+            "customize is the only place that calls setSemconvStabilityOptInUnlessConfigured, and"
+                + " dropping that call leaves every other unit test green while every deployment"
+                + " emits the superseded attribute names")
+        .isEqualTo(NEWER_SEMCONV_DOMAINS);
+  }
+
+  @Test
   void neverReturnsTheSemconvStabilityOptInThroughEitherPropertyHook() {
     RecordingCustomizer recording = new RecordingCustomizer();
 
