@@ -304,8 +304,7 @@ A non-SQL database span is the other way round. It carries `db.operation.name`
 with the opt-in, so a filter on `db.operation` becomes a filter on
 `db.operation.name` there. Whether it also carries `db.collection.name` is up to
 the instrumentation: MongoDB, Geode and HBase report a collection, and Redis and
-Elasticsearch report none, which is the same reason their span names fall back
-to `<host>:<port>` below.
+Elasticsearch report none.
 
 Attribute names are not the only thing that changes. Span names, span kinds,
 metric names and one metric unit change with them, and a dashboard, query or
