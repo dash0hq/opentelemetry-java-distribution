@@ -408,12 +408,28 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
-  void inventsNoProviderTheFileDoesNotDeclare() {
+  void theEndpointMappingInventsNoProviderTheFileDoesNotDeclare() {
     OpenTelemetryConfigurationModel model = new OpenTelemetryConfigurationModel();
 
     useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(model, COLLECTOR_BASE_URL, null);
 
     assertThat(model.getTracerProvider()).isNull();
+    assertThat(model.getMeterProvider()).isNull();
+    assertThat(model.getLoggerProvider()).isNull();
+  }
+
+  @Test
+  void theDefaultsAttachTheirOwnNodeAndNoExporter() {
+    OpenTelemetryConfigurationModel model =
+        applyDash0Settings(new OpenTelemetryConfigurationModel(), null, COLLECTOR_BASE_URL, null);
+
+    assertThat(model.getTracerProvider().getSampler().getAlwaysOn()).isNotNull();
+    assertThat(model.getPropagator().getCompositeList()).isNotNull();
+    assertThat(model.getTracerProvider().getProcessors())
+        .as(
+            "a default needs a node to live in; it must not start an export the file never asked"
+                + " for")
+        .isNull();
     assertThat(model.getMeterProvider()).isNull();
     assertThat(model.getLoggerProvider()).isNull();
   }

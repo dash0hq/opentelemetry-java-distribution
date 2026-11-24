@@ -236,10 +236,17 @@ declared that exporter and left its `endpoint` unset. The customizer walks
 `logger_provider.processors`, and covers the `batch` and `simple` processors and
 both the `otlp_http` and `otlp_grpc` exporters.
 
-A file that declares no tracer provider gets no tracer provider invented for it,
-and a provider that declares no processors gets none added. The point of
-`OTEL_CONFIG_FILE` is that the file is the configuration, and a signal the
-operator did not ask to export is not switched on by a host-wide variable.
+The endpoint mapping invents nothing. A file that declares no tracer provider
+gets no processor and no exporter added to it, and a provider that declares no
+processors gets none added. The point of `OTEL_CONFIG_FILE` is that the file is
+the configuration, and a signal the operator did not ask to export is not
+switched on by a host-wide variable.
+
+The sampler and propagators defaults do attach a node, since a default has
+nowhere else to go: `defaultTheSamplerToAlwaysOn` creates a `tracer_provider`
+when the file declares none, and `defaultThePropagatorsToTracecontextBaggageXray`
+creates a `propagator`. Neither adds a processor or an exporter, so neither
+starts an export the file did not ask for.
 Declare the exporter in the file and leave the `endpoint` out to have the
 variable fill it in:
 
