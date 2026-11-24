@@ -9,9 +9,15 @@ issues: [12]
 subtext: |
   The distribution set nothing and inherited the upstream agent's default, which
   is the superseded convention in every domain. A JDBC span carried
-  ``db.statement``, ``db.system``, ``db.name`` and ``db.operation`` rather than
+  ``db.statement``, ``db.system``, ``db.name``, ``db.operation``,
+  ``db.sql.table``, ``db.user`` and ``db.connection_string`` rather than
   ``db.query.text``, ``db.system.name``, ``db.namespace`` and
-  ``db.operation.name``.
+  ``db.query.summary``. Three of the seven have no replacement: ``db.user`` and
+  ``db.connection_string`` are gone from the stable conventions, and
+  ``db.sql.table`` is dropped without ``db.collection.name`` taking its place,
+  since the agent emits the operation and collection pair only for Cassandra.
+  The operation survives inside ``db.query.summary`` and not as
+  ``db.operation.name``, which a JDBC span does not carry under this default.
   ``database`` and ``code`` select conventions the semantic conventions working
   group has declared stable. ``rpc`` and ``messaging`` select experimental ones,
   included because the working group considers their current shape close to

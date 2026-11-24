@@ -288,9 +288,17 @@ are expected to change again and adopting them now buys a second rename later.
 working group considers the current shape close to final.
 
 The database attributes are the ones most people notice. Without the opt-in a
-JDBC span carries `db.statement`, `db.system`, `db.name` and `db.operation`;
-with it, `db.query.text`, `db.system.name`, `db.namespace` and
-`db.operation.name`.
+JDBC span carries `db.statement`, `db.system`, `db.name`, `db.operation`,
+`db.sql.table`, `db.user` and `db.connection_string`. With it, it carries
+`db.query.text`, `db.system.name`, `db.namespace` and `db.query.summary`.
+
+Three of those seven have no replacement, so no rewritten query recovers them:
+`db.user` and `db.connection_string` are gone from the stable conventions, and
+`db.sql.table` is dropped without `db.collection.name` taking its place, because
+the agent emits the operation and collection pair only for Cassandra. The
+operation survives inside `db.query.summary`, which holds `SELECT customers` for
+a query against one table, and not as `db.operation.name`, which a JDBC span
+does not carry under this default.
 
 Attribute names are not the only thing that changes. Span names, span kinds,
 metric names and one metric unit change with them, and a dashboard, query or
