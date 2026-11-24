@@ -180,7 +180,7 @@ Both free Azure detectors set `cloud.provider` themselves, which the guard below
 reads, so on an Azure App Service or Azure Functions host
 `AzureVmResourceProvider` is skipped and the `azure` group costs nothing. On an
 Azure VM it runs and answers at once. Anywhere else it runs and waits, and how
-long it waits is the subject of the next two sections.
+long it waits is the subject of the next section.
 
 Whatever a detector costs is added to startup rather than paid in the
 background. The SDK is autoconfigured from the agent's `premain`, and the
