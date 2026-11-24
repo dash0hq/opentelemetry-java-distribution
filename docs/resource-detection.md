@@ -301,7 +301,8 @@ deployment that was getting its name from the Spring Boot application name or
 from the jar file name. `OTEL_SERVICE_NAME` still beats it, because
 `EnvironmentResourceProvider` declares an order of `2147483646`.
 `CloudResourceDetectorsTest` in `smoke-tests/` asserts that the site name is
-absent with the group off and present with it on.
+absent with the group off, present with it on, and beaten by
+`OTEL_SERVICE_NAME`.
 
 The group toggles do not offer a "free detectors only" position. `aws` covers
 `Ec2ResourceProvider` and `EksResourceProvider` together with three free ones,

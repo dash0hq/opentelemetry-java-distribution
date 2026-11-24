@@ -34,6 +34,8 @@ class CloudResourceDetectorsTest {
 
   private static final String SPRING_APPLICATION_NAME = "smoke-test-spring-app";
 
+  private static final String SERVICE_NAME = "smoke-test-service";
+
   @Test
   void contributesNoCloudAttributeWhileNoGroupToggleIsSet() throws Exception {
     String exported = exportingTheResourceToTheLog(appServiceEnvironment());
@@ -122,6 +124,22 @@ class CloudResourceDetectorsTest {
         .contains("cloud.platform=\"azure.functions\"")
         .contains("faas.name=\"" + SITE_NAME + "\"")
         .contains("service.name=\"" + SITE_NAME + "\"");
+  }
+
+  @Test
+  void letsTheServiceNameVariableBeatTheAzureSiteName() throws Exception {
+    Map<String, String> environment = appServiceEnvironment();
+    environment.put("OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED", "true");
+    environment.put("OTEL_SERVICE_NAME", SERVICE_NAME);
+
+    String exported = exportingTheResourceToTheLog(environment);
+
+    assertThat(exported)
+        .as("exported resource attributes were:%n%s", exported)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .contains("cloud.platform=\"azure.app_service\"")
+        .contains("service.name=\"" + SERVICE_NAME + "\"")
+        .doesNotContain("service.name=\"" + SITE_NAME + "\"");
   }
 
   /**
