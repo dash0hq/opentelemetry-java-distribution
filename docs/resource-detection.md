@@ -165,12 +165,15 @@ at 2.33.1, which matters to anything naming it in
 | `GCPResourceProvider` | `0` | Google Cloud attributes | no, group `gcp` |
 | `CloudFoundryResourceProvider` | `0` | Cloud Foundry attributes | no, group `cloudfoundry` |
 
-`service.version` is the one key in the table whose winner the ascending-order
-rule predicts wrongly. `ManifestResourceProvider` fills it only when it is still
-absent, so `SpringBootServiceVersionDetector` at order `0` beats the manifest at
-order `300` whenever the jar carries `META-INF/build-info.properties`. A jar
-carrying both `build.version=1.0.0` there and `Implementation-Version: 9.9.9` in
-its manifest exports `service.version="1.0.0"`.
+`service.name` and `service.version` are the two keys in the table whose winner
+the ascending-order rule predicts wrongly, since the providers that write them
+defer to a value that is already there. The `service.name` section below gives
+that chain in full. For `service.version`, `ManifestResourceProvider` fills the
+key only when it is still absent, so `SpringBootServiceVersionDetector` at order
+`0` beats the manifest at order `300` whenever a `META-INF/build-info.properties`
+on the class path carries a `build.version` property. A jar carrying both
+`build.version=1.0.0` there and `Implementation-Version: 9.9.9` in its manifest
+exports `service.version="1.0.0"`.
 
 Eleven of the 23 are off by default, and ten of those eleven are cloud
 detectors. `HostIdResourceProvider` is the only non-cloud one. The five group
