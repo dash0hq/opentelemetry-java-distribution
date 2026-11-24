@@ -73,8 +73,12 @@ three and the third has no Java counterpart:
 ## Standard OpenTelemetry variables
 
 All standard `OTEL_*` configuration works as it does with the upstream agent.
-One standard default is changed: `OTEL_TRACES_SAMPLER` is `always_on` here and
-`parentbased_always_on` upstream.
+Two standard defaults are changed:
+
+| Variable | This distribution | Upstream |
+|---|---|---|
+| `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
+| `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | `tracecontext,baggage` |
 
 Upstream's configuration reference:
 https://opentelemetry.io/docs/zero-code/java/agent/configuration/
@@ -148,6 +152,52 @@ to `169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and
 table, the experiment behind those two figures, the attributes each detector
 contributes, and the reason this distribution leaves them off.
 
+### `OTEL_PROPAGATORS`
+
+The distribution supplies `otel.propagators=tracecontext,baggage,xray`, so
+outgoing requests carry both a W3C `traceparent` and an AWS `X-Amzn-Trace-Id`
+header, plus `baggage` when there is any. The X-Ray propagator is the
+OpenTelemetry contrib one that the upstream agent already bundles; nothing is
+added to the jar. Setting `OTEL_PROPAGATORS` or `-Dotel.propagators` replaces
+the default exactly, through the same `addPropertiesSupplier` precedence as the
+sampler.
+
+The order matters on extraction. Each propagator runs in turn and a later one
+that finds a valid context replaces an earlier one, so when a request carries
+both headers the X-Ray context wins.
+
+This keeps one trace across an AWS Application Load Balancer:
+
+- The ALB keeps `Root` and `Parent` from an incoming `X-Amzn-Trace-Id` and may
+  add fields such as `Self=`. Unknown fields are ignored on extraction.
+- When a request arrives without `X-Amzn-Trace-Id`, the ALB adds one with a
+  `Root` and no `Parent`. The X-Ray propagator treats a header without a
+  `Parent` as no context at all, so the `traceparent` context extracted before
+  it is kept.
+- Both headers are written on injection, so a load balancer further downstream
+  sees a `Parent`.
+
+The flip side is that any valid `X-Amzn-Trace-Id` beats `traceparent`, even one
+this service's direct caller didn't write. A hop that forwards incoming headers
+unchanged but writes a fresh `traceparent`, e.g. a reverse proxy instrumented
+with only `tracecontext`, passes along the `X-Amzn-Trace-Id` from the hop before
+it. This service then parents its span to that earlier hop, and the proxy's span
+ends up with no children. AWS services with X-Ray active tracing, such as API
+Gateway, write a `Parent` that exists only in X-Ray, which has a similar effect.
+Setting `OTEL_PROPAGATORS=tracecontext,baggage` restores `traceparent`-only
+extraction.
+
+`baggage` comes before `xray` because the two treat existing baggage
+differently. The X-Ray propagator adds its `Lineage` field to the baggage
+already extracted, while the baggage propagator replaces it, so the reverse
+order would drop `Lineage` whenever both headers arrive. When an incoming
+`X-Amzn-Trace-Id` carries `Lineage`, the entry stays in baggage for the rest of
+the request. That means it is written to the outgoing W3C `baggage` header as
+well as `X-Amzn-Trace-Id`, and it appears wherever baggage is copied onto spans
+or logs.
+
+Declarative configuration does not apply this default either.
+
 ## Declarative configuration
 
 `OTEL_CONFIG_FILE` points the agent at a YAML file that replaces environment
@@ -188,9 +238,9 @@ version string survives only because upstream's own
 `io.opentelemetry.javaagent.tooling.resources.ResourceCustomizerProvider` reads
 it from the agent jar manifest, which this build writes. No
 `AutoConfigurationCustomizerProvider` runs at all, so `DASH0_DISABLE`,
-`DASH0_OTEL_COLLECTOR_BASE_URL` and the `always_on` sampler default are silently
-ignored; a file that omits `sampler` gets the specification's
-`parentbased_always_on`. Every upstream host, process and OS detector disappears
+`DASH0_OTEL_COLLECTOR_BASE_URL`, the `always_on` sampler default and the
+propagators default are silently ignored; a file that omits `sampler` gets the
+specification's `parentbased_always_on`. Every upstream host, process and OS detector disappears
 as well.
 
 The cause is that declarative configuration uses two different SPIs.

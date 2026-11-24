@@ -10,20 +10,11 @@ import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 
 /**
- * Records what this distribution does when {@code OTEL_CONFIG_FILE} is set.
+ * Records what this distribution does when {@code OTEL_CONFIG_FILE} is set: none of the Dash0
+ * customisations run. See {@code docs/configuration.md}.
  *
- * <p>These assertions describe behaviour the distribution does not want. Declarative configuration
- * replaces environment configuration wholesale and consults a different pair of SPIs, so none of
- * the Dash0 customisations run: not the resource providers, not the configuration customizer.
- * {@code docs/configuration.md} explains why and what supporting it would take.
- *
- * <p>The test exists so the day that changes is a test failure rather than a discovery. Upstream is
- * actively moving on declarative configuration, and the next agent bump could start honouring these
- * SPIs. Without this, the distribution would keep claiming no support for something that had
- * quietly started working, and the documented measurement would rot.
- *
- * <p>A failure here is therefore not necessarily a defect. Read it as a prompt to re-measure,
- * update {@code docs/configuration.md}, and decide whether declarative support can now be declared.
+ * <p>A failure here is not necessarily a defect. Read it as a prompt to re-measure, update {@code
+ * docs/configuration.md}, and decide whether declarative support can now be declared.
  */
 class DeclarativeConfigurationTest {
 

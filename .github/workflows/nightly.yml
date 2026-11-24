@@ -3,12 +3,6 @@
 
 name: Nightly
 
-# Builds against the newest upstream agent release, whatever the repository is
-# currently pinned to. Three of the four vendor distributions (Splunk, Elastic,
-# Amazon) run a job like this, because the failures that matter here are silent:
-# an upstream change can break the packaging or the resource-provider ordering
-# without breaking compilation. The smoke tests are what surface that.
-
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -66,11 +60,6 @@ jobs:
           sed -i -E "s|^opentelemetryJavaagentAlpha = \".*\"|opentelemetryJavaagentAlpha = \"${latest}-alpha\"|" gradle/libs.versions.toml
           git --no-pager diff -- gradle/libs.versions.toml
 
-      # Reads the pinned version out of gradle/libs.versions.toml, so after the
-      # repin above it compares against the newest upstream copy. Relocation
-      # drift is exactly the kind of upstream change this job exists to find:
-      # it breaks nothing at compile time and silently stops a resource
-      # provider from ever being invoked.
       - name: Compare the relocation rules against the latest upstream
         run: scripts/check-relocations.sh
 

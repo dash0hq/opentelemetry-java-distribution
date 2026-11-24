@@ -21,20 +21,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Runs {@link TestApplication} in a real JVM with an agent attached, and returns what it printed.
  *
- * <p>Six test classes launch a JVM and each used to carry its own copy of this code. The copies
- * drifted: one checked the child's exit code and five did not, so a test could assert that
- * telemetry was absent and pass against a JVM that had died before producing any.
- *
- * <p>{@link #run()} therefore refuses to return output from a run that did not complete. Every
- * assertion a caller then makes is about a JVM that reached the end of {@code main}, which is what
- * makes an assertion phrased as an absence mean anything at all.
- *
- * <p>The child's output is redirected to a file rather than read from a pipe. Reading the pipe to
- * end of file first and calling {@code waitFor} afterwards puts the timeout out of reach, because
- * end of file arrives when the child exits: a child that hangs blocks the read forever and the
- * timeout is never consulted. The agent is attached with {@code -javaagent:}, so a deadlock in its
- * premain is a realistic way for that to happen, and the cost is a CI job that runs until GitHub
- * kills it six hours later.
+ * <p>{@link #run()} refuses to return output from a run that did not complete.
  */
 final class InstrumentedJvm {
 
@@ -129,19 +116,7 @@ final class InstrumentedJvm {
     }
   }
 
-  /**
-   * Whether {@code name} is a variable the SDK or this distribution reads.
-   *
-   * <p>{@link ProcessBuilder#environment()} starts from the environment Gradle was launched with,
-   * so without this the child inherits whatever the developer happens to export. A shell carrying
-   * {@code OTEL_EXPORTER_OTLP_ENDPOINT} fails the two tests that assume no endpoint is configured,
-   * and one carrying {@code DASH0_DISABLE} or {@code OTEL_SERVICE_NAME} changes what several others
-   * read back. Exporting these is ordinary for anyone working on OpenTelemetry, and the result is a
-   * red build on a correct tree with nothing to explain it.
-   *
-   * <p>Removal is by prefix rather than by clearing the map, which would also drop {@code PATH} and
-   * {@code JAVA_HOME} and leave nothing able to start.
-   */
+  /** Whether {@code name} is a variable the SDK or this distribution reads. */
   private static boolean configuresTheSdk(String name) {
     return name.startsWith("OTEL_") || name.startsWith("DASH0_");
   }

@@ -18,37 +18,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 
-/**
- * Compares the repackaged agent jar against the upstream jar it was built from.
- *
- * <p>Three of the failures listed in {@code CLAUDE.md} are properties of what ends up in the jar:
- * package relocation drifting from upstream's, a dependency landing in the wrong class loader
- * bucket, and bundling a second copy of something the agent already contains. None of them produces
- * an error. The third is the one that bit Amazon, whose extra copy of ASM could not read Java 25
- * class files and silently disabled every instrumentation.
- *
- * <p>Entry names catch a file appearing or disappearing. They do not catch a file being replaced,
- * which is the shape the ASM problem actually takes, because a second copy at a different version
- * overwrites the entry instead of adding one. That case needs the content comparison below.
- */
+/** Compares the repackaged agent jar against the upstream jar it was built from. */
 class AgentCompositionTest {
 
-  /** The package the distribution's own classes are shaded into, inside the isolated agent tree. */
   private static final String DASH0_CLASSES = "inst/com/dash0/";
-
-  /** Written into the agent jar by the Gradle {@code generateVersionResource} task. */
   private static final String VERSION_RESOURCE = "inst/dash0-distro-version.properties";
-
-  /** The agent's own class loader serves everything under here; the application never sees it. */
   private static final String ISOLATED_AGENT_TREE = "inst/";
-
-  /** The only files inside the isolated agent tree this build is allowed to rewrite. */
   private static final String MERGED_SERVICE_FILES = "inst/META-INF/services/";
-
-  /**
-   * This distribution's own licence. Upstream ships licences for the libraries it bundles under
-   * {@code META-INF/licenses/} and nothing at this path, so adding it replaces nothing.
-   */
   private static final String LICENCE = "META-INF/LICENSE";
 
   @Test
@@ -77,19 +53,6 @@ class AgentCompositionTest {
         .isEmpty();
   }
 
-  /**
-   * The isolated agent tree holds every instrumentation and every shaded library, so a library
-   * swapped for another version changes bytes here and nowhere else.
-   *
-   * <p>Only the merged service files may differ, and they must: the point of the merge is to add
-   * the Dash0 providers to upstream's. {@code AgentPackagingTest} checks what it produced.
-   *
-   * <p>Entries outside {@code inst/} are excluded. Those are the bootstrap class loader's classes,
-   * which this build takes from the published {@code opentelemetry-javaagent-bootstrap} artifact
-   * rather than copying out of upstream's assembled jar. They come out byte-different but
-   * semantically identical: same class file version, same size, constant pool in a different order,
-   * because a different build compiled them.
-   */
   @Test
   void changesNothingUpstreamShipsInsideTheIsolatedAgentTree() throws IOException {
     Set<String> changed = new TreeSet<>();

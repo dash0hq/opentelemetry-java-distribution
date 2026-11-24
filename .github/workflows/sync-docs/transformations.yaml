@@ -1,9 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-# Configuration for dash0hq/sync-docs-action: how docs/*.md is transformed and
-# where each file lands in dash0hq/dash0-website.
-
 common:
   - description: Strip the leading H1 heading (the frontmatter title replaces it on the website).
     type: replace-regex
@@ -52,7 +49,6 @@ files:
     title: Kubernetes Injection
     description: How JVM workloads are instrumented under the Dash0 operator through the OpenTelemetry injector and JAVA_TOOL_OPTIONS, and what wiring this distribution in would involve.
 
-# Fail if any docs/*.md file is not listed above, to catch forgotten entries.
 coverage:
   include:
     - "docs/*.md"

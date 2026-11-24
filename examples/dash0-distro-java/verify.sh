@@ -4,12 +4,6 @@
 #
 # Runs the compose stack and asserts on the telemetry the collector received.
 #
-# Everything else in this repository tests the distribution through the console
-# exporter, which proves the SDK produced something but not that any of it
-# leaves the process. This is the only check that OTLP export works, that real
-# library instrumentation fires, and that the Dash0 resource attributes survive
-# the trip to a collector.
-#
 # Requires docker, docker compose and jq. Build the agent first:
 #
 #     ./gradlew :agent:shadowJar
@@ -42,21 +36,11 @@ mkdir -p output
 
 docker compose up --detach
 
-# `docker compose wait` cannot report which application failed. Given several
-# services it returns the exit code of whichever container finished last, and
-# called on a container that has already exited it returns 1 whatever that
-# container's real exit code was, so calling it once per service does not help
-# either. Use it only to wait for the stack to settle, then read each exit code
-# back from `docker compose ps`.
-# The `|| true` is required. On a container that has already exited, wait
-# returns 1 and prints "no containers for project", and under `set -e` that
-# ends the script here, skipping the very diagnostics below. Its exit status
-# carries nothing the verdict needs, so it is discarded outright.
+# `|| true` is required: on an already-exited container, wait returns 1 and
+# `set -e` would end the script before the diagnostics below.
 docker compose wait app app-packaged > /dev/null || true
 
 for service in app app-packaged; do
-  # Both fields matter. A running container reports its exit code as 0, so
-  # reading the code alone would pass a service that never finished.
   read -r state exit_code \
     <<< "$(docker compose ps --all --format '{{.State}} {{.ExitCode}}' "$service")" || true
 
@@ -75,8 +59,6 @@ for service in app app-packaged; do
   fi
 done
 
-# The collector writes each batch as it arrives; give the last one time to land
-# before the stack goes away.
 sleep 3
 docker compose down --timeout 10 > /dev/null
 
@@ -113,11 +95,6 @@ NAMED_METRIC='
     | select(.name == $name) ] | length > 0
 '
 
-# The client span must be the parent of the server span it provoked. That only
-# holds if the W3C traceparent header was written by one instrumentation and
-# read by the other, through the propagator. Propagators are among the classes
-# deliberately excluded from package relocation, so a relocation mistake shows
-# up here as two unrelated traces rather than as any kind of error.
 PROPAGATION='
   [ .[] | .resourceSpans[]
     | select(any(.resource.attributes[];
