@@ -308,13 +308,25 @@ itself. The declarative configuration section of
 [configuration](configuration) covers what else the customizer writes.
 
 The detectors carry the same names in both modes and not the same attributes,
-and two differences are worth knowing before a query is written against them.
+and three differences are worth knowing before a query is written against them.
 The declarative `host` detector supplies `host.id` as well as `host.name`, so
 `OTEL_CONFIG_FILE` turns on the one attribute the environment path deliberately
 leaves off, and there is no way to ask for `host.name` without it:
 `ExperimentalHostResourceDetectorModel` has no fields. The declarative
 `process` detector supplies no `process.command_args`, which the environment
 path has, and nothing in this repository can add it.
+
+The third difference is the one `OTEL_SERVICE_NAME` reaches.
+`ServiceResourceDetector` builds a `DefaultConfigProperties` over the real
+environment and reads `otel.service.name` from it, so naming the `service`
+detector makes that one variable take effect on a process whose configuration
+comes from a file. The stock upstream agent 2.33.1, which names no detector of
+its own beyond `opentelemetry_javaagent_distribution`, exports
+`unknown_service:java` for the same file and the same variable. The variable
+still loses to a `service.name` the file writes in `resource.attributes`, which
+is the reverse of the environment path, where `EnvironmentResourceProvider` at
+order `2147483646` beats every other provider. `OTEL_RESOURCE_ATTRIBUTES` is
+read by no detector at all and remains ignored in this mode.
 
 ## Not implemented
 

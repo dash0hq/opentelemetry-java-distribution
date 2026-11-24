@@ -347,9 +347,9 @@ exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 
 Setting both variables on one workload sends its telemetry to neither host.
 `OTEL_EXPORTER_OTLP_ENDPOINT` configures nothing in this mode, since the SDK
-reads no `OTEL_*` variable from a declaratively configured process, so an
-exporter the file left without an `endpoint` falls back to its own
-specification default: `http://localhost:4318` for `otlp_http` and
+reads no `OTEL_EXPORTER_OTLP_*` variable from a declaratively configured
+process, so an exporter the file left without an `endpoint` falls back to its
+own specification default: `http://localhost:4318` for `otlp_http` and
 `http://localhost:4317` for `otlp_grpc`. The stock upstream agent 2.33.1 does
 the same with no Dash0 code involved, so this is the SDK's rule and not a
 choice this distribution makes.

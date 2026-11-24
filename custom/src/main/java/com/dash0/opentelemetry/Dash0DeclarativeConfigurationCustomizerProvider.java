@@ -326,10 +326,10 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       logger.log(
           Level.WARNING,
           "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
-              + " unapplied. A declaratively configured SDK reads no OTEL_* variable, so every"
-              + " OTLP exporter the configuration file left without an endpoint falls back to"
-              + " its specification default, {1}. Name the endpoint in the configuration file"
-              + " instead.",
+              + " unapplied. A declaratively configured SDK reads no OTEL_EXPORTER_OTLP_*"
+              + " variable, so every OTLP exporter the configuration file left without an"
+              + " endpoint falls back to its specification default, {1}. Name the endpoint in"
+              + " the configuration file instead.",
           new Object[] {configuredOtlpEndpoint.trim(), String.join(" and ", defaultsLeftInPlace)});
     }
   }

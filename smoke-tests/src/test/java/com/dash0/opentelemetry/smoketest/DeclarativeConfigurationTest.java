@@ -157,6 +157,43 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
+  void theServiceDetectorMakesOtelServiceNameTakeEffect() throws Exception {
+    String exported =
+        configuredFrom("/declarative-config-no-service-name.yaml")
+            .withEnvironmentVariable("OTEL_SERVICE_NAME", "from-otel-service-name")
+            .run();
+
+    assertThat(exported)
+        .as(
+            "ServiceResourceDetector reads otel.service.name off a DefaultConfigProperties built"
+                + " over the real environment, so the one detector the customizer names for"
+                + " service.instance.id also makes this variable live in a mode that ignores"
+                + " OTEL_RESOURCE_ATTRIBUTES. The stock upstream agent exports"
+                + " unknown_service:java for the same file and the same variable. The JVM's"
+                + " output was:%n%s",
+            exported)
+        .contains("service.name=\"from-otel-service-name\"")
+        .contains("service.instance.id=");
+  }
+
+  @Test
+  void theFilesServiceNameBeatsOtelServiceName() throws Exception {
+    String exported =
+        configuredFrom("/declarative-config.yaml")
+            .withEnvironmentVariable("OTEL_SERVICE_NAME", "from-otel-service-name")
+            .run();
+
+    assertThat(exported)
+        .as(
+            "resource.attributes is applied after every detector, which is the reverse of the"
+                + " environment path, where EnvironmentResourceProvider at order 2147483646 wins."
+                + " The JVM's output was:%n%s",
+            exported)
+        .contains("service.name=\"declarative-smoke-test\"")
+        .doesNotContain("from-otel-service-name");
+  }
+
+  @Test
   void theExtensionJarContributesTheSameThingsAsTheAgent() throws Exception {
     String exported =
         InstrumentedJvm.runningTheTestApplication()
