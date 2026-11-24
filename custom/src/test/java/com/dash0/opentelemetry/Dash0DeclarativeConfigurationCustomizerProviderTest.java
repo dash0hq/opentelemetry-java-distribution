@@ -627,6 +627,10 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
 
   @Test
   void readsTheSystemPropertyBeforeTheEnvironmentVariable() {
+    assertThat(System.getenv(DISABLE_VARIABLE))
+        .as("custom/build.gradle.kts plants this value so that the two reads differ")
+        .isEqualTo("false");
+
     System.setProperty(DISABLE_PROPERTY, "true");
     try {
       assertThat(systemPropertyOrEnvironmentVariable(DISABLE_PROPERTY, DISABLE_VARIABLE))

@@ -54,3 +54,7 @@ sourceSets {
 tasks.named<ProcessResources>("processResources") {
   dependsOn(generateVersionResource)
 }
+
+tasks.withType<Test>().configureEach {
+  environment("DASH0_DISABLE", "false")
+}
