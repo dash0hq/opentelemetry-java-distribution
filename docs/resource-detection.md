@@ -39,13 +39,22 @@ Every key in that file becomes a resource attribute whose value is the property
 value. The file is absent unless a Linux package put it there, and its absence
 is not an error.
 
-A key that something else also sets is the one exception. Writing `service.name`
-into the file alongside `OTEL_SERVICE_NAME=from-env` in the environment exports
-`from-env`, and writing `host.name` into it exports the host detector's value
-rather than the file's. This is deliberate rather than inherited: a value the
-operator set on the workload should beat one the package baked in. It costs
-nothing today because the two keys below are ones nothing else sets, and
-`DistroResourceProvider` takes the opposite choice with an order of `200`
+A key that an unguarded provider also sets is the one exception. Writing
+`service.name` into the file alongside `OTEL_SERVICE_NAME=from-env` in the
+environment exports `from-env`, and writing `host.name` into it exports the host
+detector's value rather than the file's. Both of those providers write what they
+have regardless of what is already there. This is deliberate rather than
+inherited: a value the operator set on the workload should beat one the package
+baked in.
+
+The three `service.name` detectors in the table under `service.name` go the
+other way, since each is guarded on the name still being `unknown_service:java`.
+A `service.name` in the package file is already a name, so all three decline to
+run: a JVM started with `-Dspring.application.name=my-spring-app` beside a
+package file carrying `service.name=from-package` exports `from-package`.
+
+It costs nothing today because the two keys below are ones nothing else sets,
+and `DistroResourceProvider` takes the opposite choice with an order of `200`
 precisely because its job is to overwrite the agent's own value.
 
 Two different mechanisms produce that, and the doc used to credit the wrong one
@@ -55,7 +64,7 @@ win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
 environment is applied last whatever anything else does. The container, host,
 OS, process and process-runtime detectors declare no order at all, which means
 `0`; `Dash0PackageResourceProvider` declares `Integer.MIN_VALUE`, so it is
-applied first and every detector overwrites it.
+applied first and every unguarded detector overwrites it.
 `ServiceInstanceIdResourceProvider` declares `Integer.MIN_VALUE` too, so those
 two do tie; it contributes only `service.instance.id`, which no Dash0 package
 writes. Leaving the Dash0 provider on the default `0` would tie
