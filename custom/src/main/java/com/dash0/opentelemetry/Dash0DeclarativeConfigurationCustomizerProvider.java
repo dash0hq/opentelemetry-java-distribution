@@ -235,9 +235,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
     if (configuredOtlpEndpoint != null && !configuredOtlpEndpoint.trim().isEmpty()) {
       logger.log(
-          Level.FINE,
+          Level.WARNING,
           "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
-              + " unapplied.",
+              + " unapplied. A declaratively configured SDK reads no OTEL_* variable, so an"
+              + " exporter the configuration file left without an endpoint falls back to"
+              + " http://localhost:4318. Name the endpoint in the configuration file instead.",
           configuredOtlpEndpoint);
       return;
     }

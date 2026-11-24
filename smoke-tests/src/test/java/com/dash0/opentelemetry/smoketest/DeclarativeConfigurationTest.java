@@ -21,6 +21,7 @@ class DeclarativeConfigurationTest {
 
   private static final String DASH0_HOST = "declarative-collector-base-url.invalid";
   private static final String OTEL_HOST = "declarative-exporter-endpoint.invalid";
+  private static final String EXPORTER_THREAD = "[OkHttp ";
   private static final String TRACEPARENT = TestApplication.RECEIVED_HEADER + "traceparent: 00-";
   private static final Pattern XRAY_WITH_PARENT =
       Pattern.compile(
@@ -98,7 +99,8 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
-  void theStandardEndpointTakesPrecedenceOverTheCollectorBaseUrl() throws Exception {
+  void theStandardEndpointSuppressesTheCollectorBaseUrlAndConfiguresNothingItself()
+      throws Exception {
     Map<String, String> environment = new HashMap<>();
     environment.put("DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST);
     environment.put("OTEL_EXPORTER_OTLP_ENDPOINT", "http://" + OTEL_HOST + ":4318");
@@ -108,10 +110,16 @@ class DeclarativeConfigurationTest {
 
     assertThat(exported)
         .as(
-            "the precedence has to be the same under OTEL_CONFIG_FILE as it is under environment"
-                + " configuration. The JVM's output was:%n%s",
+            "a declaratively configured SDK reads no OTEL_* variable, so the exporter falls back"
+                + " to the specification default and reaches neither host. The assertions name"
+                + " the exporter's own thread, which carries the URL it opened: the customizer"
+                + " logs the value of OTEL_EXPORTER_OTLP_ENDPOINT, so a bare absence of that host"
+                + " could never hold, and a bare absence of both would pass for an agent that"
+                + " exported nothing at all. The JVM's output was:%n%s",
             exported)
-        .doesNotContain(DASH0_HOST);
+        .contains(EXPORTER_THREAD + "http://localhost:4318/")
+        .doesNotContain(EXPORTER_THREAD + "http://" + DASH0_HOST)
+        .doesNotContain(EXPORTER_THREAD + "http://" + OTEL_HOST);
   }
 
   @Test
