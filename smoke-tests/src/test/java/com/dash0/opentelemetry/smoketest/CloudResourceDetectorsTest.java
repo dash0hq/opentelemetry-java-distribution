@@ -5,8 +5,15 @@
 package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -70,6 +77,10 @@ class CloudResourceDetectorsTest {
 
   @Test
   void contributesTheHostIdOnceTheHostIdToggleIsSet() throws Exception {
+    assumeTrue(
+        aMachineIdFileOfThisHostCarriesAValue(),
+        "every machine id file HostIdResource reads is missing or empty on this host");
+
     Map<String, String> environment = appServiceEnvironment();
     environment.put("OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED", "true");
 
@@ -111,6 +122,26 @@ class CloudResourceDetectorsTest {
         .contains("cloud.platform=\"azure.functions\"")
         .contains("faas.name=\"" + SITE_NAME + "\"")
         .contains("service.name=\"" + SITE_NAME + "\"");
+  }
+
+  /**
+   * Whether either path {@code HostIdResource} reads on Linux holds a non-blank line, which is what
+   * it turns into {@code host.id}.
+   */
+  private static boolean aMachineIdFileOfThisHostCarriesAValue() throws IOException {
+    List<String> machineIdPaths = Arrays.asList("/etc/machine-id", "/var/lib/dbus/machine-id");
+    for (String machineIdPath : machineIdPaths) {
+      Path file = Paths.get(machineIdPath);
+      if (!Files.isReadable(file)) {
+        continue;
+      }
+      for (String line : Files.readAllLines(file)) {
+        if (!line.trim().isEmpty()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
