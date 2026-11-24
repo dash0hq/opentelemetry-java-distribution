@@ -137,6 +137,14 @@ reports `host.id`. It holds no cloud detector and is named here because it is
 off by default through the same mechanism, which is easy to miss while looking
 for a `host.id` that never arrives.
 
+Setting that toggle is not enough on its own. On Linux `HostIdResource` takes
+the first non-blank line of `/etc/machine-id` and falls back to
+`/var/lib/dbus/machine-id`, and reports nothing when both are missing or empty.
+The Debian-derived JDK images ship an empty `/etc/machine-id` and no
+`/var/lib/dbus/machine-id`, `eclipse-temurin:21` among them, so a container
+built on one of those exports no `host.id` with the toggle set and logs the
+reason at `FINE` only.
+
 The customizer also lists `AzureAksResourceProvider` and
 `AzureContainersResourceProvider` under the `azure` group. Agent 2.33.1
 registers neither in its merged service file, so neither runs whatever the
