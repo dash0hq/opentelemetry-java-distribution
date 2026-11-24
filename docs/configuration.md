@@ -204,7 +204,7 @@ from whatever it returns.
 | the `tracecontext,baggage,xray` propagators default | `propagator.composite_list`, unless the file declares a `composite` or a non-blank `composite_list` |
 | `telemetry.distro.name` and `telemetry.distro.version` | `resource.attributes`, unless the file declares that name |
 | `dash0.package.*`, read from beside the agent jar | `resource.attributes`, unless the file declares that name |
-| the upstream `host` and `process` detectors | `resource.detection/development`, unless the file names them |
+| the upstream `host`, `process` and `service` detectors | `resource.detection/development`, unless the file names them |
 
 Both Dash0 settings are read from the system property first and the environment
 variable second, which is the precedence `DefaultConfigProperties` gives the

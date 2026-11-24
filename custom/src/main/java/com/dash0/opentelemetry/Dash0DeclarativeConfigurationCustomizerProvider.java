@@ -27,6 +27,7 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.Exper
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalProcessResourceDetectorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalResourceDetectionModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalResourceDetectorModel;
+import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalServiceResourceDetectorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ResourceModelAccessor;
 import io.opentelemetry.sdk.resources.Resource;
 import java.util.ArrayList;
@@ -105,7 +106,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
 
     addResourceAttributesTheFileDoesNotDeclare(
         model, Dash0PackageResource.get().merge(DistroResource.get()));
-    enableTheHostAndProcessDetectors(model);
+    enableTheHostProcessAndServiceDetectors(model);
     defaultTheSamplerToAlwaysOn(model);
     defaultThePropagatorsToTracecontextBaggageXray(model);
     useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
@@ -179,11 +180,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   }
 
   /**
-   * Adds the upstream {@code host} and {@code process} resource detectors to {@code
-   * resource.detection/development}, each one only when the file does not already name it, and each
-   * one before every detector the file names.
+   * Adds the upstream {@code host}, {@code process} and {@code service} resource detectors to
+   * {@code resource.detection/development}, each one only when the file does not already name it,
+   * and each one before every detector the file names.
    */
-  static void enableTheHostAndProcessDetectors(OpenTelemetryConfigurationModel model) {
+  static void enableTheHostProcessAndServiceDetectors(OpenTelemetryConfigurationModel model) {
     ResourceModel resource = resourceModelCreatingItWhenAbsent(model);
 
     ExperimentalResourceDetectionModel detection = ResourceModelAccessor.getDetection(resource);
@@ -199,9 +200,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
 
     boolean hostIsNamed = false;
     boolean processIsNamed = false;
+    boolean serviceIsNamed = false;
     for (ExperimentalResourceDetectorModel detector : detectors) {
       hostIsNamed = hostIsNamed || detector.getHost() != null;
       processIsNamed = processIsNamed || detector.getProcess() != null;
+      serviceIsNamed = serviceIsNamed || detector.getService() != null;
     }
 
     if (!hostIsNamed) {
@@ -215,6 +218,12 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
           0,
           new ExperimentalResourceDetectorModel()
               .setProcess(new ExperimentalProcessResourceDetectorModel()));
+    }
+    if (!serviceIsNamed) {
+      detectors.add(
+          0,
+          new ExperimentalResourceDetectorModel()
+              .setService(new ExperimentalServiceResourceDetectorModel()));
     }
 
     ResourceModelAccessor.setDetection(resource, detection);

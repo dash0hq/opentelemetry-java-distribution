@@ -128,6 +128,15 @@ detector contributes `telemetry.distro.name` and `telemetry.distro.version`, and
 the Dash0 values in `resource.attributes` are applied over it. A file that wants
 `container.id` has to name `container` itself. See `docs/configuration.md`.
 
+The detectors carry the same names in both modes and not the same attributes,
+and two differences are worth knowing before a query is written against them.
+The declarative `host` detector supplies `host.id` as well as `host.name`, so
+`OTEL_CONFIG_FILE` turns on the one attribute the environment path deliberately
+leaves off, and there is no way to ask for `host.name` without it:
+`ExperimentalHostResourceDetectorModel` has no fields. The declarative
+`process` detector supplies no `process.command_args`, which the environment
+path has, and nothing in this repository can add it.
+
 ## Not implemented
 
 The Node.js and Python distributions ship a `k8s.pod.uid` detector and this one

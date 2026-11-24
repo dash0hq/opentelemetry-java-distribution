@@ -22,9 +22,12 @@ subtext: |
   still leave the SDK enabled. ``telemetry.distro.name``,
   ``telemetry.distro.version`` and the ``dash0.package.*`` attributes a Linux
   package writes beside the agent jar go into ``resource.attributes``, which
-  the SDK applies after every detector. The upstream ``host`` and ``process``
-  detectors are named in ``resource.detection/development``, so ``host.name``
-  and ``process.pid`` come back. ``tracer_provider.sampler`` is set to
+  the SDK applies after every detector. The upstream ``host``, ``process``
+  and ``service`` detectors are named in ``resource.detection/development``,
+  so ``host.name``,
+  ``process.pid`` and ``service.instance.id`` come back. ``host.id`` comes with
+  them, which the environment path leaves off, and ``process.command_args``
+  does not, which the environment path has. ``tracer_provider.sampler`` is set to
   ``always_on`` when the file declares no sampler, and
   ``propagator.composite_list`` to ``tracecontext,baggage,xray`` when the file
   declares neither a ``composite`` nor a ``composite_list`` that is not blank.

@@ -11,7 +11,7 @@ import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerPro
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.dash0DisableIsTrue;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.defaultThePropagatorsToTracecontextBaggageXray;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.defaultTheSamplerToAlwaysOn;
-import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.enableTheHostAndProcessDetectors;
+import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.enableTheHostProcessAndServiceDetectors;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.useTheCollectorBaseUrlForEveryDeclaredOtlpExporter;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -224,32 +224,34 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
-  void enablesTheHostAndProcessDetectors() {
+  void enablesTheHostProcessAndServiceDetectors() {
     OpenTelemetryConfigurationModel model = new OpenTelemetryConfigurationModel();
 
-    enableTheHostAndProcessDetectors(model);
+    enableTheHostProcessAndServiceDetectors(model);
 
     List<ExperimentalResourceDetectorModel> detectors = detectorsOf(model);
-    assertThat(detectors).hasSize(2);
-    assertThat(detectors.get(0).getProcess()).isNotNull();
-    assertThat(detectors.get(1).getHost()).isNotNull();
+    assertThat(detectors).hasSize(3);
+    assertThat(detectors.get(0).getService()).isNotNull();
+    assertThat(detectors.get(1).getProcess()).isNotNull();
+    assertThat(detectors.get(2).getHost()).isNotNull();
   }
 
   @Test
-  void putsTheHostAndProcessDetectorsBeforeEveryDetectorTheFileNames() {
+  void putsTheDash0DetectorsBeforeEveryDetectorTheFileNames() {
     OpenTelemetryConfigurationModel model = new OpenTelemetryConfigurationModel();
     declareDetectors(
         model,
         new ExperimentalResourceDetectorModel()
             .setContainer(new ExperimentalContainerResourceDetectorModel()));
 
-    enableTheHostAndProcessDetectors(model);
+    enableTheHostProcessAndServiceDetectors(model);
 
     List<ExperimentalResourceDetectorModel> detectors = detectorsOf(model);
-    assertThat(detectors).hasSize(3);
-    assertThat(detectors.get(0).getProcess()).isNotNull();
-    assertThat(detectors.get(1).getHost()).isNotNull();
-    assertThat(detectors.get(2).getContainer())
+    assertThat(detectors).hasSize(4);
+    assertThat(detectors.get(0).getService()).isNotNull();
+    assertThat(detectors.get(1).getProcess()).isNotNull();
+    assertThat(detectors.get(2).getHost()).isNotNull();
+    assertThat(detectors.get(3).getContainer())
         .as("a detector the operator chose is applied last, so it wins")
         .isNotNull();
   }
@@ -262,12 +264,13 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
         new ExperimentalResourceDetectorModel()
             .setHost(new ExperimentalHostResourceDetectorModel()));
 
-    enableTheHostAndProcessDetectors(model);
+    enableTheHostProcessAndServiceDetectors(model);
 
     List<ExperimentalResourceDetectorModel> detectors = detectorsOf(model);
-    assertThat(detectors).hasSize(2);
-    assertThat(detectors.get(0).getProcess()).isNotNull();
-    assertThat(detectors.get(1).getHost()).isNotNull();
+    assertThat(detectors).hasSize(3);
+    assertThat(detectors.get(0).getService()).isNotNull();
+    assertThat(detectors.get(1).getProcess()).isNotNull();
+    assertThat(detectors.get(2).getHost()).isNotNull();
   }
 
   @Test

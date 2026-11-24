@@ -53,17 +53,20 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
-  void theUpstreamHostAndProcessDetectorsRunToo() throws Exception {
+  void theUpstreamHostProcessAndServiceDetectorsRunToo() throws Exception {
     String exported = configuredFrom("/declarative-config.yaml").run();
 
     assertThat(exported)
         .as(
-            "the customizer names the host and process detectors in"
-                + " resource.detection/development, which the file itself does not. The JVM's"
-                + " output was:%n%s",
+            "the customizer names the host, process and service detectors in"
+                + " resource.detection/development, which the file itself does not. host.id comes"
+                + " with host.name, and the environment path leaves it off. The JVM's output"
+                + " was:%n%s",
             exported)
         .contains("host.name=")
-        .contains("process.pid=");
+        .contains("host.id=")
+        .contains("process.pid=")
+        .contains("service.instance.id=");
   }
 
   @Test
