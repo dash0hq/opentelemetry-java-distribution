@@ -191,6 +191,21 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void addsTheAttributeAnAttributesEntryWithNoValueLeavesUnset() {
+    OpenTelemetryConfigurationModel model =
+        modelDeclaring(new AttributeNameValueModel().setName("dash0.package.name"));
+
+    addResourceAttributesTheFileDoesNotDeclare(
+        model, Resource.create(Attributes.builder().put("dash0.package.name", "theirs").build()));
+
+    assertThat(attributesOf(model))
+        .as(
+            "AttributeListFactory.addToBuilder returns without touching the builder when the value"
+                + " is null, so the file sets nothing and the Dash0 value is the only one left")
+        .containsEntry("dash0.package.name", "theirs");
+  }
+
+  @Test
   void addsTheAttributeAnAttributesListPairWithNoValueLeavesUnset() {
     OpenTelemetryConfigurationModel model =
         new OpenTelemetryConfigurationModel()

@@ -137,7 +137,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
 
     Set<String> declared = new HashSet<>();
     for (AttributeNameValueModel attribute : attributes) {
-      declared.add(attribute.getName());
+      if (attribute.getValue() != null) {
+        declared.add(attribute.getName());
+      }
     }
     declared.addAll(namesIn(resource.getAttributesList()));
 
