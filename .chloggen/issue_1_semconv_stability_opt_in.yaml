@@ -21,12 +21,15 @@ subtext: |
   the agent emits them whatever this setting says.
   Attribute names are not the only thing that changes. A JDBC span is named after
   a summary of the query rather than ``<operation> <database>.<table>``, and so
-  is a Cassandra span. Every other database instrumentation, MongoDB and Redis
+  is every other SQL client's span: Cassandra, R2DBC, the Vert.x SQL client and
+  ClickHouse among them. Every other database instrumentation, MongoDB and Redis
   and Elasticsearch among them, is named after the operation and the collection
   rather than the operation and the database, falling back to the namespace and
-  then to ``<host>:<port>`` where there is no collection. The AWS SDK is the
-  exception: it names its own client spans ``<service>.<operation>`` and reads
-  none of this setting, so a DynamoDB or an S3 span is unaffected. A messaging
+  then to ``<host>:<port>`` where there is no collection. Redis and
+  Elasticsearch land on that last form, which is one span name per node rather
+  than one for the cluster. The AWS SDK names most of its client spans itself
+  and reads none of this setting, so a DynamoDB or an S3 span is unaffected;
+  its SQS messaging spans and its RDS Data API spans do move. A messaging
   span is named after the operation and
   the destination rather than the destination and the operation, and the
   operation word changes with the order: a Kafka producer span named

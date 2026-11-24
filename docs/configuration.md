@@ -298,8 +298,8 @@ alert written against any of these stops matching with no error anywhere:
 
 | What changes | Without the opt-in | With it |
 |---|---|---|
-| Database span name, JDBC and Cassandra | `<operation> <database>.<table>` | a summary of the query |
-| Database span name, everything else | `<operation> <database>.<collection>` | `<operation> <collection>` |
+| Database span name, SQL clients | `<operation> <database>.<table>` | a summary of the query |
+| Database span name, everything else | `<operation> <database>` | `<operation> <collection>` |
 | RPC span name, except gRPC | `<service>/<method>` | `<method>` |
 | Messaging span name | `<destination> <operation>`, as in `orders publish` | `<operation> <destination>`, as in `send orders` |
 | Messaging receive span kind | `CONSUMER` | `CLIENT` |
@@ -317,11 +317,15 @@ The unit change is the one to check first. A threshold written against
 `db.client.connection.wait_time` in seconds is a thousand times too high, so the
 alert stops firing rather than failing.
 
-The second database row covers MongoDB, Redis and Elasticsearch among others,
-and its right-hand cell has two fallbacks: an instrumentation reporting no
-collection is named after its namespace, and one reporting neither after
-`<host>:<port>`, which is where a Redis and an Elasticsearch span land. The
-messaging row covers Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS.
+The first database row covers every SQL client the agent instruments: JDBC,
+Cassandra, R2DBC, the Vert.x SQL client and ClickHouse among them. The second
+covers the rest, MongoDB and Redis and Elasticsearch among them, and its
+right-hand cell has two fallbacks. An instrumentation reporting no collection is
+named after its namespace, and one reporting neither after `<host>:<port>`,
+which is where Redis and Elasticsearch land: a Redis span named `GET` today is
+named `GET redis.example:6379` after the upgrade, one name per node rather than
+one for the cluster. The messaging row covers every messaging instrumentation,
+Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS among them.
 
 On a messaging span the operation word changes as well as its position: a Kafka
 producer span named `orders publish` becomes `send orders`, and a consumer span
@@ -338,9 +342,11 @@ those records carry `code.file.path`, `code.function.name` and
 
 Four instrumentations differ from the table:
 
-- The AWS SDK names its client spans itself, as `<service>.<operation>`, and
-reads none of this setting to do it, so a DynamoDB or an S3 span keeps the name
-it has. Its SQS messaging spans are renamed like every other messaging span.
+- The AWS SDK names most of its client spans itself, as
+  `<service>.<operation>`, and reads none of this setting to do it, so a
+  DynamoDB or an S3 span keeps the name it has. Two parts of it do move: its SQS
+  messaging spans are renamed like every other messaging span, and its RDS Data
+  API spans take the query summary of the first database row.
 - gRPC span names never change. gRPC does not use the shared RPC span name
   extractor, and its spans carry the full method name whatever this setting
   says.
