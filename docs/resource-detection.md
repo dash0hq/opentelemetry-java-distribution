@@ -103,6 +103,12 @@ default. This distribution adds to that set rather than replacing it, and
 `AgentPackagingTest` asserts that the merged service file still contains more
 than just the Dash0 entry.
 
+That list holds under environment configuration. When `OTEL_CONFIG_FILE` is set,
+the SDK loads no `ResourceProvider` at all, and the only detectors that run are
+the ones the file names under `resource.detection/development` plus the `host`
+and `process` detectors the Dash0 customizer inserts. A file that wants
+`container.id` has to name `container` itself. See `docs/configuration.md`.
+
 ## Not implemented
 
 The Node.js and Python distributions ship a `k8s.pod.uid` detector and this one
