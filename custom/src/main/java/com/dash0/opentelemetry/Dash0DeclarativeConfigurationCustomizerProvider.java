@@ -139,6 +139,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     for (AttributeNameValueModel attribute : attributes) {
       declared.add(attribute.getName());
     }
+    declared.addAll(namesIn(resource.getAttributesList()));
 
     for (Map.Entry<AttributeKey<?>, Object> entry :
         dash0Attributes.getAttributes().asMap().entrySet()) {
@@ -149,6 +150,25 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       }
       attributes.add(new AttributeNameValueModel().setName(name).setValue(entry.getValue()));
     }
+  }
+
+  /**
+   * The attribute names of {@code attributesList}, a comma separated list of {@code name=value}
+   * pairs in the format {@code OTEL_RESOURCE_ATTRIBUTES} uses.
+   */
+  static Set<String> namesIn(String attributesList) {
+    Set<String> names = new LinkedHashSet<>();
+    if (attributesList == null) {
+      return names;
+    }
+    for (String pair : attributesList.split(",")) {
+      int separator = pair.indexOf('=');
+      String name = (separator < 0 ? pair : pair.substring(0, separator)).trim();
+      if (!name.isEmpty()) {
+        names.add(name);
+      }
+    }
+    return names;
   }
 
   /**

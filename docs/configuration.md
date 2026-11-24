@@ -225,6 +225,17 @@ reproduces the ordering `DistroResourceProvider.order()` gives today. The host
 and process detectors are inserted ahead of every detector the file names, so a
 detector the operator chose wins over them on any attribute both would set.
 
+A name the file declares in `attributes_list` counts as declared, exactly as one
+it declares in `attributes` does. Both are read before anything is appended,
+since `attributes` is applied over `attributes_list` and appending there would
+discard what the operator wrote.
+
+Where the two Dash0 sources collide, the distribution attributes win and the
+package properties file loses, which is the ordering
+`DistroResourceProvider.order()` and `Dash0PackageResourceProvider.order()`
+produce under environment configuration. A package file naming
+`telemetry.distro.name` reaches the exported resource in neither mode.
+
 `OTEL_RESOURCE_ATTRIBUTES` is still ignored in this mode, by the SDK rather than
 by this distribution. See `docs/resource-detection.md`.
 

@@ -170,6 +170,27 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void keepsAnAttributeTheFileDeclaresThroughAttributesList() {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setResource(
+                new ResourceModel()
+                    .setAttributesList(" service.name=checkout , dash0.package.name=mine "));
+
+    addResourceAttributesTheFileDoesNotDeclare(
+        model,
+        Resource.create(
+            Attributes.builder()
+                .put("dash0.package.name", "theirs")
+                .put("dash0.package.version", "1.2.3")
+                .build()));
+
+    assertThat(attributesOf(model))
+        .containsOnlyKeys("dash0.package.version")
+        .containsEntry("dash0.package.version", "1.2.3");
+  }
+
+  @Test
   void enablesTheHostAndProcessDetectors() {
     OpenTelemetryConfigurationModel model = new OpenTelemetryConfigurationModel();
 
