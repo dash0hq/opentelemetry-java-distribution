@@ -233,10 +233,21 @@ deletes spans that no downstream processing can bring back. Under
 `OTEL_PROPAGATORS`, a caller that sends only `X-Amzn-Trace-Id`, such as an AWS
 service with X-Ray active tracing, leaves `tracecontext,baggage` with no context
 to extract, so this JVM starts a second trace that nothing downstream can join
-to the first. Cloud attributes are not in that category. They can be supplied
-out of process, once per host, by the Dash0 operator or by the
-`resourcedetection` processor in a collector, and a workload that wants them
-from the JVM gets them by setting one variable.
+to the first. Cloud attributes are not in that category. For the `aws`, `azure`
+and `gcp` groups they can be supplied out of process, once per host, by the
+Dash0 operator or by the `resourcedetection` processor in a collector, and a
+workload that wants them from the JVM gets them by setting one variable.
+
+Cloud Foundry is the exception, and it stays off for a different reason.
+`VCAP_APPLICATION` exists only inside the application container, the Dash0
+operator injects into Kubernetes pods and not into Cloud Foundry, and the
+collector's `resourcedetection` processor ships no Cloud Foundry detector, so
+nothing outside the process can supply `cloudfoundry.app.name` and its
+siblings. `CloudFoundryResourceProvider` is also free, is the only member of its
+group, carries no `cloud.provider` guard and writes no `service.name`, so none
+of the four reasons below reaches it. What holds it to the same decision is
+upstream parity alone: a workload on Cloud Foundry knows it is on Cloud Foundry,
+and one variable turns the group on.
 
 Against that stands a startup cost the experiment above puts in seconds, paid by
 every JVM that is not on the cloud in question, in an amount that depends on a
