@@ -227,27 +227,34 @@ of the three it lands on.
 ### Why they stay off
 
 A default is worth changing when the upstream default loses data that cannot be
-recovered later. Both of the defaults `docs/configuration.md` records are of
-that kind. Under `OTEL_TRACES_SAMPLER`, an incoming `traceparent` silently
-deletes spans that no downstream processing can bring back. Under
-`OTEL_PROPAGATORS`, a caller that sends only `X-Amzn-Trace-Id`, such as an AWS
-service with X-Ray active tracing, leaves `tracecontext,baggage` with no context
-to extract, so this JVM starts a second trace that nothing downstream can join
-to the first. Cloud attributes are not in that category. For the `aws`, `azure`
-and `gcp` groups they can be supplied out of process, once per host, by the
-Dash0 operator or by the `resourcedetection` processor in a collector, and a
-workload that wants them from the JVM gets them by setting one variable.
+recovered later and the workload has no way of telling that it is losing it.
+Both of the defaults `docs/configuration.md` records meet both conditions. Under
+`OTEL_TRACES_SAMPLER`, an incoming `traceparent` silently deletes spans that no
+downstream processing can bring back, and nothing in the process reports that a
+sampled flag arrived unset. Under `OTEL_PROPAGATORS`, a caller that sends only
+`X-Amzn-Trace-Id`, such as an AWS service with X-Ray active tracing, leaves
+`tracecontext,baggage` with no context to extract, so this JVM starts a second
+trace that nothing downstream can join to the first, and from inside the process
+that second trace looks like an ordinary one.
 
-Cloud Foundry is the exception, and it stays off for a different reason.
+Cloud attributes fail the second condition, the one about the workload being
+unable to tell. A missing `cloud.region` is a missing attribute, plain in the
+exported resource to anyone who looks, and a workload that wants it knows which
+cloud it runs on. For the `aws`, `azure` and `gcp` groups the attributes can
+also be supplied out of process, once per host, by the Dash0 operator or by the
+`resourcedetection` processor in a collector.
+
+Cloud Foundry is the one group nothing outside the process can supply.
 `VCAP_APPLICATION` exists only inside the application container, the Dash0
 operator injects into Kubernetes pods and not into Cloud Foundry, and the
 collector's `resourcedetection` processor ships no Cloud Foundry detector, so
-nothing outside the process can supply `cloudfoundry.app.name` and its
-siblings. `CloudFoundryResourceProvider` is also free, is the only member of its
+`cloudfoundry.app.name` and its siblings are lost for as long as the group is
+off. `CloudFoundryResourceProvider` is also free, is the only member of its
 group, carries no `cloud.provider` guard and writes no `service.name`, so none
-of the four reasons below reaches it. What holds it to the same decision is
-upstream parity alone: a workload on Cloud Foundry knows it is on Cloud Foundry,
-and one variable turns the group on.
+of the four reasons below reaches it. What keeps it off is the second condition
+on its own: a workload on Cloud Foundry knows it is on Cloud Foundry, the absent
+attributes are plain in the exported resource, and one variable turns the group
+on.
 
 Against that stands a startup cost the experiment above puts in seconds, paid by
 every JVM that is not on the cloud in question, in an amount that depends on a
