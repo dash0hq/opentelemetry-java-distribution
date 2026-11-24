@@ -169,13 +169,11 @@ Several providers in the table are `ConditionalResourceProvider`s, and each
 declares its own condition instead of sharing one. The three `service.name`
 detectors write only while the name is still `unknown_service:java`, which the
 `service.name` section below sets out in full. `ManifestResourceProvider` writes
-each of its other keys only while that key is absent. `HostIdResourceProvider`
-writes `host.id` only while `host.id` is absent, so a value a Dash0 package file
-or an enabled cloud detector already set survives it. Each cloud provider tests
-`cloud.provider` being absent, which is not one of the keys it writes, so it can
-overwrite a key another provider already set. `SpringBootServiceVersionDetector`
-at order `0` and `EnvironmentResourceProvider` at order `2147483646` declare no
-condition and overwrite whatever is there.
+its only other key, `service.version`, only while that key is absent.
+`HostIdResourceProvider` writes `host.id` only while `host.id` is absent, so a
+value a Dash0 package file or an enabled cloud detector already set survives it.
+`SpringBootServiceVersionDetector` at order `0` and `EnvironmentResourceProvider`
+at order `2147483646` declare no condition and overwrite whatever is there.
 
 Reading the `order()` column alone therefore predicts the wrong winner wherever
 one of those conditions applies. For `service.version`,
