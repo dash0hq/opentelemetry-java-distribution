@@ -153,8 +153,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   }
 
   /**
-   * The attribute names of {@code attributesList}, a comma separated list of {@code name=value}
-   * pairs in the format {@code OTEL_RESOURCE_ATTRIBUTES} uses.
+   * The attribute names {@code DefaultConfigProperties.getMap} reads out of {@code attributesList},
+   * a comma separated list of {@code name=value} pairs in the format {@code
+   * OTEL_RESOURCE_ATTRIBUTES} uses.
    */
   static Set<String> namesIn(String attributesList) {
     Set<String> names = new LinkedHashSet<>();
@@ -163,8 +164,12 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     }
     for (String pair : attributesList.split(",")) {
       int separator = pair.indexOf('=');
-      String name = (separator < 0 ? pair : pair.substring(0, separator)).trim();
-      if (!name.isEmpty()) {
+      if (separator < 0) {
+        continue;
+      }
+      String name = pair.substring(0, separator).trim();
+      String value = pair.substring(separator + 1).trim();
+      if (!name.isEmpty() && !value.isEmpty()) {
         names.add(name);
       }
     }

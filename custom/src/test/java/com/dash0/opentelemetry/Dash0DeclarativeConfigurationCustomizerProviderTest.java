@@ -191,6 +191,24 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void addsTheAttributeAnAttributesListPairWithNoValueLeavesUnset() {
+    OpenTelemetryConfigurationModel model =
+        new OpenTelemetryConfigurationModel()
+            .setResource(
+                new ResourceModel()
+                    .setAttributesList("service.name=checkout,dash0.package.name= "));
+
+    addResourceAttributesTheFileDoesNotDeclare(
+        model, Resource.create(Attributes.builder().put("dash0.package.name", "theirs").build()));
+
+    assertThat(attributesOf(model))
+        .as(
+            "DefaultConfigProperties.getMap drops a pair whose value is empty after trimming, so"
+                + " the file sets nothing and the Dash0 value is the only one left")
+        .containsEntry("dash0.package.name", "theirs");
+  }
+
+  @Test
   void enablesTheHostAndProcessDetectors() {
     OpenTelemetryConfigurationModel model = new OpenTelemetryConfigurationModel();
 
