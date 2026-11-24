@@ -293,14 +293,15 @@ task attribute, because `Ec2ResourceProvider` is listed above
 distribution's problem. Enabling two makes it a race between groups.
 
 `AzureAppServiceResourceProvider` and `AzureFunctionsResourceProvider` both set
-`service.name` from `WEBSITE_SITE_NAME`, and both run at order `0`. The two
+`service.name` from `WEBSITE_SITE_NAME`, and both run at order `0`. The three
 detectors that would otherwise decide the service name run later and decline to
 act once something else has decided it: `SpringBootServiceNameDetector` at order
-`100` and `JarServiceNameDetector` at order `1000` each apply only while the
-accumulated `service.name` is still the SDK default `unknown_service:java`.
-Enabling `azure` therefore renames every Azure App Service and Azure Functions
-deployment that was getting its name from the Spring Boot application name or
-from the jar file name. `OTEL_SERVICE_NAME` still beats it, because
+`100`, `ManifestResourceProvider` at order `300` and `JarServiceNameDetector` at
+order `1000` each apply only while the accumulated `service.name` is still the
+SDK default `unknown_service:java`. Enabling `azure` therefore renames every
+Azure App Service and Azure Functions deployment that was getting its name from
+the Spring Boot application name, from `Implementation-Title` in the jar
+manifest, or from the jar file name. `OTEL_SERVICE_NAME` still beats it, because
 `EnvironmentResourceProvider` declares an order of `2147483646`.
 `CloudResourceDetectorsTest` in `smoke-tests/` asserts that the site name is
 absent with the group off, present with it on, and beaten by
