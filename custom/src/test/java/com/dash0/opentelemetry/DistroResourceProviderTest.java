@@ -22,4 +22,9 @@ class DistroResourceProviderTest {
   void providesTheDistroResource() {
     assertThat(new DistroResourceProvider().createResource(null)).isEqualTo(DistroResource.get());
   }
+
+  @Test
+  void declaresTheDocumentedOrder() {
+    assertThat(new DistroResourceProvider().order()).isEqualTo(200);
+  }
 }

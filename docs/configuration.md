@@ -66,7 +66,7 @@ three and the third has no Java counterpart:
 
 | Variable | Why it is absent |
 |---|---|
-| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default. |
+| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default; the `service.name` section of [resource detection](resource-detection) gives the value a JVM reports for each launch shape. |
 | `DASH0_FLUSH_ON_SIGTERM_SIGINT` | The agent registers a JVM shutdown hook that flushes. |
 | `DASH0_BOOTSTRAP_SPAN` | No Java equivalent, and no demand recorded for one. |
 
@@ -127,7 +127,70 @@ start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
 Declarative configuration applies this default too, through a different
-mechanism that the next section describes.
+mechanism that the section on it below describes.
+
+### Resource-provider toggles
+
+The upstream agent ships eleven resource providers switched off, grouped into
+five groups that `ResourceProviderPropertiesCustomizer` gates on one property
+each:
+
+| Property | Environment variable | Providers it covers | Default |
+|---|---|---|---|
+| `otel.resource.providers.aws.enabled` | `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` | `false` |
+| `otel.resource.providers.gcp.enabled` | `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | `GCPResourceProvider` | `false` |
+| `otel.resource.providers.azure.enabled` | `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider`, `AzureVmResourceProvider` | `false` |
+| `otel.resource.providers.cloudfoundry.enabled` | `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | `CloudFoundryResourceProvider` | `false` |
+| `otel.resource.providers.host-id.enabled` | `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` | `HostIdResourceProvider` | `false` |
+
+Those five are the only correct toggles, and this distribution changes none of
+the defaults.
+
+`otel.java.enabled.resource.providers` is an allow-list rather than a second way
+to spell these, and setting it switches off every provider it does not name.
+[Resource detection](resource-detection) gives what a JVM exported when it was
+set.
+
+The hyphen in `otel.resource.providers.host-id.enabled` is not a typo, and the
+environment spelling is still all underscores. Two different methods normalise a
+name before the lookup. `ConfigUtil.normalizePropertyKey` lowercases it and
+turns each hyphen into a dot, and is applied to a system property and to the key
+a provider asks for. `ConfigUtil.normalizeEnvironmentVariableKey` lowercases it
+and turns each underscore into a dot, and is applied to an environment variable.
+Both `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
+`-Dotel.resource.providers.host-id.enabled` therefore arrive as
+`otel.resource.providers.host.id.enabled`, and both were observed switching
+`HostIdResourceProvider` on at agent 2.33.1. An environment variable whose name
+carries a literal hyphen was observed doing nothing.
+
+### `host.id`
+
+`HostIdResourceProvider` is the one non-cloud provider the agent ships disabled,
+and this distribution leaves it disabled. Switch it on with
+`OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED=true` only after reading what it does
+on your platform.
+
+On Linux it reads `/etc/machine-id`, falling back to
+`/var/lib/dbus/machine-id`. Either file is baked into a container image at build
+time, so every container started from one image reports the same `host.id`, and
+the attribute groups unrelated workloads together instead of separating them.
+The failure is confident rather than noisy: a wrong identifier arrives looking
+exactly like a right one.
+
+On macOS and Windows it forks a subprocess at startup, `/usr/sbin/ioreg` and
+`reg.exe query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid`
+respectively, which costs startup time in every process the agent attaches to.
+On BSD it reads `/etc/hostid` or runs `/bin/kenv`.
+
+On a Linux host running the Dash0 Linux package rather than a container,
+`/etc/machine-id` is a stable and correct identifier for that host, and
+switching the group on is reasonable.
+
+`OTEL_CONFIG_FILE` switches `host.id` on whichever way this group is set. The
+customizer names the `host` detector in `resource.detection/development`, and
+that detector supplies `host.id` beside `host.name` with no field to ask for one
+without the other. So the same JVM reports `host.id` with a configuration file
+and no `host.id` without one. See [Resource detection](resource-detection).
 
 ### `OTEL_PROPAGATORS`
 
@@ -221,9 +284,10 @@ The resource ordering follows from `ResourceFactory`, which starts from
 `Resource.getDefault()`, applies the detectors under `detection/development`,
 then `attributes_list`, then `attributes`, each overwriting the one before. So
 the Dash0 attributes, written into `attributes`, beat every detector, which
-reproduces the ordering `DistroResourceProvider.order()` gives today. The host
-and process detectors are inserted ahead of every detector the file names, so a
-detector the operator chose wins over them on any attribute both would set.
+reproduces the ordering `DistroResourceProvider.order()` of `200` gives today.
+The host, process and service detectors are inserted ahead of every detector the
+file names, so a detector the operator chose wins over them on any attribute
+both would set.
 
 A name the file declares in `attributes_list` counts as declared, exactly as one
 it declares in `attributes` does. Both are read before anything is appended,
@@ -237,7 +301,8 @@ produce under environment configuration. A package file naming
 `telemetry.distro.name` reaches the exported resource in neither mode.
 
 `OTEL_RESOURCE_ATTRIBUTES` is still ignored in this mode, by the SDK rather than
-by this distribution. See `docs/resource-detection.md`.
+by this distribution. [Resource detection](resource-detection) gives the whole
+list of what runs in this mode and what each detector contributes.
 
 ### What the endpoint mapping does and does not touch
 
