@@ -39,6 +39,8 @@ tasks.withType<Test>().configureEach {
   val resolvedUpstreamAgentJar = upstreamAgentJar
   val testApplicationClasses = sourceSets.main.get().output.classesDirs
 
+  val awsXrayPropagatorVersion = libs.versions.opentelemetryAwsXrayPropagator.get()
+  inputs.property("awsXrayPropagatorVersion", awsXrayPropagatorVersion)
   inputs.files(
     resolvedAgentJar,
     resolvedExtensionJar,
@@ -54,6 +56,7 @@ tasks.withType<Test>().configureEach {
         "-Ddash0.upstream.agent.jar=${resolvedUpstreamAgentJar.singleFile.absolutePath}",
         "-Ddash0.test.app.classes=${testApplicationClasses.asPath}",
         "-Ddash0.distro.version=$version",
+        "-Ddash0.aws.xray.propagator.version=$awsXrayPropagatorVersion",
       )
     },
   )

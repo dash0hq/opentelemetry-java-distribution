@@ -29,6 +29,9 @@ dependencies {
   testImplementation(libs.opentelemetrySdkAutoconfigureSpi)
   testImplementation(libs.opentelemetrySdkDeclarativeConfig)
   testImplementation(libs.opentelemetrySdkTesting)
+  // The agent already bundles the X-Ray propagator, so it is only a test dependency here.
+  testImplementation(libs.opentelemetrySdkAutoconfigure)
+  testImplementation(libs.opentelemetryAwsXrayPropagator)
   // The tests read DistroResourceProvider, which carries @AutoService, so the
   // annotation has to be resolvable when compiling them even though it is
   // compileOnly for the main source set.

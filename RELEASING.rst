@@ -99,10 +99,13 @@ The documentation sync
 once the release is published, so a release syncs the docs without anyone
 asking it to.
 
-A real sync needs three repository secrets that do not exist on this
-repository: ``DASH0_WEBSITE_SYNC_TOKEN``,
-``SYNC_DOCUMENTATION_TARGET_REPOSITORY`` and
-``SYNC_DOCUMENTATION_TARGET_DIRECTORY``. They are repository-level secrets on
+A real sync needs two repository secrets that do not exist on this
+repository: ``SYNC_DOCUMENTATION_TARGET_REPOSITORY`` and
+``SYNC_DOCUMENTATION_TARGET_DIRECTORY``. The pull request in the target
+repository is opened with a token of the GitHub App "Dash0 Docs Sync", minted
+from the ``DOCS_SYNC_APP_CLIENT_ID`` organization variable and the
+``DOCS_SYNC_APP_PRIVATE_KEY`` organization secret, which this repository can
+already access. They are repository-level secrets on
 the Ruby distribution, not organisation-level, so someone with administrator
 access has to create them here. Until they exist, the sync job fails on every
 release. The sync job runs after the publish step, so the release itself is

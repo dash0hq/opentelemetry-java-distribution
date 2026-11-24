@@ -1,6 +1,8 @@
 [versions]
 opentelemetryJavaagent = "2.33.1"
 opentelemetryJavaagentAlpha = "2.33.1-alpha"
+# The contrib release the agent above bundles; AwsXrayPropagatorVersionTest checks it.
+opentelemetryAwsXrayPropagator = "1.61.0-alpha"
 
 autoService = "1.1.1"
 junit = "5.11.4"
@@ -20,6 +22,8 @@ opentelemetrySdk = { group = "io.opentelemetry", name = "opentelemetry-sdk" }
 opentelemetrySdkAutoconfigureSpi = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-autoconfigure-spi" }
 opentelemetrySdkDeclarativeConfig = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-declarative-config" }
 opentelemetrySdkTesting = { group = "io.opentelemetry", name = "opentelemetry-sdk-testing" }
+opentelemetrySdkAutoconfigure = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-autoconfigure" }
+opentelemetryAwsXrayPropagator = { group = "io.opentelemetry.contrib", name = "opentelemetry-aws-xray-propagator", version.ref = "opentelemetryAwsXrayPropagator" }
 
 autoServiceAnnotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "autoService" }
 autoServiceProcessor = { group = "com.google.auto.service", name = "auto-service", version.ref = "autoService" }

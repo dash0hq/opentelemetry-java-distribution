@@ -8,7 +8,6 @@ import com.google.auto.service.AutoService;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -31,6 +30,8 @@ public final class Dash0ConfigurationCustomizerProvider
   static final String OTLP_ENDPOINT = "otel.exporter.otlp.endpoint";
   static final String TRACES_SAMPLER = "otel.traces.sampler";
   static final String ALWAYS_ON = "always_on";
+  static final String PROPAGATORS = "otel.propagators";
+  static final String TRACECONTEXT_BAGGAGE_XRAY = "tracecontext,baggage,xray";
 
   private static final Logger logger =
       Logger.getLogger(Dash0ConfigurationCustomizerProvider.class.getName());
@@ -42,7 +43,12 @@ public final class Dash0ConfigurationCustomizerProvider
   }
 
   static Map<String, String> dash0Defaults() {
-    return Collections.singletonMap(TRACES_SAMPLER, ALWAYS_ON);
+    Map<String, String> defaults = new HashMap<>();
+    defaults.put(TRACES_SAMPLER, ALWAYS_ON);
+    // xray is last so that its context wins over traceparent, and so that it adds Lineage to the
+    // extracted baggage rather than having the baggage propagator replace it.
+    defaults.put(PROPAGATORS, TRACECONTEXT_BAGGAGE_XRAY);
+    return defaults;
   }
 
   /**
