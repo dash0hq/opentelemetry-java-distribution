@@ -51,12 +51,15 @@ precisely because its job is to overwrite the agent's own value.
 Two different mechanisms produce that, and the doc used to credit the wrong one
 for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
-`EnvironmentResourceProvider`, which declares an order of `2147483646`, so the
-environment is applied last whatever anything else does. Orders vary among the
-rest: `100` on the Spring Boot service-name detector, `300` on
+`EnvironmentResourceProvider`, which declares an order of `2147483646`, the
+highest value any registered provider declares. Orders vary among the rest:
+`100` on the Spring Boot service-name detector, `300` on
 `ManifestResourceProvider`, `1000` on `JarServiceNameDetector`, `2147483646` on
 `HostIdResourceProvider`, and the default `0` on the container, host, OS,
-process and process-runtime detectors among others. `Dash0PackageResourceProvider`
+process and process-runtime detectors among others. `HostIdResourceProvider` is
+the only provider that ties with `EnvironmentResourceProvider`, and it never
+competes with it: its `shouldApply` declines whenever `OTEL_RESOURCE_ATTRIBUTES`
+already carries `host.id`. `Dash0PackageResourceProvider`
 declares `Integer.MIN_VALUE`, so it is applied first and every detector
 overwrites it. `ServiceInstanceIdResourceProvider` declares the same value, and
 the tie between the two changes nothing, since the only key it writes is
