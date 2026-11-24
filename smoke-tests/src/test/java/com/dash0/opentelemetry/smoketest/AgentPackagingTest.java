@@ -67,7 +67,7 @@ class AgentPackagingTest {
 
   @Test
   void registersTheTenCloudDetectorsThatResourceDetectionDocuments() throws IOException {
-    assertThat(cloudDetectorsRegisteredIn(AGENT_JAR))
+    assertThat(contribProvidersRegisteredIn(AGENT_JAR))
         .as(
             "docs/resource-detection.md names these ten and sorts them into four toggle groups."
                 + " An upstream bump that adds or drops one makes that table wrong, and the"
@@ -86,15 +86,15 @@ class AgentPackagingTest {
             "io.opentelemetry.contrib.cloudfoundry.resources.CloudFoundryResourceProvider");
   }
 
-  /** Every registered provider whose package is {@code io.opentelemetry.contrib}. */
-  private static List<String> cloudDetectorsRegisteredIn(Path jarPath) throws IOException {
-    List<String> detectors = new ArrayList<>();
+  /** Every registered provider whose package starts with {@code io.opentelemetry.contrib}. */
+  private static List<String> contribProvidersRegisteredIn(Path jarPath) throws IOException {
+    List<String> contribProviders = new ArrayList<>();
     for (String provider : providersRegisteredIn(jarPath)) {
       if (provider.startsWith("io.opentelemetry.contrib.")) {
-        detectors.add(provider);
+        contribProviders.add(provider);
       }
     }
-    return detectors;
+    return contribProviders;
   }
 
   private static List<String> providersRegisteredIn(Path jarPath) throws IOException {
