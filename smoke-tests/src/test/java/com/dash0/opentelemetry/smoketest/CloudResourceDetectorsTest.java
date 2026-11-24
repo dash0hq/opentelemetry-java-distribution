@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
  * Asserts that no detector upstream ships disabled contributes an attribute unless its group toggle
  * is set.
  *
- * <p>The toggles and the detectors each one covers are documented in {@code
- * docs/resource-detection.md}.
+ * <p>The toggles are documented in {@code docs/configuration.md} and what each detector costs in
+ * {@code docs/resource-detection.md}.
  */
 class CloudResourceDetectorsTest {
 

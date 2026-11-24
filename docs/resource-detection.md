@@ -21,7 +21,7 @@ the same two attributes to `opentelemetry-java-instrumentation` and the jar
 manifest version.
 
 Resource providers are applied in ascending `Ordered.order()`, and later ones
-win. `DistroResourceProvider.order()` therefore returns `100`, so the Dash0
+win. `DistroResourceProvider.order()` therefore returns `200`, so the Dash0
 values are applied after upstream's.
 
 **This produces no error when it is wrong.** Without the ordering the agent
@@ -39,35 +39,53 @@ Every key in that file becomes a resource attribute whose value is the property
 value. The file is absent unless a Linux package put it there, and its absence
 is not an error.
 
-A key that something else also sets is the one exception. Writing `service.name`
-into the file alongside `OTEL_SERVICE_NAME=from-env` in the environment exports
-`from-env`, and writing `host.name` into it exports the host detector's value
-rather than the file's. This is deliberate rather than inherited: a value the
-operator set on the workload should beat one the package baked in. It costs
-nothing today because the two keys below are ones nothing else sets, and
-`DistroResourceProvider` takes the opposite choice with an order of `100`
-precisely because its job is to overwrite the agent's own value.
+A key that an unguarded provider also sets is the one exception. Writing
+`service.name` into the file alongside `OTEL_SERVICE_NAME=from-env` in the
+environment exports `from-env`, and writing `host.name` into it exports the host
+detector's value rather than the file's. Both of those providers write what they
+have regardless of what is already there. This is deliberate rather than
+inherited: a value the operator set on the workload should beat one the package
+baked in.
 
-Two different mechanisms produce that, and the doc used to credit the wrong one
-for both. Providers are applied in ascending `Ordered.order()` and later ones
+The three `service.name` detectors in the table under `service.name` go the
+other way, since each is guarded on the name still being `unknown_service:java`.
+A `service.name` in the package file is already a name, so none of the three
+contributes one: a JVM started with `-Dspring.application.name=my-spring-app`
+beside a package file carrying `service.name=from-package` exports
+`from-package`. In a `java -jar` launch whose manifest carries
+`Implementation-Version`, `ManifestResourceProvider` still contributes
+`service.version`, since `AttributeResourceProvider` tests each key on its own:
+`service.name` against being `unknown_service:java`, and every other key against
+being absent.
+
+Losing a key to an unguarded provider costs nothing today because the two keys
+below are ones nothing else sets, and `DistroResourceProvider` takes the
+opposite choice with an order of `200` precisely because its job is to overwrite
+the agent's own value.
+
+Two different mechanisms produce the environment beating the package file and
+the package file losing to every unguarded detector, and the doc used to credit
+the wrong one for both. Providers are applied in ascending `Ordered.order()` and later ones
 win. `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` are read by
 `EnvironmentResourceProvider`, which declares an order of `2147483646`, the
-highest value any registered provider declares. Orders vary among the rest:
-`100` on the Spring Boot service-name detector, `300` on
-`ManifestResourceProvider`, `1000` on `JarServiceNameDetector`, `2147483646` on
-`HostIdResourceProvider`, and the default `0` on the container, host, OS,
-process and process-runtime detectors among others. `HostIdResourceProvider` is
-the only provider that ties with `EnvironmentResourceProvider`, and it never
-competes with it: its `shouldApply` declines whenever `OTEL_RESOURCE_ATTRIBUTES`
-already carries `host.id`. `Dash0PackageResourceProvider`
-declares `Integer.MIN_VALUE`, so it is applied first and every detector
-overwrites it. `ServiceInstanceIdResourceProvider` declares the same value, and
-the tie between the two changes nothing, since the only key it writes is
-`service.instance.id`. Leaving the Dash0 provider on the default `0` instead
-would tie it with every detector that is also there, and a tie is settled by
-position in the merged `META-INF/services`
+highest value any registered provider declares, so the environment is applied
+last. `HostIdResourceProvider` declares that same value and is the only provider
+that ties with it, and the tie decides nothing: whichever of the two runs first,
+a `host.id` carried by `OTEL_RESOURCE_ATTRIBUTES` is the one exported, since
+`HostIdResourceProvider` declines while `host.id` is already set and is
+overwritten while it is not. The container, host,
+OS, process and process-runtime detectors declare no order at all, which means
+`0`; `Dash0PackageResourceProvider` declares `Integer.MIN_VALUE`, so it is
+applied first and every unguarded detector overwrites it.
+`ServiceInstanceIdResourceProvider` declares `Integer.MIN_VALUE` too, so those
+two do tie; it contributes only `service.instance.id`, which no Dash0 package
+writes. Leaving the Dash0 provider on the default `0` would tie
+with those detectors, and a tie is settled by position in the merged `META-INF/services`
 file, which is a byproduct of the order `mergeServiceFiles` concatenates in and
-could flip without failing anything.
+could flip without failing anything. `0` is not the only value already taken.
+Read the `order()` column of the table under `Upstream detectors` before
+choosing one: it carries the value every one of the 23 declares, and several of
+them declare something other than `0`.
 
 The Dash0 Linux packages write exactly two keys:
 
@@ -105,54 +123,193 @@ absent, so the unit tests cannot catch it.
 
 ## Upstream detectors
 
-All upstream resource providers stay registered and unmodified, each keeping
-whatever default upstream gives it: container, host, host id, OS, process,
-process runtime, manifest, jar service name, Spring Boot service name and
-version, and the cloud providers that upstream ships disabled by default. This distribution adds to that set rather than replacing it, and
-`AgentPackagingTest` asserts that the merged service file still contains more
-than just the Dash0 entry.
+Every resource provider the upstream agent registers is registered here and
+unmodified, with the same group defaults upstream applies, so the eleven the
+table below marks as off are off here too. This distribution adds to that set
+rather than replacing it, and
+`AgentPackagingTest` asserts that every provider in the upstream agent's own
+service file survived the merge into ours.
+
+The service file is
+`inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.ResourceProvider`
+inside `agent/build/libs/dash0-opentelemetry-javaagent-*.jar`. At agent 2.33.1
+it lists 25 providers: the two Dash0 ones above and the 23 upstream ones here.
+The `.classdata` entries under `inst/` are ordinary class files, so `javap`
+reads the `order()` values out of them once each entry is copied to a file whose
+name ends in `.class`, which `javap` requires.
+
+The table below is read off agent 2.33.1 by hand. Of the 23 providers it names,
+only the ten cloud detectors are pinned to the jar, by the test the
+`Cloud detectors` section below names. The comparison `AgentPackagingTest` makes
+between two jars of the same upstream version stays green when a version bump
+adds, removes or renames any other provider. Re-derive the table from the
+service file whenever
+`opentelemetryJavaagent` in `gradle/libs.versions.toml` moves. One rename has
+already happened: `ServiceInstanceIdResourceProvider` was
+`io.opentelemetry.sdk.extension.incubator.resources.ServiceInstanceIdResourceProvider`
+at 2.32.0 and is `io.opentelemetry.sdk.autoconfigure.ServiceInstanceIdResourceProvider`
+at 2.33.1, which matters to anything naming it in
+`otel.java.disabled.resource.providers`.
+
+| Provider | `order()` | Contributes | On by default |
+|---|---|---|---|
+| `ServiceInstanceIdResourceProvider` | `-2147483648` | `service.instance.id` | yes |
+| `io.opentelemetry.javaagent.tooling.resources.DistroResourceProvider` | `0` | `telemetry.distro.name` and `telemetry.distro.version`, which the Dash0 provider then overwrites | yes |
+| `ContainerResourceProvider` | `0` | `container.id` | yes |
+| `HostResourceProvider` | `0` | `host.name`, `host.arch` | yes |
+| `OsResourceProvider` | `0` | `os.type`, `os.description`, `os.version` | yes |
+| `ProcessResourceProvider` | `0` | `process.pid`, `process.executable.path`, `process.command_args` | yes |
+| `ProcessRuntimeResourceProvider` | `0` | `process.runtime.name`, `process.runtime.version`, `process.runtime.description` | yes |
+| `SpringBootServiceVersionDetector` | `0` | `service.version` | yes |
+| `SpringBootServiceNameDetector` | `100` | `service.name` | yes |
+| `ManifestResourceProvider` | `300` | `service.name`, `service.version` | yes |
+| `JarServiceNameDetector` | `1000` | `service.name` | yes |
+| `HostIdResourceProvider` | `2147483646` | `host.id` | no, group `host-id` |
+| `EnvironmentResourceProvider` | `2147483646` | whatever `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` carry | yes |
+| `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider` | `0` | Azure attributes, and `service.name` from `WEBSITE_SITE_NAME` | no, group `azure` |
+| `AzureVmResourceProvider` | `100` | Azure attributes | no, group `azure` |
+| `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` | `0` | AWS attributes | no, group `aws` |
+| `GCPResourceProvider` | `0` | Google Cloud attributes | no, group `gcp` |
+| `CloudFoundryResourceProvider` | `0` | Cloud Foundry attributes | no, group `cloudfoundry` |
+
+Several providers in the table are `ConditionalResourceProvider`s, and they do
+not all apply the same condition. The three `service.name`
+detectors write only while the name is still `unknown_service:java`, which the
+`service.name` section below sets out in full. `ManifestResourceProvider` writes
+its only other key, `service.version`, only while that key is absent.
+`HostIdResourceProvider` writes `host.id` only while `host.id` is absent, so a
+value a Dash0 package file or an enabled cloud detector already set survives it.
+`SpringBootServiceVersionDetector` at order `0` and `EnvironmentResourceProvider`
+at order `2147483646` declare no condition and overwrite whatever is there.
+
+Reading the `order()` column alone therefore predicts the wrong winner wherever
+one of those conditions applies. For `service.version`,
+`SpringBootServiceVersionDetector` at order `0` beats `ManifestResourceProvider`
+at order `300` whenever a `META-INF/build-info.properties` on the class path
+carries a `build.version` property. A jar carrying both `build.version=1.0.0`
+there and `Implementation-Version: 9.9.9` in its manifest exports
+`service.version="1.0.0"`.
+
+Eleven of the 23 are off by default, and ten of those eleven are cloud
+detectors. `HostIdResourceProvider` is the only non-cloud one. The five group
+names and what each toggle does are in the resource-provider section of
+[configuration](configuration).
+
+### `otel.java.enabled.resource.providers` is an allow-list
+
+Two properties take a list of provider class names, and they are not symmetric:
+
+| Property | Effect |
+|---|---|
+| `otel.java.disabled.resource.providers` | removes the providers named in it, and leaves every other one alone |
+| `otel.java.enabled.resource.providers` | runs **only** the providers named in it, and removes all 24 others |
+
+Reaching for `otel.java.enabled.resource.providers` to switch one detector on
+therefore switches everything else off. Observed on agent 2.33.1, a JVM started
+with
+
+```bash
+-Dotel.java.enabled.resource.providers=io.opentelemetry.instrumentation.resources.HostIdResourceProvider
+```
+
+exports `host.id`, plus the `service.name` and `telemetry.sdk.*` attributes that
+`Resource.getDefault()` always carries, and nothing else. `host.name`, `os.type`,
+`process.pid` and `telemetry.distro.name` are all gone, because
+`DistroResourceProvider` is in the service file like everything else and the
+allow-list does not name it. All telemetry from that process is attributed to
+no distribution at all.
+
+Naming a cloud detector in it costs the same way, and the expensive loss is
+`EnvironmentResourceProvider`, which is what reads `OTEL_SERVICE_NAME` and
+`OTEL_RESOURCE_ATTRIBUTES`. With `OTEL_SERVICE_NAME=checkout` alone this agent
+exports `service.name="checkout"`. Adding
+`OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS=io.opentelemetry.contrib.cloudfoundry.resources.CloudFoundryResourceProvider`
+exports `service.name="unknown_service:java"` and no `telemetry.distro.name` at
+all, with nothing logged about either.
+
+Use `otel.resource.providers.<group>.enabled` to switch a disabled group on, and
+`otel.java.disabled.resource.providers` to switch an individual provider off.
+
+### `service.name`
+
+Five providers can set `service.name` with the shipped defaults. Three of them are
+`ConditionalResourceProvider`s guarded on the value still being
+`unknown_service:java`, so the first one to find a name in ascending `order()`
+is the one that wins:
+
+| `order()` | Provider | Where the name comes from |
+|---|---|---|
+| `-2147483648` | `Dash0PackageResourceProvider` | a `service.name` key in `dash0-resource-attributes.properties`, which no Dash0 package writes |
+| `100` | `SpringBootServiceNameDetector` | a `--spring.application.name=` argument in `sun.java.command`, the `spring.application.name` system property, `SPRING_APPLICATION_NAME`, then `application.properties`, `application.yml` and `application.yaml` in the working directory, then the same three on the class path, then `bootstrap.properties`, `bootstrap.yml` and `bootstrap.yaml` on the class path. There is no working-directory lookup for a `bootstrap` file. |
+| `300` | `ManifestResourceProvider` | `Implementation-Title` in the main jar's manifest |
+| `1000` | `JarServiceNameDetector` | the main jar's file name, without the `.jar` suffix |
+| `2147483646` | `EnvironmentResourceProvider` | `OTEL_SERVICE_NAME`, or a `service.name` entry in `OTEL_RESOURCE_ATTRIBUTES` |
+
+The three are `SpringBootServiceNameDetector`, `ManifestResourceProvider`, which
+inherits the guard from `AttributeResourceProvider`, and `JarServiceNameDetector`.
+The other two are plain `ResourceProvider`s and write whatever they have.
+`Dash0PackageResourceProvider` runs first of everything, at
+`Integer.MIN_VALUE`, so nothing has named the service yet when it writes, and
+`EnvironmentResourceProvider` runs at `2147483646` and replaces whatever a
+detector found rather than deferring to it.
+
+Switching the `azure` group on adds two more. `AzureAppServiceResourceProvider`
+and `AzureFunctionsResourceProvider` both set `service.name` from
+`WEBSITE_SITE_NAME`, declare no order and so run at `0`, and gate on
+`cloud.provider` being absent rather than on `service.name` still being
+`unknown_service:java`. Both therefore run ahead of every detector in the table
+except `Dash0PackageResourceProvider`, and a `spring.application.name` set on an
+Azure App Service workload loses to `WEBSITE_SITE_NAME`.
+
+These are the values a real instrumented JVM exported for each launch shape, all
+reproduced on agent 2.33.1 and all covered by `ServiceNameDetectionTest` in
+`smoke-tests/`:
+
+| Launch | Resulting `service.name` |
+|---|---|
+| `-cp`, with nothing else set | `unknown_service:java` |
+| `-Dspring.application.name=my-spring-app` | `my-spring-app` |
+| `SPRING_APPLICATION_NAME=env-spring-app` | `env-spring-app` |
+| an `application.properties` in the working directory carrying `spring.application.name=from-properties-file` | `from-properties-file` |
+| `java -jar my-payments-service.jar` | `my-payments-service` |
+| the same jar, with `Implementation-Title: titled-from-manifest` in its manifest | `titled-from-manifest` |
+| the same jar, plus `-Dspring.application.name=my-spring-app` | `my-spring-app` |
+| all of those, plus `OTEL_SERVICE_NAME=from-otel-service-name` | `from-otel-service-name` |
+
+Two of those rows are worth knowing about.
+
+`SpringBootServiceNameDetector` fires with no Spring anywhere on the class path.
+It reads the system property, the environment variable and the files in the
+working directory before it looks for Spring configuration on the class path, so
+a plain `-cp` launch of an ordinary class picks up a `spring.application.name`
+set for something else entirely.
+
+`unknown_service:java` survives in a narrower set of cases than the name
+suggests, and in a real one: a `-cp` launch with no Spring name and no
+`OTEL_SERVICE_NAME`. Tomcat started through `catalina.sh`, the start scripts
+Gradle and Maven generate, and a container image whose `CMD` is
+`["java","-cp",…]` all land there. No shipped provider rescues that case, and
+agent 2.33.1 has no servlet or WAR service-name detector. Set
+`OTEL_SERVICE_NAME` on those workloads.
 
 ## Cloud detectors
 
 Agent 2.33.1 registers ten cloud detectors and starts every one of them
 disabled. This distribution leaves them disabled and does not plan to change
-that. Turning a group on is one environment variable, documented below.
+that. Turning a group on is one environment variable: the four group names that
+hold the ten, and the fifth that holds `HostIdResourceProvider` instead, are in
+the resource-provider section of [configuration](configuration).
 
-### The toggles
-
-Four properties control the ten, read by
-`io.opentelemetry.instrumentation.resources.internal.ResourceProviderPropertiesCustomizer`.
-Each takes `true` or `false` and covers a whole group at once.
-
-| Variable | System property | Detectors in the group |
-|---|---|---|
-| `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | `otel.resource.providers.aws.enabled` | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` |
-| `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | `otel.resource.providers.azure.enabled` | `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider`, `AzureVmResourceProvider` |
-| `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | `otel.resource.providers.gcp.enabled` | `GCPResourceProvider` |
-| `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | `otel.resource.providers.cloudfoundry.enabled` | `CloudFoundryResourceProvider` |
-
-A fifth toggle of the same shape, `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED`,
-covers `HostIdResourceProvider`, which reads `/etc/machine-id` on Linux and
-reports `host.id`. It holds no cloud detector and is named here because it is
-off by default through the same mechanism, which is easy to miss while looking
-for a `host.id` that never arrives.
-
-Setting that toggle is not enough on its own. On Linux `HostIdResource` takes
-the first non-blank line of `/etc/machine-id` and falls back to
-`/var/lib/dbus/machine-id`, and reports nothing when both are missing or empty.
-The Debian-derived JDK images ship an empty `/etc/machine-id` and no
-`/var/lib/dbus/machine-id`, `eclipse-temurin:21` among them, so a container
-built on one of those exports no `host.id` with the toggle set and logs the
-reason at `FINE` only.
-
-The customizer also lists `AzureAksResourceProvider` and
+`ResourceProviderPropertiesCustomizer` also lists `AzureAksResourceProvider` and
 `AzureContainersResourceProvider` under the `azure` group. Agent 2.33.1
 registers neither in its merged service file, so neither runs whatever the
 toggle says.
 
-`AgentPackagingTest` asserts that the ten names above are registered in the
-agent jar, so an upstream bump that adds or drops one fails the build instead
-of leaving this table wrong.
+`registersTheTenCloudDetectorsThatResourceDetectionDocuments` in
+`AgentPackagingTest` asserts that the ten the next table names, and no other
+provider from the `io.opentelemetry.contrib` packages, are registered in the
+agent jar. An upstream bump that adds, drops or renames one fails the build
+instead of leaving the table wrong.
 
 ### What each detector contributes, and what it costs off its own cloud
 
@@ -299,15 +456,12 @@ task attribute, because `Ec2ResourceProvider` is listed above
 distribution's problem. Enabling two makes it a race between groups.
 
 `AzureAppServiceResourceProvider` and `AzureFunctionsResourceProvider` both set
-`service.name` from `WEBSITE_SITE_NAME`, and both run at order `0`. The three
-detectors that would otherwise decide the service name run later and decline to
-act once something else has decided it: `SpringBootServiceNameDetector` at order
-`100`, `ManifestResourceProvider` at order `300` and `JarServiceNameDetector` at
-order `1000` each apply only while the accumulated `service.name` is still the
-SDK default `unknown_service:java`. Enabling `azure` therefore renames every
-Azure App Service and Azure Functions deployment that was getting its name from
-the Spring Boot application name, from `Implementation-Title` in the jar
-manifest, or from the jar file name. `OTEL_SERVICE_NAME` still beats it, because
+`service.name` from `WEBSITE_SITE_NAME` and run ahead of the three detectors
+that would otherwise decide it, which the `service.name` section above sets out
+in full. Enabling `azure` therefore renames every Azure App Service and Azure
+Functions deployment that was getting its name from the Spring Boot application
+name, from `Implementation-Title` in the jar manifest, or from the jar file
+name. `OTEL_SERVICE_NAME` still beats the site name, since
 `EnvironmentResourceProvider` declares an order of `2147483646`.
 `CloudResourceDetectorsTest` in `smoke-tests/` asserts that the site name is
 absent with the group off, present with it on, and beaten by
@@ -375,23 +529,14 @@ with a 2 s timeout. A workload that runs in Kubernetes and is not on EKS adds
 `io.opentelemetry.contrib.aws.resource.EksResourceProvider` to the same list.
 
 `io.opentelemetry.contrib.azure.resource.AzureVmResourceProvider` is the
-equivalent name for the `azure` group. The customizer merges the value with the
-list it builds itself, so nothing else is lost by setting it.
+equivalent name for the `azure` group. `ResourceProviderPropertiesCustomizer`
+merges the value with the list it builds itself, so nothing else is lost by
+setting it.
 
-`OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` is the opposite and is a trap here. It is
-an allowlist over every resource provider rather than over the cloud ones, so
-setting it to a cloud detector turns off every other entry in the merged service
-file, among them the container, host, host id, OS, process, process runtime,
-manifest, jar service name and Spring Boot detectors, both Dash0 providers,
-upstream's own `DistroResourceProvider`, `ServiceInstanceIdResourceProvider` and
-`EnvironmentResourceProvider`.
-
-Losing that last one is the expensive part, since it is what reads
-`OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Running this agent with
-`OTEL_SERVICE_NAME=checkout` exports `service.name="checkout"`. Adding
-`OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS=io.opentelemetry.contrib.cloudfoundry.resources.CloudFoundryResourceProvider`
-exports `service.name="unknown_service:java"` and no `telemetry.distro.name` at
-all, with nothing logged about either.
+`OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS` is the opposite, and naming a cloud
+detector in it switches off every other provider in the merged service file.
+The `otel.java.enabled.resource.providers` section above has what a JVM exports
+once that happens.
 
 ## Not implemented
 

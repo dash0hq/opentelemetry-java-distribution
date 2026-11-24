@@ -33,6 +33,7 @@ dependencies {
 tasks.withType<Test>().configureEach {
   environment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://ambient-environment.invalid:4318")
   environment("DASH0_DISABLE", "true")
+  environment("SPRING_APPLICATION_NAME", "ambient-spring-app")
 
   val resolvedAgentJar = agentJar
   val resolvedExtensionJar = extensionJar

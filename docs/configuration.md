@@ -66,7 +66,7 @@ three and the third has no Java counterpart:
 
 | Variable | Why it is absent |
 |---|---|
-| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default. |
+| `DASH0_AUTOMATIC_SERVICE_NAME` | `JarServiceNameDetector` and the Spring Boot application-name detector both run by default; the `service.name` section of [resource detection](resource-detection) gives the value a JVM reports for each launch shape. |
 | `DASH0_FLUSH_ON_SIGTERM_SIGINT` | The agent registers a JVM shutdown hook that flushes. |
 | `DASH0_BOOTSTRAP_SPAN` | No Java equivalent, and no demand recorded for one. |
 
@@ -126,8 +126,77 @@ downstream service still on `parentbased_always_on` will sample the traces you
 start. That is `ParentBased` deferring to an incoming flag again, this time in
 someone else's process rather than yours.
 
-Declarative configuration does not apply this default either, for the reason
-`Declarative configuration` below gives.
+Declarative configuration does not apply this default either, for the reason the
+`Declarative configuration` section below gives.
+
+### Resource-provider toggles
+
+The upstream agent ships eleven resource providers switched off, grouped into
+five groups that `ResourceProviderPropertiesCustomizer` gates on one property
+each:
+
+| Property | Environment variable | Providers it covers | Default |
+|---|---|---|---|
+| `otel.resource.providers.aws.enabled` | `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | `BeanstalkResourceProvider`, `Ec2ResourceProvider`, `EcsResourceProvider`, `EksResourceProvider`, `LambdaResourceProvider` | `false` |
+| `otel.resource.providers.gcp.enabled` | `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | `GCPResourceProvider` | `false` |
+| `otel.resource.providers.azure.enabled` | `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | `AzureAppServiceResourceProvider`, `AzureFunctionsResourceProvider`, `AzureVmResourceProvider` | `false` |
+| `otel.resource.providers.cloudfoundry.enabled` | `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | `CloudFoundryResourceProvider` | `false` |
+| `otel.resource.providers.host-id.enabled` | `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` | `HostIdResourceProvider` | `false` |
+
+Those five are the only correct toggles, and this distribution changes none of
+the defaults.
+
+`otel.java.enabled.resource.providers` is an allow-list rather than a second way
+to spell these, and setting it switches off every provider it does not name.
+[Resource detection](resource-detection) gives what a JVM exported when it was
+set.
+
+The hyphen in `otel.resource.providers.host-id.enabled` is not a typo, and the
+environment spelling is still all underscores. Two different methods normalise a
+name before the lookup. `ConfigUtil.normalizePropertyKey` lowercases it and
+turns each hyphen into a dot, and is applied to a system property and to the key
+a provider asks for. `ConfigUtil.normalizeEnvironmentVariableKey` lowercases it
+and turns each underscore into a dot, and is applied to an environment variable.
+Both `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
+`-Dotel.resource.providers.host-id.enabled` therefore arrive as
+`otel.resource.providers.host.id.enabled`, and both were observed switching
+`HostIdResourceProvider` on at agent 2.33.1. An environment variable whose name
+carries a literal hyphen was observed doing nothing.
+
+Three of the ten cloud detectors open a socket to a metadata endpoint, so the
+`aws`, `azure` and `gcp` groups are not free to enable on a host that is
+somewhere else. On a Linux host where traffic to `169.254.169.254` is dropped
+rather than refused, `aws` adds 4.35 s and `azure` adds 5.18 s to JVM startup.
+The `cloudfoundry` group reads `VCAP_APPLICATION` and opens nothing.
+[Resource detection](resource-detection) has the per-detector cost table, the
+experiment behind those two figures, the attributes each detector contributes,
+and the reason this distribution leaves every group off.
+
+### `host.id`
+
+`HostIdResourceProvider` is the one non-cloud provider the agent ships disabled,
+and this distribution leaves it disabled. Switch it on with
+`OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED=true` only after reading what it does
+on your platform.
+
+On Linux it reads `/etc/machine-id`, falling back to
+`/var/lib/dbus/machine-id`. Either file is baked into a container image at build
+time, so every container started from one image reports the same `host.id`, and
+the attribute groups unrelated workloads together instead of separating them.
+The failure is confident rather than noisy: a wrong identifier arrives looking
+exactly like a right one. Several Debian-derived JDK images go the other way and
+ship an empty `/etc/machine-id` with no `/var/lib/dbus/machine-id` beside it,
+`eclipse-temurin:21` among them. A container built on one of those exports no
+`host.id` at all with the group switched on, and logs the reason at `FINE` only.
+
+On macOS and Windows it forks a subprocess at startup, `/usr/sbin/ioreg` and
+`reg.exe query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid`
+respectively, which costs startup time in every process the agent attaches to.
+On BSD it reads `/etc/hostid` or runs `/bin/kenv`.
+
+On a Linux host running the Dash0 Linux package rather than a container,
+`/etc/machine-id` is a stable and correct identifier for that host, and
+switching the group on is reasonable.
 
 ### `OTEL_PROPAGATORS`
 
@@ -174,35 +243,6 @@ well as `X-Amzn-Trace-Id`, and it appears wherever baggage is copied onto spans
 or logs.
 
 Declarative configuration does not apply this default either.
-
-### The cloud resource detector toggles
-
-Agent 2.33.1 ships ten cloud resource detectors and starts all ten disabled.
-This distribution changes nothing about that, so the group toggles below behave
-exactly as they do with the upstream agent. Four of the five cover the ten cloud
-detectors. The fifth covers `HostIdResourceProvider`, which is not a cloud
-detector and is off by default through the same mechanism. They are listed here
-because a missing `cloud.region` or `host.id` sends people looking for a Dash0
-setting that does not exist.
-
-| Variable | Covers |
-|---|---|
-| `OTEL_RESOURCE_PROVIDERS_AWS_ENABLED` | EC2, ECS, EKS, Elastic Beanstalk, Lambda |
-| `OTEL_RESOURCE_PROVIDERS_AZURE_ENABLED` | Azure VM, Azure App Service, Azure Functions |
-| `OTEL_RESOURCE_PROVIDERS_GCP_ENABLED` | GCE, GKE, Cloud Run, Cloud Functions, App Engine |
-| `OTEL_RESOURCE_PROVIDERS_CLOUDFOUNDRY_ENABLED` | Cloud Foundry |
-| `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` | `host.id` from `/etc/machine-id` and its per-platform equivalents |
-
-Three of the detectors open a socket to a metadata endpoint, so the `aws`,
-`azure` and `gcp` groups are not free to enable on a host that is somewhere
-else. The `cloudfoundry` and `host-id` groups open no socket: `cloudfoundry`
-reads `VCAP_APPLICATION`, and `host-id` reads a local file on Linux and runs a
-local command with a 2 s bound on macOS, Windows and BSD. On a Linux host where
-traffic
-to `169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and
-`azure` adds 5.18 s to JVM startup. `docs/resource-detection.md` has the full
-table, the experiment behind those two figures, the attributes each detector
-contributes, and the reason this distribution leaves them off.
 
 ## Declarative configuration
 
