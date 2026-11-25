@@ -5,10 +5,10 @@
 package com.dash0.opentelemetry;
 
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE;
+import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE_PROPERTY;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.parseTheDefaultConfigurationFile;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.warningAboutAnOtlpEndpointTheDefaultFileWillIgnore;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationProvider;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.AttributeNameValueModel;
@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ServiceLoader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,12 +46,21 @@ class Dash0DefaultConfigurationFileProviderTest {
   }
 
   @Test
-  void standsAsideOnAHostThatHasNoDefaultConfigurationFile() {
-    assumeFalse(
-        Files.exists(Paths.get(DEFAULT_CONFIGURATION_FILE)),
-        DEFAULT_CONFIGURATION_FILE + " exists on this host");
+  void readsTheFileTheDefaultConfigurationFilePropertyNames(@TempDir Path directory)
+      throws IOException {
+    OpenTelemetryConfigurationModel model =
+        modelFromTheProviderReading(fileHolding(directory, A_FILE_THAT_NAMES_A_SERVICE));
 
-    assertThat(new Dash0DefaultConfigurationFileProvider().getConfigurationModel()).isNull();
+    assertThat(serviceNameIn(model))
+        .as(
+            "the build points every test JVM at a path under build/ that nothing creates, so a"
+                + " host that has the Dash0 Java package installed runs the same tests")
+        .isEqualTo("from-the-default-file");
+  }
+
+  @Test
+  void standsAsideWhenTheDefaultConfigurationFilePropertyNamesNoFile(@TempDir Path directory) {
+    assertThat(modelFromTheProviderReading(directory.resolve("otel-config.yaml"))).isNull();
   }
 
   @ParameterizedTest
@@ -195,6 +203,21 @@ class Dash0DefaultConfigurationFileProviderTest {
                 + " default file, and the SDK reports nothing when a file takes the variable over")
         .contains("set to http://collector.invalid:4318,")
         .contains(DEFAULT_CONFIGURATION_FILE);
+  }
+
+  private static OpenTelemetryConfigurationModel modelFromTheProviderReading(
+      Path defaultConfigurationFile) {
+    String previous = System.getProperty(DEFAULT_CONFIGURATION_FILE_PROPERTY);
+    System.setProperty(DEFAULT_CONFIGURATION_FILE_PROPERTY, defaultConfigurationFile.toString());
+    try {
+      return new Dash0DefaultConfigurationFileProvider().getConfigurationModel();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(DEFAULT_CONFIGURATION_FILE_PROPERTY);
+      } else {
+        System.setProperty(DEFAULT_CONFIGURATION_FILE_PROPERTY, previous);
+      }
+    }
   }
 
   private static Path fileHolding(Path directory, String content) throws IOException {

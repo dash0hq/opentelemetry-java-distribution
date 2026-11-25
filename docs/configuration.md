@@ -608,6 +608,17 @@ where the directory is not writable, which CI makes it for the runner user.
 a temporary directory, which is where the unreadable and unparseable files are
 covered.
 
+The path in step 2 is the default of the `dash0.default.configuration.file`
+system property, and `custom/build.gradle.kts` sets that property for every test
+JVM of that module to a path under `build/` that nothing creates. Without it the
+provider loads the host's own file into the unit tests, where the agent's
+`ComponentProvider` implementations are absent, and
+`DefaultPropagatorsTest` fails with `No component provider detected for
+io.opentelemetry.sdk.resources.Resource with name "process"` on exactly the
+hosts this feature is built for. `gradle.properties` sets
+`org.gradle.parallel = true`, so the same thing can happen in CI while
+`DefaultConfigurationFileTest` has the fixture installed.
+
 The declarative model classes are marked internal and experimental upstream, and
 the path spelling `detection/development` is itself a version marker that will
 change when the format stabilises. Upstream's own `javaagent-tooling` depends on

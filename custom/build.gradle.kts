@@ -57,4 +57,10 @@ tasks.named<ProcessResources>("processResources") {
 
 tasks.withType<Test>().configureEach {
   environment("DASH0_DISABLE", "false")
+  environment("OTEL_CONFIG_FILE", "")
+  environment("OTEL_SDK_DISABLED", "false")
+  systemProperty(
+    "dash0.default.configuration.file",
+    layout.buildDirectory.file("no-default-configuration-file.yaml").get().asFile.absolutePath,
+  )
 }

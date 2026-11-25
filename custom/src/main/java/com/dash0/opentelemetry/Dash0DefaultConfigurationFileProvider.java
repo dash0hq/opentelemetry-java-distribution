@@ -27,6 +27,7 @@ public final class Dash0DefaultConfigurationFileProvider
     implements DeclarativeConfigurationProvider {
 
   static final String DEFAULT_CONFIGURATION_FILE = "/etc/opentelemetry/java/otel-config.yaml";
+  static final String DEFAULT_CONFIGURATION_FILE_PROPERTY = "dash0.default.configuration.file";
   static final String CONFIGURATION_FILE_PROPERTY = "otel.config.file";
   static final String CONFIGURATION_FILE_VARIABLE = "OTEL_CONFIG_FILE";
   static final String SDK_DISABLED_PROPERTY = "otel.sdk.disabled";
@@ -45,7 +46,9 @@ public final class Dash0DefaultConfigurationFileProvider
                   CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
               Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
                   SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
-              Paths.get(DEFAULT_CONFIGURATION_FILE));
+              Paths.get(
+                  System.getProperty(
+                      DEFAULT_CONFIGURATION_FILE_PROPERTY, DEFAULT_CONFIGURATION_FILE)));
       if (model != null) {
         String warning =
             warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(
