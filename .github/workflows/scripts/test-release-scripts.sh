@@ -126,5 +126,68 @@ assert_rejects "set-gradle-version rejects an empty version" \
   "no version was given" \
   in_a_tree_whose_gradle_properties_is "version = 0.2.0" "$set_gradle_version" ""
 
+create_tag_for_release="$scripts/create-tag-for-release.sh"
+
+build_a_repository_whose_head_message_is() {
+  local message="$1" already_tagged="${2-}"
+  local root="$sandbox/tagging"
+  rm -rf "$root"
+  mkdir -p "$root"
+  git init --quiet --bare "$root/origin.git"
+  git init --quiet --initial-branch=main "$root/work"
+  git -C "$root/work" config user.name releasing-test
+  git -C "$root/work" config user.email releasing-test@example.invalid
+  git -C "$root/work" config commit.gpgsign false
+  git -C "$root/work" config tag.gpgsign false
+  git -C "$root/work" remote add origin "$root/origin.git"
+  : > "$root/work/seed"
+  git -C "$root/work" add seed
+  git -C "$root/work" commit --quiet --message "$message"
+  git -C "$root/work" push --quiet origin main
+  if [ -n "$already_tagged" ]; then
+    git -C "$root/work" tag "$already_tagged"
+    git -C "$root/work" push --quiet origin "$already_tagged"
+    git -C "$root/work" tag --delete "$already_tagged" > /dev/null
+  fi
+}
+
+run_create_tag_for_release() {
+  build_a_repository_whose_head_message_is "$1" "${2-}" > /dev/null 2>&1
+  (cd "$sandbox/tagging/work" && "$create_tag_for_release")
+}
+
+tags_on_origin_after_create_tag_for_release() {
+  run_create_tag_for_release "$1" > /dev/null 2>&1 || return 1
+  git -C "$sandbox/tagging/origin.git" tag --list | tr '\n' ' ' | sed 's/ *$//'
+}
+
+assert_prints "create-tag-for-release tags the exact release subject" \
+  "v0.2.0" tags_on_origin_after_create_tag_for_release \
+  "docs: update changelog to prepare release v0.2.0"
+assert_prints "create-tag-for-release tags a release commit that carries a body" \
+  "v0.2.0" tags_on_origin_after_create_tag_for_release \
+  "$(printf 'docs: update changelog to prepare release v0.2.0\n\nFolded 3 entries.\n')"
+assert_prints "create-tag-for-release leaves an unprefixed version untagged" \
+  "" tags_on_origin_after_create_tag_for_release \
+  "docs: update changelog to prepare release 0.2.0"
+assert_prints "create-tag-for-release leaves a v inside the version untagged" \
+  "" tags_on_origin_after_create_tag_for_release \
+  "docs: update changelog to prepare release 0.v2.0"
+assert_prints "create-tag-for-release leaves an ordinary commit untagged" \
+  "" tags_on_origin_after_create_tag_for_release \
+  "fix(custom): stop the resource provider losing to upstream"
+assert_prints "create-tag-for-release leaves a subject with a prefix untagged" \
+  "" tags_on_origin_after_create_tag_for_release \
+  "Revert \"docs: update changelog to prepare release v0.2.0\""
+assert_prints "create-tag-for-release leaves a subject with a suffix untagged" \
+  "" tags_on_origin_after_create_tag_for_release \
+  "docs: update changelog to prepare release v0.2.0 (#21)"
+assert_prints "create-tag-for-release leaves a four-part version untagged" \
+  "" tags_on_origin_after_create_tag_for_release \
+  "docs: update changelog to prepare release v0.2.0.1"
+assert_rejects "create-tag-for-release refuses to retag a published version" \
+  "already exists on origin" run_create_tag_for_release \
+  "docs: update changelog to prepare release v0.2.0" "v0.2.0"
+
 printf '\n%s passed, %s failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
