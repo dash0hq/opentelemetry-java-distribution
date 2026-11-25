@@ -19,6 +19,16 @@ Releasing
    made to reject on a runner. The same goes for the refusal to re-run against
    an already published tag.
 
+   That run also predates the automation. It covered the publish only, and it
+   covered the ``release.yml`` of the time. ``prepare-release.yml``,
+   ``create-tag-for-release.yml`` and the ``open-next-snapshot`` job of
+   ``release.yml`` have never run on a runner at all. Their scripts are
+   exercised by ``.github/workflows/scripts/test-release-scripts.sh``, which
+   ``ci.yml`` runs on every pull request, and that is a different claim from
+   having cut a release with them. Repeat the throwaway-version run above,
+   starting from **Prepare release**, once the token prerequisite below is met,
+   and then delete this paragraph.
+
 
 Where the artifacts go
 ======================
