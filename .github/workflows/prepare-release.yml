@@ -67,17 +67,14 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "Preparing $version dated $date."
 
-      - name: Refuse a version that is already tagged
+      - name: Refuse a version that is not newer than the last release
         env:
-          TAG: ${{ steps.inputs.outputs.tag }}
+          VERSION: ${{ steps.inputs.outputs.version }}
         run: |
           set -euo pipefail
-          existing="$(git ls-remote --tags origin "refs/tags/$TAG")"
-          if [ -n "$existing" ]; then
-            echo "::error::$TAG already exists. Pick a higher version; a published" \
-              "version is never re-cut."
-            exit 1
-          fi
+          published="$(git ls-remote --tags origin 'refs/tags/v*')"
+          printf '%s\n' "$published" \
+            | .github/workflows/scripts/check-release-version-is-newest.sh "$VERSION"
 
       - name: Refuse a release with no pending changelog entries
         run: .github/workflows/scripts/check-pending-changelog-entries.sh

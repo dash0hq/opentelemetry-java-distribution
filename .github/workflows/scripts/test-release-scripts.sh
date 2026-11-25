@@ -247,6 +247,50 @@ assert_rejects "next-snapshot-version rejects a v-prefixed released version" \
 assert_rejects "next-snapshot-version rejects an empty released version" \
   "does not match X.Y.Z" next_snapshot_after_releasing "" "subject"
 
+check_release_version_is_newest="$scripts/check-release-version-is-newest.sh"
+
+ls_remote_output_for() {
+  local tag
+  for tag in "$@"; do
+    printf '1111111111111111111111111111111111111111\trefs/tags/%s\n' "$tag"
+  done
+}
+
+newest_check_against() {
+  local version="$1"
+  shift
+  ls_remote_output_for "$@" | "$check_release_version_is_newest" "$version"
+}
+
+assert_prints "check-release-version-is-newest accepts the first release" \
+  "no release is published yet, so 0.1.0 is the first" \
+  newest_check_against "0.1.0"
+assert_prints "check-release-version-is-newest accepts a higher patch" \
+  "0.2.1 is newer than the highest published version 0.2.0" \
+  newest_check_against "0.2.1" "v0.1.0" "v0.2.0"
+assert_prints "check-release-version-is-newest accepts a higher minor" \
+  "0.3.0 is newer than the highest published version 0.2.0" \
+  newest_check_against "0.3.0" "v0.1.0" "v0.2.0"
+assert_prints "check-release-version-is-newest compares numerically, not as text" \
+  "0.10.0 is newer than the highest published version 0.9.0" \
+  newest_check_against "0.10.0" "v0.9.0"
+assert_prints "check-release-version-is-newest ignores a dereferenced annotated tag" \
+  "0.3.0 is newer than the highest published version 0.2.0" \
+  newest_check_against "0.3.0" "v0.2.0" "v0.2.0^{}"
+assert_prints "check-release-version-is-newest ignores a tag that is not a release" \
+  "0.3.0 is newer than the highest published version 0.2.0" \
+  newest_check_against "0.3.0" "v0.2.0" "nightly" "v0.2.0-rc1"
+assert_rejects "check-release-version-is-newest rejects an already published version" \
+  "already tagged" newest_check_against "0.2.0" "v0.1.0" "v0.2.0"
+assert_rejects "check-release-version-is-newest rejects a version below the highest" \
+  "is older than the highest published version 0.2.0" \
+  newest_check_against "0.1.1" "v0.1.0" "v0.2.0"
+assert_rejects "check-release-version-is-newest rejects a lower major" \
+  "is older than the highest published version 1.0.0" \
+  newest_check_against "0.9.9" "v1.0.0"
+assert_rejects "check-release-version-is-newest rejects a malformed version" \
+  "does not match X.Y.Z" newest_check_against "0.2" "v0.1.0"
+
 check_next_version="$scripts/check-next-version.sh"
 
 assert_prints "check-next-version accepts a newer -SNAPSHOT" \
