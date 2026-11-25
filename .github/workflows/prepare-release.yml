@@ -81,6 +81,9 @@ jobs:
             exit 1
           fi
 
+      - name: Refuse a release with no pending changelog entries
+        run: .github/workflows/scripts/check-pending-changelog-entries.sh
+
       - uses: actions/setup-go@v7
         with:
           go-version: stable

@@ -230,5 +230,39 @@ assert_rejects "next-snapshot-version rejects a v-prefixed released version" \
 assert_rejects "next-snapshot-version rejects an empty released version" \
   "does not match X.Y.Z" next_snapshot_after_releasing "" "subject"
 
+check_pending_changelog_entries="$scripts/check-pending-changelog-entries.sh"
+
+in_a_tree_whose_chloggen_holds() {
+  local names="$1"
+  shift
+  rm -rf "${sandbox:?}/chloggen"
+  mkdir -p "$sandbox/chloggen/.chloggen"
+  local name
+  for name in $names; do
+    : > "$sandbox/chloggen/.chloggen/$name"
+  done
+  (cd "$sandbox/chloggen" && "$@")
+}
+
+assert_prints "check-pending-changelog-entries counts one real entry" \
+  "pending changelog entries: 1" \
+  in_a_tree_whose_chloggen_holds "config.yaml TEMPLATE.yaml summary.tmpl oss_18.yaml" \
+  "$check_pending_changelog_entries"
+assert_prints "check-pending-changelog-entries counts several real entries" \
+  "pending changelog entries: 3" \
+  in_a_tree_whose_chloggen_holds "config.yaml TEMPLATE.yaml a.yaml b.yaml c.yaml" \
+  "$check_pending_changelog_entries"
+assert_rejects "check-pending-changelog-entries rejects config and template alone" \
+  "holds no pending entries" \
+  in_a_tree_whose_chloggen_holds "config.yaml TEMPLATE.yaml summary.tmpl" \
+  "$check_pending_changelog_entries"
+assert_rejects "check-pending-changelog-entries rejects an empty directory" \
+  "holds no pending entries" \
+  in_a_tree_whose_chloggen_holds "" "$check_pending_changelog_entries"
+assert_rejects "check-pending-changelog-entries ignores a non-yaml entry" \
+  "holds no pending entries" \
+  in_a_tree_whose_chloggen_holds "config.yaml TEMPLATE.yaml notes.md" \
+  "$check_pending_changelog_entries"
+
 printf '\n%s passed, %s failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

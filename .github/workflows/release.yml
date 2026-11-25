@@ -111,8 +111,9 @@ jobs:
             }
           ' CHANGELOG.rst > notes.rst
 
-          if [ ! -s notes.rst ]; then
-            echo "::error::CHANGELOG.rst has no section for $version"
+          if ! grep -q '[^[:space:]]' notes.rst; then
+            echo "::error::CHANGELOG.rst has no section for $version, or its" \
+              "section is empty"
             exit 1
           fi
 
