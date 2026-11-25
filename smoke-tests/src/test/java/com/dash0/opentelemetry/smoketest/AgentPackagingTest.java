@@ -35,6 +35,10 @@ class AgentPackagingTest {
       "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.declarativeconfig"
           + ".DeclarativeConfigurationCustomizerProvider";
 
+  private static final String DECLARATIVE_PROVIDER_SERVICE_FILE =
+      "inst/META-INF/services/io.opentelemetry.sdk.autoconfigure.declarativeconfig"
+          + ".DeclarativeConfigurationProvider";
+
   @Test
   void bundlesTheDistroClassesUnderInstAsClassdata() throws IOException {
     List<String> entries = entryNamesOf(AGENT_JAR);
@@ -81,6 +85,16 @@ class AgentPackagingTest {
     assertThat(providersRegisteredIn(AGENT_JAR, DECLARATIVE_CUSTOMIZER_SERVICE_FILE))
         .containsAll(
             providersRegisteredIn(UPSTREAM_AGENT_JAR, DECLARATIVE_CUSTOMIZER_SERVICE_FILE));
+  }
+
+  @Test
+  void registersTheDefaultConfigurationFileProviderInItsOwnServiceFile() throws IOException {
+    assertThat(providersRegisteredIn(AGENT_JAR, DECLARATIVE_PROVIDER_SERVICE_FILE))
+        .as(
+            "upstream registers nothing under this SPI, so the file is the distribution's own and"
+                + " AgentCompositionTest allows it by name. Nothing reads"
+                + " /etc/opentelemetry/java/otel-config.yaml unless this is registered.")
+        .containsExactly("com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider");
   }
 
   @Test

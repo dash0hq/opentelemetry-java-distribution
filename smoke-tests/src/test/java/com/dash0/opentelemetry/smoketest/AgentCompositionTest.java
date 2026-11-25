@@ -25,6 +25,9 @@ class AgentCompositionTest {
   private static final String VERSION_RESOURCE = "inst/dash0-distro-version.properties";
   private static final String ISOLATED_AGENT_TREE = "inst/";
   private static final String MERGED_SERVICE_FILES = "inst/META-INF/services/";
+  private static final String DECLARATIVE_PROVIDER_SERVICE_FILE =
+      MERGED_SERVICE_FILES
+          + "io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationProvider";
   private static final String LICENCE = "META-INF/LICENSE";
 
   @Test
@@ -43,13 +46,17 @@ class AgentCompositionTest {
         name ->
             name.startsWith(DASH0_CLASSES)
                 || name.equals(VERSION_RESOURCE)
+                || name.equals(DECLARATIVE_PROVIDER_SERVICE_FILE)
                 || name.equals(LICENCE));
 
     assertThat(added)
         .as(
             "the repackaged agent contains entries that are neither upstream's nor the"
                 + " distribution's own. If these are wanted, say so here, because an extra copy of"
-                + " a bundled library disables instrumentation with no error.")
+                + " a bundled library disables instrumentation with no error."
+                + " DECLARATIVE_PROVIDER_SERVICE_FILE is allowed above: upstream registers nothing"
+                + " under that SPI, so the whole service file is this distribution's, and"
+                + " AgentPackagingTest asserts what it names.")
         .isEmpty();
   }
 

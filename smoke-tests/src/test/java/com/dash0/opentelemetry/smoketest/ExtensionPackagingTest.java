@@ -41,7 +41,10 @@ class ExtensionPackagingTest {
                 + "io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider")
         .contains(
             "META-INF/services/io.opentelemetry.sdk.autoconfigure.declarativeconfig"
-                + ".DeclarativeConfigurationCustomizerProvider");
+                + ".DeclarativeConfigurationCustomizerProvider")
+        .contains(
+            "META-INF/services/io.opentelemetry.sdk.autoconfigure.declarativeconfig"
+                + ".DeclarativeConfigurationProvider");
   }
 
   @Test
