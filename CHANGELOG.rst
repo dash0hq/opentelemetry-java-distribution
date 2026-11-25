@@ -27,6 +27,94 @@ than ordinary prose.
 Breaking Changes
 ----------------
 
+- ``custom``: Default otel.semconv-stability.opt-in to database,code,rpc,messaging, so database, code, RPC and messaging telemetry carries the newer semantic conventions
+
+  The distribution set nothing and inherited the upstream agent's default,
+  which is the superseded convention in every domain.
+  On a JDBC span, ``db.statement`` becomes ``db.query.text``, ``db.system``
+  becomes ``db.system.name``, ``db.name`` becomes ``db.namespace``, and
+  ``db.query.summary`` is new. Five attributes go away with nothing taking
+  their place: ``db.sql.table``, ``db.operation``, ``db.connection_string``,
+  ``db.user`` and ``code.namespace``. ``db.system.name`` reports a new value as
+  well as a new key for fifteen systems, H2 as ``h2database`` where
+  ``db.system`` said ``h2`` and SQL Server as ``microsoft.sql_server`` where it
+  said ``mssql``. On a manually instrumented method, ``code.function`` and
+  ``code.namespace`` are replaced by one ``code.function.name`` holding the
+  class and the method together, ``TestApplication.doWork`` where
+  ``code.function`` held ``doWork``. A SQL span is named after a summary of the
+  query, so a span named ``SELECT testdb.widgets`` is named ``SELECT widgets``.
+  The JDBC connection pool metrics are the part that fails without reporting an
+  error. Every instrument is renamed from ``db.client.connections.*`` to
+  ``db.client.connection.*``, with ``db.client.connections.usage`` becoming
+  ``db.client.connection.count`` and ``db.client.connections.max`` becoming
+  ``db.client.connection.limit``. The ``pool.name`` and ``state`` attributes
+  become ``db.client.connection.pool.name`` and ``db.client.connection.state``.
+  ``create_time``, ``wait_time`` and ``use_time`` are recorded in seconds
+  instead of milliseconds. A renamed instrument empties a dashboard, which
+  somebody notices. A threshold alert written against a duration in
+  milliseconds and pointed at a series now reported in seconds keeps evaluating
+  and stops firing, which nobody notices.
+  ``/dup`` does not cover the connection pool metrics. The agent picks one
+  name, one attribute set and one unit per instrument instead of recording
+  both, so ``database/dup`` still renames them and still moves those three
+  histograms to seconds. Dual emit covers attributes on spans, not the identity
+  of an instrument.
+  HTTP is untouched. ``http`` is not a domain this setting accepts, the HTTP
+  semantic conventions are stable already, and the agent emits the stable
+  attribute names whatever this setting says.
+  Two of the four domains are experimental. ``database`` and ``code`` select
+  conventions the semantic conventions working group has declared stable, while
+  ``rpc`` and ``messaging`` select experimental ones that a later agent version
+  may rename again.
+  To keep the superseded names, set ``OTEL_SEMCONV_STABILITY_OPT_IN`` or
+  ``-Dotel.semconv-stability.opt-in`` to a non-blank value naming no domain,
+  such as ``none``. Clearing the variable does not work: a blank value is read
+  as unset and the default applies again.
+  This default is environment-only. A host configured from a declarative
+  configuration file, which is every host where
+  ``/etc/opentelemetry/java/otel-config.yaml`` exists, keeps the superseded
+  names until the file says otherwise.
+  ``docs/configuration.md`` has the rest: the RPC and messaging span names and
+  span kinds that change, the metrics that start and stop being recorded, the
+  four instrumentations that behave differently from the table, and the
+  spelling a configuration file uses for the same choice.
+  
+- ``custom``: Configure the SDK from /etc/opentelemetry/java/otel-config.yaml when OTEL_CONFIG_FILE is unset
+
+  A Dash0 Linux package installs an OpenTelemetry configuration file at
+  ``/etc/opentelemetry/java/otel-config.yaml``, and nothing read it. The file
+  stayed inert until a host administrator also set ``OTEL_CONFIG_FILE``.
+  The order is now ``OTEL_CONFIG_FILE`` when it is set to anything that is not
+  blank, then ``/etc/opentelemetry/java/otel-config.yaml`` when that file
+  exists, then the environment variables, which is what a host without the file
+  keeps doing. An ``OTEL_CONFIG_FILE`` that names a file which does not exist
+  counts as set, so the SDK reports the error instead of this distribution
+  quietly loading a different file.
+  A host leaves the default file behind by removing or renaming it, which puts
+  the next JVM back on environment configuration, or by setting
+  ``OTEL_CONFIG_FILE`` for a single workload. No variable selects environment
+  configuration while the file is there.
+  ``OTEL_SDK_DISABLED=true`` keeps the default file from loading at all, read
+  from the system property, the environment variable and the properties file
+  ``otel.javaagent.configuration-file`` names, which is the same set of three
+  the SDK resolves it from under environment configuration. ``DASH0_DISABLE``
+  is now read from those three as well. An explicit ``OTEL_CONFIG_FILE`` is
+  unaffected by either, since naming a file is an opt-in.
+  A default file that cannot be read or parsed stops autoconfiguration, as does
+  one that parses to no document at all. The agent reports that it failed to
+  start and the JVM runs uninstrumented, with no fallback to environment
+  configuration, which is what the Dash0 Python and Node.js distributions do
+  with their own default file.
+  A host that has the Dash0 Java package installed and sets neither variable
+  changes behaviour without changing its configuration, because the shipped file
+  now configures the SDK. Every standard ``OTEL_*`` variable other than
+  ``OTEL_SDK_DISABLED`` stops configuring the SDK directly, and the shipped file
+  answers for them by interpolating the ones you set, including
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` and ``OTEL_RESOURCE_ATTRIBUTES``. The
+  repackaged agent jar and the standalone extension jar both do this.
+  ``docs/configuration.md`` describes the SPI the provider registers under and
+  what the Dash0 customizer still contributes in this mode.
+  
 - ``custom``: Default otel.propagators to tracecontext,baggage,xray instead of tracecontext,baggage, so a trace survives an AWS load balancer that rewrites X-Amzn-Trace-Id
 
   When an incoming request carries both ``traceparent`` and ``X-Amzn-Trace-Id``,
@@ -144,6 +232,50 @@ Enhancements
   an incoming ``traceparent`` with the sampled flag off used to suppress. Both
   delivery shapes are covered: the repackaged agent jar and the standalone
   extension jar.
+  
+- ``docs``: Document how to capture MDC attributes on exported log records, with a deny list of credential-shaped keys to start from
+
+  MDC is where an application puts the identifiers people filter logs by:
+  request id, tenant, customer, user, job id. Neither the upstream agent nor
+  this distribution captures them, so those values reach Dash0 only as a
+  substring of the message body, if the log pattern includes them at all.
+  Capture stays off until the operator turns it on, and
+  ``docs/configuration.md`` now says how. Each of the three appender
+  instrumentations that read an MDC selector has its own property, and the
+  JBoss Log Manager one carries no ``_APPENDER_`` where the other two do:
+  ``OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED``,
+  ``OTEL_INSTRUMENTATION_LOG4J_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED``
+  and
+  ``OTEL_INSTRUMENTATION_JBOSS_LOGMANAGER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED``.
+  An excluded selector with no included selector beside it captures every key
+  that does not match it, so one value both turns capture on and keeps the
+  denied keys out.
+  The deny list the documentation gives is twelve case-sensitive glob
+  patterns, four stems in three spellings: ``*token*``, ``*Token*``,
+  ``*TOKEN*``, ``*secret*``, ``*Secret*``, ``*SECRET*``, ``*password*``,
+  ``*Password*``, ``*PASSWORD*``, ``*authorization*``, ``*Authorization*`` and
+  ``*AUTHORIZATION*``. Matching is case-sensitive upstream, so the spellings
+  are not redundant: ``*token*`` alone matches ``session-token`` and misses
+  both ``authToken`` and ``AUTH_TOKEN``. It is a starting point rather than a
+  guarantee, since it matches four stems and three spellings of each, and
+  nothing inspects values.
+  Two costs are documented beside it. A large MDC can displace other
+  attributes, because ``OTEL_ATTRIBUTE_COUNT_LIMIT`` caps a record at 128 and
+  drops the excess with no warning; on Log4j 2.17 the thread context is
+  recorded before the exception, so a thread context at or over the limit
+  takes ``exception.type``, ``exception.message`` and ``exception.stacktrace``
+  off an error record. And these property names are marked experimental
+  upstream, which may rename or remove them in any minor release.
+  Under a configuration file the agent reads the selectors from the file alone
+  and never from a system property or an environment variable, so a host with
+  the Dash0 Java package installed opts in through an
+  ``instrumentation/development`` node instead. ``docs/configuration.md`` gives
+  the YAML, whose node names are not a mechanical translation of the property
+  names.
+  ``MdcAttributeCaptureTest`` pins all of this against a real JVM with the
+  built agent attached at 2.33.1: the three property names, the globs, the
+  included selector, the deprecated ``capture-mdc-attributes``, and that a
+  workload setting no selector exports no MDC entry at all.
   
 
 0.1.0 - 2026-11-09
