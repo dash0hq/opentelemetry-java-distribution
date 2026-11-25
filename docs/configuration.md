@@ -368,9 +368,10 @@ The file is parsed with `DeclarativeConfiguration.parse`, which is the call
 names, so `${VARIABLE}` substitution and the model are identical either way.
 
 A default file that cannot be read or parsed is logged at `WARNING` and the
-process configures itself from the environment instead. Throwing out of
-`getConfigurationModel` aborts autoconfiguration and stops the agent, so one
-broken file would take every JVM on the host with it.
+process configures itself from the environment instead. `getConfigurationModel`
+catches every `RuntimeException` for the same reason the resource providers do:
+throwing there aborts autoconfiguration and stops the agent, so one broken file
+would take every JVM on the host with it.
 
 ### Dropping an attribute a detector contributes
 

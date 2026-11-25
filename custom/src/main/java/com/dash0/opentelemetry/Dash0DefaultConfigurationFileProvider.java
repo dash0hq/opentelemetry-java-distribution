@@ -35,14 +35,25 @@ public final class Dash0DefaultConfigurationFileProvider
   private static final Logger logger =
       Logger.getLogger(Dash0DefaultConfigurationFileProvider.class.getName());
 
+  /** Returns the model parsed from the default configuration file. Never throws. */
   @Override
   public OpenTelemetryConfigurationModel getConfigurationModel() {
-    return parseTheDefaultConfigurationFile(
-        Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-            CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
-        Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-            SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
-        Paths.get(DEFAULT_CONFIGURATION_FILE));
+    try {
+      return parseTheDefaultConfigurationFile(
+          Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+              CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
+          Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+              SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
+          Paths.get(DEFAULT_CONFIGURATION_FILE));
+    } catch (RuntimeException e) {
+      logger.log(
+          Level.WARNING,
+          "Could not look for "
+              + DEFAULT_CONFIGURATION_FILE
+              + "; the OpenTelemetry SDK is configured from the environment instead",
+          e);
+      return null;
+    }
   }
 
   /**
