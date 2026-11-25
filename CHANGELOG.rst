@@ -21,6 +21,131 @@ than ordinary prose.
 
 .. <!-- next version -->
 
+0.2.0 - 2026-11-25
+========================================
+
+Breaking Changes
+----------------
+
+- ``custom``: Default otel.propagators to tracecontext,baggage,xray instead of tracecontext,baggage, so a trace survives an AWS load balancer that rewrites X-Amzn-Trace-Id
+
+  When an incoming request carries both ``traceparent`` and ``X-Amzn-Trace-Id``,
+  the X-Ray context now wins. Set ``OTEL_PROPAGATORS=tracecontext,baggage`` to
+  restore the previous behavior.
+  
+
+Enhancements
+------------
+
+- ``custom``: Move DistroResourceProvider to an order value no other resource provider in the agent jar uses, and document every provider the distribution ships
+
+  ``DistroResourceProvider`` returned ``100`` from ``order()``. At agent 2.33.1
+  so do ``SpringBootServiceNameDetector``, which inherits it, and
+  ``AzureVmResourceProvider``. Three providers at one order value leaves the
+  sequence they are applied in decided by their position in the merged
+  ``META-INF/services`` file, which is a byproduct of the order
+  ``mergeServiceFiles`` concatenates in. The keys are disjoint today, so
+  nothing observable changes; what the tie costs is the guarantee, because a
+  provider added at ``100`` later that does set ``telemetry.distro.name``
+  would overwrite the Dash0 value with no error at all. No other provider in
+  the built jar uses ``200``, and it still beats upstream's own
+  ``DistroResourceProvider``, which declares no order and so gets ``0``.
+  ``docs/resource-detection.md`` now lists all 23 upstream providers with their
+  ``order()`` values and what each contributes, says which eleven are off by
+  default, and gives the ``service.name`` a real JVM reported for each of eight
+  launch shapes. ``docs/configuration.md`` gains the five
+  ``otel.resource.providers.<group>.enabled`` toggles and a section on
+  ``host.id``, which stays off: ``/etc/machine-id`` is baked into a container
+  image, so every container started from one image would report the same value.
+  Both files now warn that ``otel.java.enabled.resource.providers`` is an
+  allow-list. Setting it to enable one detector switches off every provider it
+  does not name, including ``DistroResourceProvider``, and the process then
+  reports no distribution attributes at all with nothing in its output saying
+  so.
+  
+- ``custom``: Default otel.traces.sampler to always_on, so an incoming trace context can no longer decide whether this process is traced
+
+  The distribution set no sampler and inherited the OpenTelemetry default,
+  ``parentbased_always_on``. ``ParentBased`` holds five sub-samplers, and the
+  ``root`` one applies only to a span with no parent. A span whose parent
+  arrived in a ``traceparent`` header is decided by ``remote_parent_sampled``
+  or ``remote_parent_not_sampled`` instead, which default to ``AlwaysOn`` and
+  ``AlwaysOff``.
+  A caller that sends a ``traceparent`` with the sampled flag off therefore
+  silenced every span in the service receiving the request, and in every
+  service that one called. That caller is often outside the organization
+  operating the service, so the clients of an API decided whether its owner
+  got to trace it.
+  ``always_on`` takes the incoming trace context out of the decision. Dash0
+  samples traces after ingestion with Signal Control, which evaluates a whole
+  trace at once, and a span dropped by a sampler inside the process never
+  reaches that evaluation.
+  Nothing stops working and no setting becomes invalid, but an existing
+  deployment is affected without changing its configuration. Expect more spans
+  to leave the application, costing CPU in the process and bandwidth to the
+  collector, and reduce the volume with Signal Control or a collector-side
+  processor rather than in the SDK. Set ``OTEL_TRACES_SAMPLER`` or
+  ``-Dotel.traces.sampler`` on the workload to keep the previous behaviour; the
+  value is registered through ``addPropertiesSupplier``, which both of those
+  beat.
+  Under ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so
+  the default arrives by another route: the customizer described in
+  ``docs/configuration.md`` sets ``tracer_provider.sampler`` on the parsed
+  model when the file declares no sampler.
+  
+- ``custom``: Honour the Dash0 settings and contribute the Dash0 attributes under OTEL_CONFIG_FILE
+
+  Setting ``OTEL_CONFIG_FILE`` made the SDK skip every
+  ``AutoConfigurationCustomizerProvider`` and every ``ResourceProvider``, which
+  is where this distribution contributed everything it contributed. A Java
+  process under declarative configuration therefore ran as the stock upstream
+  agent, and nothing said so. The expensive case was ``DASH0_DISABLE``: an
+  operator who set it to stop a host sending telemetry kept sending and kept
+  being billed.
+  ``Dash0DeclarativeConfigurationCustomizerProvider`` registers under
+  ``DeclarativeConfigurationCustomizerProvider``, which that mode does consult,
+  and writes into the parsed configuration model. ``DASH0_DISABLE=true`` sets
+  the model's ``disabled`` flag, compared against the string ``true``
+  case-insensitively and after trimming as before, so ``1``, ``yes`` and ``on``
+  still leave the SDK enabled. ``telemetry.distro.name``,
+  ``telemetry.distro.version`` and the ``dash0.package.*`` attributes a Linux
+  package writes beside the agent jar go into ``resource.attributes``, which
+  the SDK applies after every detector. The upstream ``host``, ``process``
+  and ``service`` detectors are named in ``resource.detection/development``,
+  so ``host.name``,
+  ``process.pid`` and ``service.instance.id`` come back. ``host.id`` comes with
+  them, which the environment path leaves off, and ``process.command_args``
+  does not, which the environment path has. ``tracer_provider.sampler`` is set to
+  ``always_on`` when the file declares no sampler, and
+  ``propagator.composite_list`` to ``tracecontext,baggage,xray`` when the file
+  declares neither a ``composite`` nor a ``composite_list`` that is not blank.
+  A file with no ``propagator`` node left the SDK on its noop propagators, so
+  an outgoing request carried no ``traceparent`` at all, and a blank
+  ``composite_list`` leaves it with zero propagators for the same outcome.
+  ``composite: []`` and ``composite_list: none`` ask for no propagation and are
+  left alone.
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` fills in the ``endpoint`` of an OTLP
+  exporter the file declared and left without one, across the batch and simple
+  processors of all three signals and both the HTTP and gRPC exporters. It adds
+  no exporter and no provider the file did not declare, since the file is the
+  whole configuration under ``OTEL_CONFIG_FILE``.
+  A set ``OTEL_EXPORTER_OTLP_ENDPOINT`` suppresses that mapping and leaves the
+  file untouched, and configures nothing itself in this mode, so an exporter
+  the file left without an ``endpoint`` keeps its own specification default,
+  ``http://localhost:4318`` for ``otlp_http`` and ``http://localhost:4317`` for
+  ``otlp_grpc``. The customizer logs that at ``WARNING``.
+  Both Dash0 settings are read from the system property first and the
+  environment variable second, the precedence the autoconfigure SPI gives the
+  same two names.
+  An existing deployment that sets ``OTEL_CONFIG_FILE`` is affected without
+  changing its configuration, and three of the changes are visible. A process
+  with ``DASH0_DISABLE=true`` stops exporting. Telemetry is attributed to
+  ``dash0-java`` rather than to ``opentelemetry-javaagent``. Spans arrive that
+  an incoming ``traceparent`` with the sampled flag off used to suppress. Both
+  delivery shapes are covered: the repackaged agent jar and the standalone
+  extension jar.
+  
+
 0.1.0 - 2026-11-09
 ========================================
 
