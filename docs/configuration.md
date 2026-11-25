@@ -163,6 +163,16 @@ Both `OTEL_RESOURCE_PROVIDERS_HOST_ID_ENABLED` and
 `HostIdResourceProvider` on at agent 2.33.1. An environment variable whose name
 carries a literal hyphen was observed doing nothing.
 
+Ten of those eleven are cloud detectors, and three of the ten open a socket to a
+metadata endpoint, so the `aws`, `azure` and `gcp` groups are not free to enable
+on a host that is somewhere else. On a Linux host where traffic to
+`169.254.169.254` is dropped rather than refused, `aws` adds 4.35 s and `azure`
+adds 5.18 s to JVM startup. The `cloudfoundry` group reads `VCAP_APPLICATION`
+and opens nothing. [Resource detection](resource-detection) has the per-detector
+cost table, the experiment behind those two figures, the attributes each
+detector contributes, and the reason this distribution leaves the cloud groups
+off. The eleventh is `HostIdResourceProvider`, which the next section covers.
+
 ### `host.id`
 
 `HostIdResourceProvider` is the one non-cloud provider the agent ships disabled,
@@ -175,7 +185,10 @@ On Linux it reads `/etc/machine-id`, falling back to
 time, so every container started from one image reports the same `host.id`, and
 the attribute groups unrelated workloads together instead of separating them.
 The failure is confident rather than noisy: a wrong identifier arrives looking
-exactly like a right one.
+exactly like a right one. Several Debian-derived JDK images go the other way and
+ship an empty `/etc/machine-id` with no `/var/lib/dbus/machine-id` beside it,
+`eclipse-temurin:21` among them. A container built on one of those exports no
+`host.id` at all with the group switched on, and logs the reason at `FINE` only.
 
 On macOS and Windows it forks a subprocess at startup, `/usr/sbin/ioreg` and
 `reg.exe query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid`
