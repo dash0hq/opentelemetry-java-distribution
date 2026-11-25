@@ -28,6 +28,12 @@ dependencies {
   agentJar(project(path = ":agent", configuration = "shadow"))
   extensionJar(project(path = ":agentextension", configuration = "shadow"))
   upstreamAgentJar(libs.opentelemetryJavaagent)
+
+  implementation(libs.slf4jApi)
+  runtimeOnly(libs.logbackClassic)
+  implementation(libs.log4jApi)
+  runtimeOnly(libs.log4jCore)
+  implementation(libs.jbossLogmanager)
 }
 
 tasks.withType<Test>().configureEach {
@@ -38,7 +44,7 @@ tasks.withType<Test>().configureEach {
   val resolvedAgentJar = agentJar
   val resolvedExtensionJar = extensionJar
   val resolvedUpstreamAgentJar = upstreamAgentJar
-  val testApplicationClasses = sourceSets.main.get().output.classesDirs
+  val testApplicationClasspath = sourceSets.main.get().runtimeClasspath
 
   val awsXrayPropagatorVersion = libs.versions.opentelemetryAwsXrayPropagator.get()
   inputs.property("awsXrayPropagatorVersion", awsXrayPropagatorVersion)
@@ -46,7 +52,7 @@ tasks.withType<Test>().configureEach {
     resolvedAgentJar,
     resolvedExtensionJar,
     resolvedUpstreamAgentJar,
-    testApplicationClasses,
+    testApplicationClasspath,
   )
 
   jvmArgumentProviders.add(
@@ -55,7 +61,7 @@ tasks.withType<Test>().configureEach {
         "-Ddash0.agent.jar=${resolvedAgentJar.singleFile.absolutePath}",
         "-Ddash0.extension.jar=${resolvedExtensionJar.singleFile.absolutePath}",
         "-Ddash0.upstream.agent.jar=${resolvedUpstreamAgentJar.singleFile.absolutePath}",
-        "-Ddash0.test.app.classes=${testApplicationClasses.asPath}",
+        "-Ddash0.test.app.classpath=${testApplicationClasspath.asPath}",
         "-Ddash0.absent.default.configuration.file=" +
           layout.buildDirectory.file("no-default-configuration-file.yaml").get().asFile.absolutePath,
         "-Ddash0.distro.version=$version",

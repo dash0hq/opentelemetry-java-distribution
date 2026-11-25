@@ -214,7 +214,7 @@ class ServiceNameDetectionTest {
     try (OutputStream file = Files.newOutputStream(jar);
         JarOutputStream out = new JarOutputStream(file, manifest)) {
       for (String classesDirectory :
-          System.getProperty("dash0.test.app.classes").split(File.pathSeparator)) {
+          System.getProperty("dash0.test.app.classpath").split(File.pathSeparator)) {
         Path root = Paths.get(classesDirectory);
         if (!Files.isDirectory(root)) {
           continue;
