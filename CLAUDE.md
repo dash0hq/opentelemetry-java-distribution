@@ -85,8 +85,20 @@ does less than it should.
    match a registered `ComponentProvider`, or the SDK fails to build.
    `DeclarativeConfigurationTest` and
    `Dash0DeclarativeConfigurationCustomizerProviderTest` guard this one.
+10. **The order the default configuration file is picked in.**
+    `maybeConfigureFromFile` calls `DeclarativeConfigUtil.configureFromSpi`
+    before it reads `otel.config.file`, so a `DeclarativeConfigurationProvider`
+    that answers with a model unconditionally replaces the file an operator
+    named in `OTEL_CONFIG_FILE`, which is the reverse of what this distribution
+    promises. `Dash0DefaultConfigurationFileProvider` reads `otel.config.file`
+    itself and stands aside when it holds a value that is not blank. Nothing
+    reports the inversion: the agent starts and exports from the wrong file.
+    `DefaultConfigurationFileTest` and
+    `Dash0DefaultConfigurationFileProviderTest` guard this one, and both skip
+    themselves where `/etc/opentelemetry/java` is not writable, which is why CI
+    makes it writable for the runner user.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all nine. They
+The smoke tests in `smoke-tests/` exist specifically to catch all ten. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
@@ -101,7 +113,8 @@ What guards what:
 | 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 27 |
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
 | 9, declarative configuration | `DeclarativeConfigurationTest`, `Dash0DeclarativeConfigurationCustomizerProviderTest` |
-| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest` |
+| 10, the order the default configuration file is picked in | `DefaultConfigurationFileTest`, `Dash0DefaultConfigurationFileProviderTest` |
+| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest`, `DefaultConfigurationFileTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
 
 Two habits these tests encode, both learned the hard way. Assert a presence

@@ -50,13 +50,17 @@ Linux package attributes
    ``docs/resource-detection.md``.
 
 Declarative configuration
-   Supported. Under ``OTEL_CONFIG_FILE`` the SDK consults a different pair of
+   Supported. Under ``OTEL_CONFIG_FILE`` the SDK consults a different set of
    SPIs, so the distribution registers a
    ``DeclarativeConfigurationCustomizerProvider`` that writes the Dash0
    settings and the Dash0 attributes into the parsed configuration model.
    ``DASH0_OTEL_COLLECTOR_BASE_URL`` fills in the endpoint of an exporter the
    file declared without one, and adds no exporter the file did not declare.
-   See ``docs/configuration.md``.
+   With ``OTEL_CONFIG_FILE`` unset, a
+   ``DeclarativeConfigurationProvider`` configures the SDK from
+   ``/etc/opentelemetry/java/otel-config.yaml`` when that file exists, which is
+   where a Dash0 Linux package installs it. A host without that file keeps
+   configuring itself from the environment. See ``docs/configuration.md``.
 
 Kubernetes detection
    No ``k8s.pod.uid`` detector, unlike Node.js and Python. The reasoning, and
