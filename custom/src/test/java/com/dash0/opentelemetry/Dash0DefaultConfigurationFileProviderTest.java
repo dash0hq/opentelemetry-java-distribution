@@ -6,9 +6,7 @@ package com.dash0.opentelemetry;
 
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE_PROPERTY;
-import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.RESOURCE_ATTRIBUTES_PROPERTY;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.parseTheDefaultConfigurationFile;
-import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.warningAboutTheVariablesTheDefaultFileWillIgnore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -21,14 +19,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.ServiceLoader;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -182,32 +173,6 @@ class Dash0DefaultConfigurationFileProviderTest {
   }
 
   @Test
-  void reportsTheVariablesTheDefaultFileIgnoresWhenItConfiguresTheSdk(@TempDir Path directory)
-      throws IOException {
-    Path defaultConfigurationFile = fileHolding(directory, A_FILE_THAT_NAMES_A_SERVICE);
-    System.setProperty(RESOURCE_ATTRIBUTES_PROPERTY, "k8s.pod.name=checkout-0");
-
-    List<LogRecord> logged;
-    try {
-      logged =
-          whileCapturingTheProvidersLog(
-              () -> modelFromTheProviderReading(defaultConfigurationFile));
-    } finally {
-      System.clearProperty(RESOURCE_ATTRIBUTES_PROPERTY);
-    }
-
-    assertThat(messagesIn(logged, Level.WARNING))
-        .as(
-            "getConfigurationModel is where the warning reaches a log, and a test of the message"
-                + " alone leaves the call that emits it free to disappear")
-        .hasSize(1)
-        .allSatisfy(
-            message ->
-                assertThat(message)
-                    .contains("OTEL_RESOURCE_ATTRIBUTES is set to k8s.pod.name=checkout-0"));
-  }
-
-  @Test
   void failsWhenTheDefaultFileCannotBeParsed(@TempDir Path directory) throws IOException {
     Path defaultConfigurationFile = fileHolding(directory, "file_format: [\"1.0\"\n");
 
@@ -240,46 +205,6 @@ class Dash0DefaultConfigurationFileProviderTest {
         .isEqualTo("from-the-fallback");
   }
 
-  @ParameterizedTest
-  @NullSource
-  @ValueSource(strings = {"", "   "})
-  void reportsNothingAboutVariablesNobodySet(String configured) {
-    assertThat(warningAboutTheVariablesTheDefaultFileWillIgnore(configured, configured)).isNull();
-  }
-
-  @Test
-  void reportsThatTheDefaultFileWillIgnoreTheConfiguredOtlpEndpoint() {
-    assertThat(
-            warningAboutTheVariablesTheDefaultFileWillIgnore(
-                " http://collector.invalid:4318 ", null))
-        .as(
-            "a workload that set the endpoint itself exported there until the host gained the"
-                + " default file, and the SDK reports nothing when a file takes the variable over")
-        .contains("OTEL_EXPORTER_OTLP_ENDPOINT is set to http://collector.invalid:4318.")
-        .doesNotContain("OTEL_RESOURCE_ATTRIBUTES is set to")
-        .contains(DEFAULT_CONFIGURATION_FILE);
-  }
-
-  @Test
-  void reportsThatTheDefaultFileWillIgnoreTheConfiguredResourceAttributes() {
-    assertThat(warningAboutTheVariablesTheDefaultFileWillIgnore(null, " k8s.pod.name=checkout-0 "))
-        .as(
-            "the Kubernetes operator carries k8s.* through OTEL_RESOURCE_ATTRIBUTES, and nothing"
-                + " in this distribution restores it once a file configures the SDK")
-        .contains("OTEL_RESOURCE_ATTRIBUTES is set to k8s.pod.name=checkout-0.")
-        .doesNotContain("OTEL_EXPORTER_OTLP_ENDPOINT is set to");
-  }
-
-  @Test
-  void reportsEveryIgnoredVariableInOneWarning() {
-    assertThat(
-            warningAboutTheVariablesTheDefaultFileWillIgnore(
-                "http://collector.invalid:4318", "k8s.pod.name=checkout-0"))
-        .contains(
-            "OTEL_EXPORTER_OTLP_ENDPOINT is set to http://collector.invalid:4318,"
-                + " OTEL_RESOURCE_ATTRIBUTES is set to k8s.pod.name=checkout-0.");
-  }
-
   private static OpenTelemetryConfigurationModel modelFromTheProviderReading(
       Path defaultConfigurationFile) {
     String previous = System.getProperty(DEFAULT_CONFIGURATION_FILE_PROPERTY);
@@ -293,44 +218,6 @@ class Dash0DefaultConfigurationFileProviderTest {
         System.setProperty(DEFAULT_CONFIGURATION_FILE_PROPERTY, previous);
       }
     }
-  }
-
-  private static List<LogRecord> whileCapturingTheProvidersLog(Runnable action) {
-    List<LogRecord> captured = new ArrayList<>();
-    Logger logger = Logger.getLogger(Dash0DefaultConfigurationFileProvider.class.getName());
-    Handler handler =
-        new Handler() {
-          @Override
-          public void publish(LogRecord record) {
-            captured.add(record);
-          }
-
-          @Override
-          public void flush() {}
-
-          @Override
-          public void close() {}
-        };
-    logger.addHandler(handler);
-    Level previous = logger.getLevel();
-    logger.setLevel(Level.ALL);
-    try {
-      action.run();
-    } finally {
-      logger.setLevel(previous);
-      logger.removeHandler(handler);
-    }
-    return captured;
-  }
-
-  private static List<String> messagesIn(List<LogRecord> records, Level level) {
-    List<String> messages = new ArrayList<>();
-    for (LogRecord record : records) {
-      if (record.getLevel().intValue() == level.intValue()) {
-        messages.add(new MessageFormat(record.getMessage()).format(record.getParameters()));
-      }
-    }
-    return messages;
   }
 
   private static Path fileHolding(Path directory, String content) throws IOException {

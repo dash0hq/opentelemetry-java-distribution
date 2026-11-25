@@ -52,13 +52,11 @@ subtext: |
   the next JVM back on environment configuration, or by setting
   ``OTEL_CONFIG_FILE`` for a single workload. No variable selects environment
   configuration while the file is there.
-  Every other standard ``OTEL_*`` variable stops taking effect on a host that
-  gains the file, which the file answers for by interpolating the variables you
-  set. ``OTEL_EXPORTER_OTLP_ENDPOINT`` and ``OTEL_RESOURCE_ATTRIBUTES`` are
-  named in a single ``WARNING`` when they are set and the default file is
-  loaded, since nothing in this distribution can restore either, and the Dash0
-  Kubernetes operator carries the ``k8s.*`` attributes through the second one.
-  ``OTEL_SERVICE_NAME`` survives, through the ``service`` detector the
+  Every other standard ``OTEL_*`` variable stops configuring the SDK directly on
+  a host that gains the file, and the file answers for them by interpolating the
+  ones you set. The file a Dash0 Linux package installs interpolates
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` and ``OTEL_RESOURCE_ATTRIBUTES``, so both keep
+  applying. ``OTEL_SERVICE_NAME`` survives through the ``service`` detector the
   customizer inserts, unless the file names ``service.name`` itself.
   A host that has the Dash0 Java package installed and sets neither variable
   changes behaviour without changing its configuration, because the shipped file

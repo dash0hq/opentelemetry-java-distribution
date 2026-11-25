@@ -415,18 +415,17 @@ host, and the file belongs to a package rather than to the operator. Whatever
 ships `/etc/opentelemetry/java/otel-config.yaml` is where it has to be validated
 against the agent version the package carries.
 
-Every other standard `OTEL_*` variable stops taking effect on a host that gains
-the default file, which is the consequence the file itself has to answer for by
-interpolating the variables you set. Two of them are reported: when
-`OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_RESOURCE_ATTRIBUTES` is set and the
-default file is loaded, the provider names each one in a single `WARNING` and
-says that the file decides where the process exports and what resource
-attributes it carries. Nothing in this repository can restore either, since a
-declaratively configured SDK reads no `OTEL_EXPORTER_OTLP_*` name and no
-`OTEL_RESOURCE_ATTRIBUTES` at all. The Dash0 Kubernetes operator carries
-`k8s.pod.name`, `k8s.container.name` and the rest through
-`OTEL_RESOURCE_ATTRIBUTES`, which is what makes that variable worth a line of
-its own.
+Every other standard `OTEL_*` variable stops configuring the SDK directly on a
+host that gains the default file, and the file is what answers for them, by
+interpolating the ones you set. The file a Dash0 Linux package installs
+interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` on each of its exporters and
+`OTEL_RESOURCE_ATTRIBUTES` as `resource.attributes_list`, among others, so both
+of those keep applying, and so do the `k8s.*` attributes the Dash0 Kubernetes
+operator carries through the second one. The substitution is
+`DeclarativeConfiguration.parse`'s own, the same call the file `OTEL_CONFIG_FILE`
+names goes through, which `substitutesAnEnvironmentReferenceTheDefaultFileMakes`
+asserts. A variable the file does not interpolate has no effect, and the way to
+restore it is to edit the file.
 
 `OTEL_SERVICE_NAME` is not reported, and does not need to be. The `service`
 detector the customizer inserts reads `otel.service.name` off the real
