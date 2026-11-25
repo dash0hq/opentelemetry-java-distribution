@@ -144,6 +144,23 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
+  void theSamplerDefaultStartsNoTracingForAFileThatDeclaresNoTracerProvider() throws Exception {
+    String output = sendingARequestConfiguredFrom("/declarative-config.yaml").run();
+
+    assertThat(output)
+        .as(
+            "SdkTracerProvider.tracerBuilder answers with a noop tracer while the provider holds"
+                + " no span processor, so the always_on sampler the customizer writes into the"
+                + " node it creates is never consulted and no span is started. The presence"
+                + " asserted is the Dash0 resource attribute, which an agent that failed to start"
+                + " would not print either. The JVM's output was:%n%s",
+            output)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .doesNotContain(TRACEPARENT)
+        .doesNotContain("X-Amzn-Trace-Id");
+  }
+
+  @Test
   void thePropagatorsTheFileDeclaresAreKept() throws Exception {
     String output = sendingARequestConfiguredFrom("/declarative-config-propagator.yaml").run();
 
