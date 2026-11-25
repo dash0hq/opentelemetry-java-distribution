@@ -1,0 +1,43 @@
+change_type: enhancement
+
+component: custom
+
+note: Configure the SDK from /etc/opentelemetry/java/otel-config.yaml when OTEL_CONFIG_FILE is unset
+
+issues: [21]
+
+subtext: |
+  A Dash0 Linux package installs an OpenTelemetry configuration file at
+  ``/etc/opentelemetry/java/otel-config.yaml``, and nothing read it. The file
+  stayed inert until a host administrator also set ``OTEL_CONFIG_FILE``, and the
+  one place that reaches every process on a host,
+  ``/etc/opentelemetry/injector/default_env.conf``, can only name one path for
+  every language at once.
+  The order is now ``OTEL_CONFIG_FILE`` when it is set to anything that is not
+  blank, then ``/etc/opentelemetry/java/otel-config.yaml`` when that file
+  exists, then the environment variables, which is what a host without the file
+  keeps doing. An ``OTEL_CONFIG_FILE`` that names a file which does not exist
+  counts as set, so the SDK reports the error instead of this distribution
+  quietly loading a different file.
+  ``Dash0DefaultConfigurationFileProvider`` registers under
+  ``DeclarativeConfigurationProvider``, which
+  ``AutoConfiguredOpenTelemetrySdkBuilder.buildImpl`` reaches through
+  ``maybeConfigureFromFile`` before it reads ``otel.config.file`` and before it
+  loads a single ``AutoConfigurationCustomizerProvider``. That ordering is also
+  why the provider reads ``otel.config.file`` itself, from the system property
+  first and the environment variable second: a provider that answered
+  unconditionally would override the file an operator named.
+  ``Dash0DeclarativeConfigurationCustomizerProvider`` still runs over the
+  resulting model, so ``DASH0_DISABLE``, ``DASH0_OTEL_COLLECTOR_BASE_URL``, the
+  ``telemetry.distro.*`` and ``dash0.package.*`` attributes, the sampler and
+  propagator defaults and the ``host``, ``process`` and ``service`` detectors
+  apply to the default file exactly as they apply to a file named by
+  ``OTEL_CONFIG_FILE``.
+  A default file that cannot be read or parsed is reported at ``WARNING`` and
+  the process configures itself from the environment instead. Throwing there
+  aborts autoconfiguration and stops the agent, so one broken file would take
+  every JVM on the host with it.
+  A host that has the Dash0 Java package installed and sets neither variable
+  changes behaviour without changing its configuration, because the shipped file
+  now configures the SDK. Both delivery shapes are covered: the repackaged agent
+  jar and the standalone extension jar.
