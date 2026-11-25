@@ -40,7 +40,15 @@ subtext: |
   A default file that cannot be read or parsed is reported at ``WARNING`` and
   the process configures itself from the environment instead. Throwing there
   aborts autoconfiguration and stops the agent, so one broken file would take
-  every JVM on the host with it.
+  every JVM on the host with it. That covers reading and parsing only: a file
+  that is valid YAML and then names a component the agent cannot build fails in
+  ``DeclarativeConfigUtil.create``, after the provider has returned, and leaves
+  every JVM on the host uninstrumented. Whatever ships the file is where it has
+  to be validated.
+  A host leaves the default file behind by removing or renaming it, which puts
+  the next JVM back on environment configuration, or by setting
+  ``OTEL_CONFIG_FILE`` for a single workload. No variable selects environment
+  configuration while the file is there.
   Every other standard ``OTEL_*`` variable stops taking effect on a host that
   gains the file, which the file answers for by interpolating the variables you
   set. ``OTEL_EXPORTER_OTLP_ENDPOINT`` and ``OTEL_RESOURCE_ATTRIBUTES`` are

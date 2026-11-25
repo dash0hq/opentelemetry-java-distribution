@@ -275,6 +275,12 @@ that package and no `OTEL_CONFIG_FILE` runs in declarative-configuration mode
 from the file the package ships. A host or container without that file is
 unaffected.
 
+A host leaves step 2 by changing the file, not by setting a variable. Removing
+or renaming `/etc/opentelemetry/java/otel-config.yaml` puts the next JVM back on
+step 3, and a package upgrade that reinstalls the file puts it back on step 2.
+Setting `OTEL_CONFIG_FILE` moves a single workload to step 1 without touching
+the host. No variable selects step 3 while the file is there.
+
 An `OTEL_CONFIG_FILE` naming a file that does not exist still wins. The SDK
 reports the error and starts no telemetry, which is what makes a typo in the
 path visible rather than silently replaced by step 2. The step is skipped for a
@@ -376,6 +382,18 @@ process configures itself from the environment instead. `getConfigurationModel`
 catches every `RuntimeException` for the same reason the resource providers do:
 throwing there aborts autoconfiguration and stops the agent, so one broken file
 would take every JVM on the host with it.
+
+That fallback covers reading and parsing, and stops there. Turning the parsed
+model into an SDK happens in `DeclarativeConfigUtil.create`, after
+`getConfigurationModel` has returned, so a file that is valid YAML and then
+names an exporter, sampler or detector the agent has no `ComponentProvider` for
+throws out of autoconfiguration and leaves every JVM on the host
+uninstrumented. No code in the provider can catch that one. Under
+`OTEL_CONFIG_FILE` the same mistake reaches the one process whose operator set
+the variable; under the default file it reaches the host, and the file belongs
+to a package rather than to the operator. Whatever ships
+`/etc/opentelemetry/java/otel-config.yaml` is where it has to be validated
+against the agent version the package carries.
 
 Every other standard `OTEL_*` variable stops taking effect on a host that gains
 the default file, which is the consequence the file itself has to answer for by
