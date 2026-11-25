@@ -6,6 +6,7 @@ package com.dash0.opentelemetry;
 
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.parseTheDefaultConfigurationFile;
+import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.warningAboutAnOtlpEndpointTheDefaultFileWillIgnore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -176,6 +177,24 @@ class Dash0DefaultConfigurationFileProviderTest {
             "the default file goes through the same DeclarativeConfiguration.parse as the file"
                 + " OTEL_CONFIG_FILE names, so it gets the same environment substitution")
         .isEqualTo("from-the-fallback");
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = {"", "   "})
+  void reportsNothingAboutAnOtlpEndpointNobodySet(String configuredOtlpEndpoint) {
+    assertThat(warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(configuredOtlpEndpoint)).isNull();
+  }
+
+  @Test
+  void reportsThatTheDefaultFileWillIgnoreTheConfiguredOtlpEndpoint() {
+    assertThat(
+            warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(" http://collector.invalid:4318 "))
+        .as(
+            "a workload that set the endpoint itself exported there until the host gained the"
+                + " default file, and the SDK reports nothing when a file takes the variable over")
+        .contains("set to http://collector.invalid:4318,")
+        .contains(DEFAULT_CONFIGURATION_FILE);
   }
 
   private static Path fileHolding(Path directory, String content) throws IOException {

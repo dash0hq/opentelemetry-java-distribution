@@ -373,6 +373,14 @@ catches every `RuntimeException` for the same reason the resource providers do:
 throwing there aborts autoconfiguration and stops the agent, so one broken file
 would take every JVM on the host with it.
 
+Every other standard `OTEL_*` variable stops taking effect on a host that gains
+the default file, which is the consequence the file itself has to answer for by
+interpolating the variables you set. `OTEL_EXPORTER_OTLP_ENDPOINT` is the one
+case the distribution reports: when it is set and the default file is loaded,
+the provider logs at `WARNING` that the file decides where the process exports.
+Nothing else in this repository can restore the variable, since a declaratively
+configured SDK reads no `OTEL_EXPORTER_OTLP_*` name at all.
+
 ### Dropping an attribute a detector contributes
 
 `host`, `process` and `service` are inserted whenever the file does not name

@@ -39,12 +39,24 @@ public final class Dash0DefaultConfigurationFileProvider
   @Override
   public OpenTelemetryConfigurationModel getConfigurationModel() {
     try {
-      return parseTheDefaultConfigurationFile(
-          Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-              CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
-          Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-              SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
-          Paths.get(DEFAULT_CONFIGURATION_FILE));
+      OpenTelemetryConfigurationModel model =
+          parseTheDefaultConfigurationFile(
+              Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+                  CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
+              Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+                  SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
+              Paths.get(DEFAULT_CONFIGURATION_FILE));
+      if (model != null) {
+        String warning =
+            warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(
+                Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_PROPERTY,
+                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE));
+        if (warning != null) {
+          logger.log(Level.WARNING, warning);
+        }
+      }
+      return model;
     } catch (RuntimeException e) {
       logger.log(
           Level.WARNING,
@@ -97,5 +109,26 @@ public final class Dash0DefaultConfigurationFileProvider
           e);
       return null;
     }
+  }
+
+  /**
+   * Returns what to log when {@code configuredOtlpEndpoint} is set and the default configuration
+   * file is about to configure the SDK, or null when there is nothing to report.
+   *
+   * @param configuredOtlpEndpoint the value of {@code OTEL_EXPORTER_OTLP_ENDPOINT}, or null when it
+   *     is not set
+   */
+  static String warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(String configuredOtlpEndpoint) {
+    if (configuredOtlpEndpoint == null || configuredOtlpEndpoint.trim().isEmpty()) {
+      return null;
+    }
+    return Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE
+        + " is set to "
+        + configuredOtlpEndpoint.trim()
+        + ", and a declaratively configured SDK reads no OTEL_EXPORTER_OTLP_* variable. "
+        + DEFAULT_CONFIGURATION_FILE
+        + " decides where this process exports. Name the endpoint in that file, or set "
+        + CONFIGURATION_FILE_VARIABLE
+        + " to a file of your own.";
   }
 }

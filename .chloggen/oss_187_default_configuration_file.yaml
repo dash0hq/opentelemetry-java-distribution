@@ -41,6 +41,11 @@ subtext: |
   the process configures itself from the environment instead. Throwing there
   aborts autoconfiguration and stops the agent, so one broken file would take
   every JVM on the host with it.
+  Every other standard ``OTEL_*`` variable stops taking effect on a host that
+  gains the file, which the file answers for by interpolating the variables you
+  set. ``OTEL_EXPORTER_OTLP_ENDPOINT`` is reported at ``WARNING`` when it is set
+  and the default file is loaded, since nothing in this distribution can restore
+  it.
   A host that has the Dash0 Java package installed and sets neither variable
   changes behaviour without changing its configuration, because the shipped file
   now configures the SDK. Both delivery shapes are covered: the repackaged agent
