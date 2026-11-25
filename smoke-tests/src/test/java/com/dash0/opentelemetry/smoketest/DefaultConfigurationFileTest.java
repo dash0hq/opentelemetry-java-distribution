@@ -19,8 +19,9 @@ import org.junit.jupiter.api.Test;
  * Asserts that a real instrumented JVM configures itself from {@value #DEFAULT_CONFIGURATION_FILE}
  * when {@code OTEL_CONFIG_FILE} is unset. See {@code docs/configuration.md}.
  *
- * <p>Every test that needs the file installs it and removes it again, and skips itself where the
- * directory is not writable. CI makes it writable for the runner user.
+ * <p>Every test that needs the file installs it and removes it again. This is the one class whose
+ * JVMs read the path the provider's own constant names; every other smoke test reads a path under
+ * {@code build/} that nothing creates.
  */
 class DefaultConfigurationFileTest {
 
@@ -123,10 +124,6 @@ class DefaultConfigurationFileTest {
 
   @Test
   void theEnvironmentConfiguresTheSdkWhenTheDefaultFileIsAbsent() throws Exception {
-    assumeFalse(
-        Files.exists(DEFAULT_CONFIGURATION_PATH),
-        DEFAULT_CONFIGURATION_FILE + " exists on this host");
-
     String exported =
         InstrumentedJvm.runningTheTestApplication()
             .withJvmArguments(
@@ -200,7 +197,7 @@ class DefaultConfigurationFileTest {
       abort(DEFAULT_CONFIGURATION_FILE + " cannot be written on this host: " + e);
     }
     try {
-      return jvm.exitingAfter(4000).run();
+      return jvm.readingTheHostDefaultConfigurationFile().exitingAfter(4000).run();
     } finally {
       Files.delete(DEFAULT_CONFIGURATION_PATH);
     }

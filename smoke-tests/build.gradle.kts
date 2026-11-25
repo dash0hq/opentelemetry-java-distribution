@@ -56,6 +56,8 @@ tasks.withType<Test>().configureEach {
         "-Ddash0.extension.jar=${resolvedExtensionJar.singleFile.absolutePath}",
         "-Ddash0.upstream.agent.jar=${resolvedUpstreamAgentJar.singleFile.absolutePath}",
         "-Ddash0.test.app.classes=${testApplicationClasses.asPath}",
+        "-Ddash0.absent.default.configuration.file=" +
+          layout.buildDirectory.file("no-default-configuration-file.yaml").get().asFile.absolutePath,
         "-Ddash0.distro.version=$version",
         "-Ddash0.aws.xray.propagator.version=$awsXrayPropagatorVersion",
       )

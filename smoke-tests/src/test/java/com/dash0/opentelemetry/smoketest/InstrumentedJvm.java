@@ -33,6 +33,7 @@ final class InstrumentedJvm {
   private Integer millisecondsBeforeExit;
   private Path executableJar;
   private Path workingDirectory;
+  private boolean readsTheHostDefaultConfigurationFile;
 
   private InstrumentedJvm() {}
 
@@ -75,6 +76,16 @@ final class InstrumentedJvm {
     return this;
   }
 
+  /**
+   * Lets the JVM read the default configuration file at the path {@code
+   * Dash0DefaultConfigurationFileProvider} names, instead of the path under {@code build/} that
+   * nothing creates.
+   */
+  InstrumentedJvm readingTheHostDefaultConfigurationFile() {
+    readsTheHostDefaultConfigurationFile = true;
+    return this;
+  }
+
   /** Keeps the application alive this long, so that a periodic exporter runs at least once. */
   InstrumentedJvm exitingAfter(int milliseconds) {
     millisecondsBeforeExit = milliseconds;
@@ -92,6 +103,11 @@ final class InstrumentedJvm {
     List<String> command = new ArrayList<>();
     command.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
     command.add("-javaagent:" + agentJar);
+    if (!readsTheHostDefaultConfigurationFile) {
+      command.add(
+          "-Ddash0.default.configuration.file="
+              + System.getProperty("dash0.absent.default.configuration.file"));
+    }
     command.addAll(jvmArguments);
     if (executableJar == null) {
       command.add("-cp");
