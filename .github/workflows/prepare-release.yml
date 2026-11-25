@@ -13,6 +13,10 @@ on:
         description: "Date for the CHANGELOG.rst heading (YYYY-MM-DD, defaults to today)"
         required: false
         default: ""
+      next-version:
+        description: "Version main returns to once the release publishes (e.g. 0.2.1-SNAPSHOT, defaults to the next minor)"
+        required: false
+        default: ""
 
 permissions: {}
 
@@ -52,10 +56,15 @@ jobs:
         env:
           RAW_VERSION: ${{ inputs.version }}
           RAW_DATE: ${{ inputs.date }}
+          RAW_NEXT_VERSION: ${{ inputs['next-version'] }}
         run: |
           set -euo pipefail
           version="$(.github/workflows/scripts/check-release-version.sh "$RAW_VERSION")"
           date="$(.github/workflows/scripts/resolve-release-date.sh "$RAW_DATE")"
+          if [ -n "$RAW_NEXT_VERSION" ]; then
+            printf 'subject\n\nNext-Version: %s\n' "$RAW_NEXT_VERSION" \
+              | .github/workflows/scripts/next-snapshot-version.sh "$version" > /dev/null
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "date=$date" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
@@ -90,6 +99,7 @@ jobs:
       - name: Commit and push to main
         env:
           VERSION: ${{ steps.inputs.outputs.version }}
+          NEXT_VERSION: ${{ inputs['next-version'] }}
         run: |
           set -euo pipefail
           git config user.name d0etu
@@ -100,5 +110,10 @@ jobs:
               "$VERSION, and there may be no entries under .chloggen/ to fold."
             exit 1
           fi
-          git commit -m "docs: update changelog to prepare release v$VERSION"
+          subject="docs: update changelog to prepare release v$VERSION"
+          if [ -n "$NEXT_VERSION" ]; then
+            git commit -m "$subject" -m "Next-Version: $NEXT_VERSION"
+          else
+            git commit -m "$subject"
+          fi
           git push origin HEAD:main

@@ -189,5 +189,46 @@ assert_rejects "create-tag-for-release refuses to retag a published version" \
   "already exists on origin" run_create_tag_for_release \
   "docs: update changelog to prepare release v0.2.0" "v0.2.0"
 
+next_snapshot_version="$scripts/next-snapshot-version.sh"
+
+next_snapshot_after_releasing() {
+  printf '%s\n' "$2" | "$next_snapshot_version" "$1"
+}
+
+assert_prints "next-snapshot-version bumps the minor when nothing is requested" \
+  "0.3.0-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "docs: update changelog to prepare release v0.2.0"
+assert_prints "next-snapshot-version carries the minor past nine" \
+  "1.10.0-SNAPSHOT" next_snapshot_after_releasing "1.9.3" \
+  "docs: update changelog to prepare release v1.9.3"
+assert_prints "next-snapshot-version resets the patch of a patch release" \
+  "0.3.0-SNAPSHOT" next_snapshot_after_releasing "0.2.7" \
+  "docs: update changelog to prepare release v0.2.7"
+assert_prints "next-snapshot-version honours a Next-Version trailer" \
+  "0.2.1-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'docs: update changelog to prepare release v0.2.0\n\nNext-Version: 0.2.1-SNAPSHOT\n')"
+assert_prints "next-snapshot-version honours a trailer that skips ahead" \
+  "1.0.0-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'docs: update changelog to prepare release v0.2.0\n\nNext-Version: 1.0.0-SNAPSHOT\n')"
+assert_prints "next-snapshot-version ignores the phrase outside the last paragraph" \
+  "0.3.0-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'docs: update changelog to prepare release v0.2.0\n\nNext-Version: 0.2.1-SNAPSHOT\n\nThat line is prose, not a trailer.\n')"
+assert_rejects "next-snapshot-version rejects a trailer with prose appended" \
+  "does not match X.Y.Z-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'subject\n\nNext-Version: 0.2.1-SNAPSHOT is what we discussed.\n')"
+assert_rejects "next-snapshot-version rejects a trailer with no -SNAPSHOT" \
+  "does not match X.Y.Z-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'subject\n\nNext-Version: 0.2.1\n')"
+assert_rejects "next-snapshot-version rejects a trailer that goes backwards" \
+  "is not newer than the released version" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'subject\n\nNext-Version: 0.1.0-SNAPSHOT\n')"
+assert_rejects "next-snapshot-version rejects a trailer equal to the release" \
+  "is not newer than the released version" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'subject\n\nNext-Version: 0.2.0-SNAPSHOT\n')"
+assert_rejects "next-snapshot-version rejects a v-prefixed released version" \
+  "does not match X.Y.Z" next_snapshot_after_releasing "v0.2.0" "subject"
+assert_rejects "next-snapshot-version rejects an empty released version" \
+  "does not match X.Y.Z" next_snapshot_after_releasing "" "subject"
+
 printf '\n%s passed, %s failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
