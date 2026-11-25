@@ -378,7 +378,12 @@ The file is parsed with `DeclarativeConfiguration.parse`, which is the call
 names, so `${VARIABLE}` substitution and the model are identical either way.
 
 A default file that cannot be read or parsed is logged at `WARNING` and the
-process configures itself from the environment instead. `getConfigurationModel`
+process configures itself from the environment instead. A file that parses to
+no document at all gets a `WARNING` of its own saying it holds no
+configuration. `DeclarativeConfiguration.parse` answers null rather than
+throwing for an empty file, a file of whitespace, a file of comments and a bare
+`---`, which `touch` on the path, a truncated write and a template that
+rendered nothing all produce. `getConfigurationModel`
 catches every `RuntimeException` for the same reason the resource providers do:
 throwing there aborts autoconfiguration and stops the agent, so one broken file
 would take every JVM on the host with it.

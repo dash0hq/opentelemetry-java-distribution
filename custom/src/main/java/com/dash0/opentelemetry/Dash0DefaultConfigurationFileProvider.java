@@ -80,8 +80,8 @@ public final class Dash0DefaultConfigurationFileProvider
   /**
    * Returns the configuration model parsed from {@code defaultConfigurationFile}, or null when
    * {@code configuredConfigurationFile} is set to a value that is not blank, when {@code
-   * sdkDisabled} reads as true, when {@code defaultConfigurationFile} is not a regular file, or
-   * when reading or parsing it fails.
+   * sdkDisabled} reads as true, when {@code defaultConfigurationFile} is not a regular file, when
+   * it holds no configuration, or when reading or parsing it fails.
    *
    * @param configuredConfigurationFile the value of {@code OTEL_CONFIG_FILE}, or null when it is
    *     not set
@@ -101,6 +101,14 @@ public final class Dash0DefaultConfigurationFileProvider
     }
     try (InputStream configurationFile = Files.newInputStream(defaultConfigurationFile)) {
       OpenTelemetryConfigurationModel model = DeclarativeConfiguration.parse(configurationFile);
+      if (model == null) {
+        logger.log(
+            Level.WARNING,
+            "{0} holds no OpenTelemetry configuration. The OpenTelemetry SDK is configured from"
+                + " the environment instead.",
+            defaultConfigurationFile);
+        return null;
+      }
       logger.log(
           Level.INFO,
           "{0} is not set, so the OpenTelemetry SDK is configured from {1} instead of from the"
