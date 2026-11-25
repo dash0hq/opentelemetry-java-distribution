@@ -202,7 +202,7 @@ tags_left_after_an_unreachable_origin() {
 }
 
 assert_rejects "create-tag-for-release fails when origin cannot be reached" \
-  "" create_tag_for_release_against_an_unreachable_origin
+  "fatal:" create_tag_for_release_against_an_unreachable_origin
 assert_prints "create-tag-for-release tags nothing when origin cannot be reached" \
   "" tags_left_after_an_unreachable_origin
 
