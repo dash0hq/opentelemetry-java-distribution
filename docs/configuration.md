@@ -434,6 +434,238 @@ still read in that mode: `SemconvSelectionResolver` evaluates
 `SystemProperty.getString` whatever the configuration source, and gives the file
 precedence only where the file names the key.
 
+### MDC capture
+
+MDC, the Mapped Diagnostic Context, is where an application puts the
+identifiers people filter logs by: request id, tenant, customer, user, job id.
+Neither the upstream agent nor this distribution captures them, so those values
+reach Dash0 only as a substring of the message body, if the log pattern includes
+them at all.
+
+Capture is opt-in, and it is turned on per appender instrumentation. Three
+instrumentations read an MDC selector, and each one has its own property:
+
+| Property | Appender |
+|---|---|
+| `otel.instrumentation.logback-appender.experimental.mdc-attributes.excluded` | Logback 1.0 and later |
+| `otel.instrumentation.log4j-appender.experimental.mdc-attributes.excluded` | Log4j 1.2, and Log4j 2.17 and later, where MDC is called the thread context. Both instrumentations read this one name. |
+| `otel.instrumentation.jboss-logmanager.experimental.mdc-attributes.excluded` | JBoss Log Manager 1.1 and later, used by WildFly and JBoss EAP |
+
+A workload usually sets the environment-variable spelling instead. The agent
+normalises both spellings to one lowercase name, folding underscores into dots
+on the environment-variable side and hyphens into dots on the property side, so
+the two meet:
+
+```bash
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED
+OTEL_INSTRUMENTATION_LOG4J_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED
+OTEL_INSTRUMENTATION_JBOSS_LOGMANAGER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED
+```
+
+The third name carries no `_APPENDER_`, unlike the other two. Upstream names
+that instrumentation `jboss-logmanager-appender`, which is the name
+`otel.instrumentation.jboss-logmanager-appender.enabled` switches off, while
+its mapper reads the MDC selector under `jboss-logmanager`. For this one
+appender the MDC property prefix and the instrumentation name differ; on
+Logback and Log4j they coincide. The agent reads nothing under
+`OTEL_INSTRUMENTATION_JBOSS_LOGMANAGER_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED`,
+so a WildFly or JBoss EAP workload that sets that name captures nothing and
+gets no diagnostic saying so.
+
+#### A deny list to start from
+
+An excluded selector with no included selector beside it captures every MDC
+entry whose key does not match, so one value both turns capture on and keeps
+the denied keys out. These twelve patterns are a starting point:
+
+```bash
+export OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*token*,*Token*,*TOKEN*,*secret*,*Secret*,*SECRET*,*password*,*Password*,*PASSWORD*,*authorization*,*Authorization*,*AUTHORIZATION*'
+```
+
+The patterns are globs, where `*` matches any number of characters and `?`
+matches exactly one. Matching is case-sensitive, which is why each stem appears
+in three spellings: `*token*` on its own matches `session-token` and misses
+both `authToken` and `AUTH_TOKEN`.
+
+`MdcAttributeCaptureTest` runs that value against a real JVM on each of the
+three appenders, with one MDC key per pattern, so the twelve are checked rather
+than asserted.
+
+#### The three properties of an appender
+
+Each appender has three MDC properties, and a workload that logs through more
+than one framework sets them on each framework it uses:
+
+```
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_INCLUDED
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED
+OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES
+```
+
+`MDC_ATTRIBUTES_INCLUDED` and `MDC_ATTRIBUTES_EXCLUDED` are applied together,
+with the excluded patterns winning over the included ones, so narrowing with an
+included list and denying with an excluded list at the same time works.
+`CAPTURE_MDC_ATTRIBUTES` is the deprecated predecessor of both, and the agent
+ignores it as soon as either of the other two is configured. An exported but
+empty variable configures nothing, and counts as unset.
+
+Capture everything, including the credential-shaped keys:
+
+```bash
+export OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_INCLUDED='*'
+```
+
+Capture a known set of keys and nothing else:
+
+```bash
+export OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_INCLUDED='request.id,tenant.id,user.*'
+```
+
+The same on WildFly or JBoss EAP, where the name differs:
+
+```bash
+export OTEL_INSTRUMENTATION_JBOSS_LOGMANAGER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED='*token*,*Token*,*TOKEN*'
+```
+
+#### Opting in under a configuration file
+
+These properties do not reach the agent under a configuration file, and that
+mode is reached without anyone setting `OTEL_CONFIG_FILE`. A host with the
+Dash0 Java package installed has `/etc/opentelemetry/java/otel-config.yaml` on
+disk, and `Dash0DefaultConfigurationFileProvider` loads it whenever
+`OTEL_CONFIG_FILE` is unset.
+
+The agent reads the selectors from the file alone. `SelectorConfig` passes
+`false` for its own `systemPropertyFallback` argument on both paths of
+`resolveLegacyLiteral`, and `getList` returns null rather than consulting a
+system property when that argument is false, so neither
+`-Dotel.instrumentation.logback-appender.experimental.mdc-attributes.excluded`
+nor the matching `OTEL_INSTRUMENTATION_` variable is read in this mode.
+`SemconvSelectionResolver` does the opposite for `otel.semconv-stability.opt-in`
+and calls `SystemProperty.getString` unconditionally, which is why that setting
+keeps working under a file and these do not.
+
+Such a host opts in by adding the selectors to the file. The node name is not a
+mechanical translation of the property name: `SelectorConfig` replaces each
+hyphen with an underscore and re-expresses the `experimental.` segment as a
+`/development` suffix on the selector node.
+
+```yaml
+instrumentation/development:
+  java:
+    logback_appender:
+      mdc_attributes/development:
+        excluded: ["*token*", "*Token*", "*TOKEN*"]
+    log4j_appender:
+      mdc_attributes/development:
+        excluded: ["*token*", "*Token*", "*TOKEN*"]
+    jboss_logmanager:
+      mdc_attributes/development:
+        excluded: ["*token*", "*Token*", "*TOKEN*"]
+```
+
+The file the Dash0 Java package ships today names no
+`instrumentation/development` node. See the Declarative configuration section.
+
+#### What the deny list does not do
+
+The deny list above is a starting point and not a guarantee, and it misses in
+two directions.
+
+It matches four stems. An MDC key named `jwt`, `bearer`, `pwd`, `apiKey`,
+`sessionId`, `authentication`, `credentials`, `Cookie`, `email` or `ssn` is
+captured and exported like any other, and so is the en-GB spelling
+`Authorisation`.
+
+It matches three spellings of each stem, and matching is case-sensitive, so a
+key spelled any other way is captured too: `passWORD`, `ToKeN` and `TOken` all
+pass. The three spellings cover the casings a key usually carries, which are
+lowercase, camelCase, Capitalised and ALL_CAPS, and nothing beyond them. There
+is no case-insensitive mode to turn on: the agent compares code points without
+folding case, and a glob of `*` and `?` cannot express an alternation.
+
+Nothing inspects values either, so a credential stored under an innocuous key
+goes through whatever the key is called.
+
+Treat the deny list as the floor and raise it where the application warrants
+it, with an included list naming the keys you want, with Dash0's Signal Control
+transformations, or by keeping the value out of MDC in the first place.
+
+#### What a large MDC costs
+
+Once capture is on, every exported log record carries every captured MDC entry,
+so a record costs more CPU to build and more bandwidth to send than it did
+before. An application that keeps a handful of identifiers in MDC will not
+notice; one that keeps dozens will.
+
+Past a point the entries stop arriving. `OTEL_ATTRIBUTE_COUNT_LIMIT` caps the
+attributes on one record at 128 by default, and the excess is dropped with no
+warning. Observed on agent 2.33.1 with 200 MDC entries and the console log
+exporter: 128 attributes on the record, the other 72 gone, nothing logged about
+it. Raising `OTEL_ATTRIBUTE_COUNT_LIMIT` to 256 exported all 200.
+
+Which attributes survive depends on the appender, because the limit keeps
+whatever reached the record first and the appenders write in different orders.
+
+Logback, JBoss Log Manager and Log4j 1.2 record the exception before the MDC,
+so `exception.type`, `exception.message` and `exception.stacktrace` are kept
+and MDC entries are what get dropped. Observed on Logback with 200 MDC entries
+and a thrown exception: three exception attributes and 125 MDC entries.
+
+Log4j 2.17 records the thread context first. A thread context at or over the
+limit therefore fills the record and the exception attributes never land.
+Observed with 200 thread-context entries and the same thrown exception: 128
+context entries and no `exception.type`, `exception.message` or
+`exception.stacktrace` at all. An error record loses its stack trace, and
+nothing reports it.
+
+The boundary is exactly 128 captured context entries. A Log4j 2.17 record
+carries no attributes of its own at agent 2.33.1, since
+`experimental-log-attributes`, `capture-code-attributes`,
+`capture-marker-attribute`, `capture-template` and `capture-arguments` all
+default to false, and the body, the severity, the timestamp and the trace
+context are record fields rather than attributes. The whole budget is therefore
+the thread context, and the three exception attributes are what the 129th,
+130th and 131st distinct names would have been. Below 128 the loss is partial
+rather than absent: at 126 entries `exception.stacktrace` alone is lost, and at
+127 `exception.type` is the only one of the three that survives.
+`AttributesMap` keeps the first 128 distinct names and drops every later one,
+counting the drops into the record's `dropped_attributes_count` and logging
+nothing.
+
+Bound the MDC with an included list naming the keys you want, as above, rather
+than by raising the limit. On Log4j 2.17 treat that as the fix rather than a
+preference.
+
+#### These are experimental property names
+
+Every property named in this section sits under
+`otel.instrumentation.*.experimental.*` and is marked experimental by upstream,
+which may rename or remove it in any minor release with no deprecation period
+that the agent enforces. There are nine: `logback-appender`, `log4j-appender`
+and `jboss-logmanager`, each with `mdc-attributes.included`,
+`mdc-attributes.excluded` and `capture-mdc-attributes`. Recheck all nine
+against the appender READMEs of the new version whenever
+`opentelemetryJavaagent` in `gradle/libs.versions.toml` is bumped.
+`MdcAttributeCaptureTest` fails when one of the three this section recommends
+stops working.
+
+A name that no longer exists is read by nothing and reports nothing, so a
+workload that keeps setting it captures no MDC and gets no diagnostic.
+
+This namespace already churned once in the window this distribution covers. The
+`mdc-attributes.included` and `mdc-attributes.excluded` pair arrived in agent
+2.31.0 and deprecated `capture-mdc-attributes`, which was the only MDC setting
+before that.
+
+`capture-mdc-attributes` is a comma-separated list of literal MDC keys, and has
+been one throughout the agent's 2.x line, as far back as 2.14.0. It is not a
+boolean and never was. Setting it to `true` therefore asks for one MDC key
+named `true`, which no application has, so the log record carries no attributes
+at all. Verified on 2.33.1: the exported record is `{}`. The agent does warn
+that the setting is deprecated and names the pair that replaces it, but nothing
+reports that the value is not a key any application uses.
+
 ## Declarative configuration
 
 A declarative configuration file is a YAML file that replaces environment
@@ -797,10 +1029,6 @@ One setting is recorded here as environment-only. The
 `AutoConfigurationCustomizerProvider` alone, so it never runs under
 `OTEL_CONFIG_FILE`. The `OTEL_SEMCONV_STABILITY_OPT_IN` section above gives the
 spelling a file uses for the same choice.
-
-https://github.com/dash0hq/opentelemetry-java-distribution/pull/11 is in the
-same position and has not merged. It sets the MDC capture defaults through
-`addPropertiesCustomizer`.
 
 The upstream resource providers are the other half. None of them is loaded
 here, so the five `otel.resource.providers.<group>.enabled` toggles,

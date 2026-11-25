@@ -162,6 +162,7 @@ two distributions document the same topics in the same order.
 | `docs/overview.md` | `README.rst` | Description, architecture, the open decisions |
 | `docs/getting-started.md` | `README.rst` (Trying it) | The runnable commands |
 | `docs/configuration.md` | `custom/src/main/java/**` | Every `DASH0_*` variable and `OTEL_*` default the distro sets |
+| `docs/configuration.md` | `gradle/libs.versions.toml` | On every agent bump, that each `otel.instrumentation.*.experimental.*` name it documents still exists upstream; `MdcAttributeCaptureTest` asserts the three it recommends |
 | `docs/resource-detection.md` | `custom/src/main/java/com/dash0/opentelemetry/DistroResource.java` | Attributes emitted and ordering behaviour |
 | `docs/auto-instrumentation.md` | `gradle/libs.versions.toml` | The upstream agent version, which determines the instrumentation set |
 | `docs/kubernetes-injection.md` | the Dash0 operator's `images/instrumentation/jvm` | How the agent is delivered and activated |
