@@ -632,22 +632,32 @@ where the exporter shapes no fixture declares are covered.
 
 `DefaultConfigurationFileTest` in `smoke-tests/` covers the three steps of the
 order above, again in both delivery shapes. It installs the fixture at
-`/etc/opentelemetry/java/otel-config.yaml`, removes it again, and skips itself
-where the directory is not writable, which CI makes it for the runner user.
+`/etc/opentelemetry/java/otel-config.yaml` and removes it again. Where the
+directory is not writable it skips on a developer machine and fails on CI,
+which it tells apart by the `CI` variable every GitHub Actions runner sets, so
+a workflow that stops preparing the directory turns the build red instead of
+dropping the only end-to-end coverage the feature has.
 `Dash0DefaultConfigurationFileProviderTest` in `custom/` points the same code at
 a temporary directory, which is where the unreadable and unparseable files are
 covered.
 
 The path in step 2 is the default of the `dash0.default.configuration.file`
-system property, and `custom/build.gradle.kts` sets that property for every test
-JVM of that module to a path under `build/` that nothing creates. Without it the
-provider loads the host's own file into the unit tests, where the agent's
-`ComponentProvider` implementations are absent, and
+system property, and the build sets that property everywhere except in the JVMs
+`DefaultConfigurationFileTest` launches, to a path under `build/` that nothing
+creates. `custom/build.gradle.kts` sets it for the unit tests, and
+`InstrumentedJvm` passes it to every JVM a smoke test launches unless the test
+calls `readingTheHostDefaultConfigurationFile`.
+
+Without it, a host that has the Dash0 Java package installed runs a different
+test suite from a host that does not. The unit tests load the host's file into a
+plain SDK, where the agent's `ComponentProvider` implementations are absent, and
 `DefaultPropagatorsTest` fails with `No component provider detected for
-io.opentelemetry.sdk.resources.Resource with name "process"` on exactly the
-hosts this feature is built for. `gradle.properties` sets
-`org.gradle.parallel = true`, so the same thing can happen in CI while
-`DefaultConfigurationFileTest` has the fixture installed.
+io.opentelemetry.sdk.resources.Resource with name "process"`. The smoke tests
+launch JVMs that take their configuration from the host's file instead of from
+the environment each test sets up, which is the same hole that stripping `OTEL_*`
+and `DASH0_*` from the launched environment exists to close. `gradle.properties`
+sets `org.gradle.parallel = true`, so `:custom:test` can also meet the fixture
+`DefaultConfigurationFileTest` installs while it is installed.
 
 The declarative model classes are marked internal and experimental upstream, and
 the path spelling `detection/development` is itself a version marker that will

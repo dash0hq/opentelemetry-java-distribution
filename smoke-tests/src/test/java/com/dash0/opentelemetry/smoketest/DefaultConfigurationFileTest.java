@@ -6,7 +6,6 @@ package com.dash0.opentelemetry.smoketest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.abort;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -187,20 +186,32 @@ class DefaultConfigurationFileTest {
    * and removes the file again, or skips the test where this host will not have it written.
    */
   private static String withTheDefaultConfigurationFile(InstrumentedJvm jvm) throws Exception {
-    assumeFalse(
-        Files.exists(DEFAULT_CONFIGURATION_PATH),
-        DEFAULT_CONFIGURATION_FILE + " already exists on this host");
+    if (Files.exists(DEFAULT_CONFIGURATION_PATH)) {
+      failInCiAndSkipElsewhere(DEFAULT_CONFIGURATION_FILE + " already exists on this host");
+    }
     try {
       Files.createDirectories(DEFAULT_CONFIGURATION_PATH.getParent());
       Files.copy(Paths.get(fixture("/default-config-file.yaml")), DEFAULT_CONFIGURATION_PATH);
     } catch (IOException e) {
-      abort(DEFAULT_CONFIGURATION_FILE + " cannot be written on this host: " + e);
+      failInCiAndSkipElsewhere(
+          DEFAULT_CONFIGURATION_FILE + " cannot be written on this host: " + e);
     }
     try {
       return jvm.readingTheHostDefaultConfigurationFile().exitingAfter(4000).run();
     } finally {
       Files.delete(DEFAULT_CONFIGURATION_PATH);
     }
+  }
+
+  /**
+   * Aborts {@code reason} as a skipped test off CI, and raises it as a failure on CI, where the
+   * workflow prepares the directory before the build runs.
+   */
+  private static void failInCiAndSkipElsewhere(String reason) {
+    if (System.getenv("CI") != null) {
+      throw new AssertionError(reason);
+    }
+    abort(reason);
   }
 
   private static String fixture(String name) throws URISyntaxException {
