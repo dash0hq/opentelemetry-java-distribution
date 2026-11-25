@@ -25,9 +25,13 @@ Releasing
    ``release.yml`` have never run on a runner at all. Their scripts are
    exercised by ``.github/workflows/scripts/test-release-scripts.sh``, which
    ``ci.yml`` runs on every pull request, and that is a different claim from
-   having cut a release with them. Repeat the throwaway-version run above,
-   starting from **Prepare release**, once the token prerequisite below is met,
-   and then delete this paragraph.
+   having cut a release with them. The 2026-10-23 approach is not available a
+   second time. That run deleted its throwaway tag, and the tag ruleset created
+   on 2026-11-09 forbids deleting ``refs/tags/v*``, while
+   ``check-release-version-is-newest.sh`` refuses any version at or below the
+   highest published one. So the first exercise of the automation is the next
+   real release. Watch that one, and delete this paragraph once it has gone
+   through.
 
 
 Where the artifacts go
