@@ -169,6 +169,14 @@ Until both are in place, **Prepare release** fails on its first step and says
 so. Ordinary pushes to ``main`` are unaffected, because the tagging workflow
 runs only on a commit whose subject begins with the release subject.
 
+One more administrator action is worth doing at the same time, though nothing
+here depends on it. ``ci.yml`` gained a **Release scripts** job that runs
+``.github/workflows/scripts/test-release-scripts.sh``, and the ``main`` ruleset
+does not list it among its required status checks, so a pull request that
+breaks one of those scripts is still mergeable with that check red. Add
+**Release scripts** to the ruleset's required checks, beside **Build and
+test** and **Relocations in sync with upstream**.
+
 
 Cutting a release by hand
 -------------------------
