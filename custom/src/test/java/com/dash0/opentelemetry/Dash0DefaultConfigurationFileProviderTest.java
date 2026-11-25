@@ -62,7 +62,8 @@ class Dash0DefaultConfigurationFileProviderTest {
     Path defaultConfigurationFile = fileHolding(directory, A_FILE_THAT_NAMES_A_SERVICE);
 
     OpenTelemetryConfigurationModel model =
-        parseTheDefaultConfigurationFile(configuredConfigurationFile, defaultConfigurationFile);
+        parseTheDefaultConfigurationFile(
+            configuredConfigurationFile, null, defaultConfigurationFile);
 
     assertThat(serviceNameIn(model)).isEqualTo("from-the-default-file");
   }
@@ -74,7 +75,8 @@ class Dash0DefaultConfigurationFileProviderTest {
     Files.write(namedByTheOperator, A_FILE_THAT_NAMES_A_SERVICE.getBytes(StandardCharsets.UTF_8));
 
     OpenTelemetryConfigurationModel model =
-        parseTheDefaultConfigurationFile(namedByTheOperator.toString(), defaultConfigurationFile);
+        parseTheDefaultConfigurationFile(
+            namedByTheOperator.toString(), null, defaultConfigurationFile);
 
     assertThat(model)
         .as(
@@ -90,7 +92,7 @@ class Dash0DefaultConfigurationFileProviderTest {
 
     OpenTelemetryConfigurationModel model =
         parseTheDefaultConfigurationFile(
-            directory.resolve("does-not-exist.yaml").toString(), defaultConfigurationFile);
+            directory.resolve("does-not-exist.yaml").toString(), null, defaultConfigurationFile);
 
     assertThat(model)
         .as(
@@ -99,9 +101,39 @@ class Dash0DefaultConfigurationFileProviderTest {
         .isNull();
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"true", "TRUE", "True"})
+  void standsAsideWhenOtelSdkDisabledIsTrue(String sdkDisabled, @TempDir Path directory)
+      throws IOException {
+    Path defaultConfigurationFile = fileHolding(directory, A_FILE_THAT_NAMES_A_SERVICE);
+
+    assertThat(parseTheDefaultConfigurationFile(null, sdkDisabled, defaultConfigurationFile))
+        .as(
+            "a declaratively configured SDK reads no OTEL_SDK_DISABLED, so a host-wide default"
+                + " file that loaded anyway would restart a workload an operator silenced")
+        .isNull();
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = {"", "false", "1", "yes", " true "})
+  void parsesTheDefaultFileForEveryOtelSdkDisabledTheSdkReadsAsFalse(
+      String sdkDisabled, @TempDir Path directory) throws IOException {
+    Path defaultConfigurationFile = fileHolding(directory, A_FILE_THAT_NAMES_A_SERVICE);
+
+    assertThat(
+            serviceNameIn(
+                parseTheDefaultConfigurationFile(null, sdkDisabled, defaultConfigurationFile)))
+        .as(
+            "the comparison is Boolean.parseBoolean on the raw value, which is what"
+                + " DefaultConfigProperties.getBoolean does, so the file loads for exactly the"
+                + " values that leave the SDK enabled under environment configuration")
+        .isEqualTo("from-the-default-file");
+  }
+
   @Test
   void standsAsideWhenTheDefaultFileDoesNotExist(@TempDir Path directory) {
-    assertThat(parseTheDefaultConfigurationFile(null, directory.resolve("otel-config.yaml")))
+    assertThat(parseTheDefaultConfigurationFile(null, null, directory.resolve("otel-config.yaml")))
         .isNull();
   }
 
@@ -110,14 +142,14 @@ class Dash0DefaultConfigurationFileProviderTest {
     Path defaultConfigurationFile = directory.resolve("otel-config.yaml");
     Files.createDirectory(defaultConfigurationFile);
 
-    assertThat(parseTheDefaultConfigurationFile(null, defaultConfigurationFile)).isNull();
+    assertThat(parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile)).isNull();
   }
 
   @Test
   void standsAsideWhenTheDefaultFileCannotBeParsed(@TempDir Path directory) throws IOException {
     Path defaultConfigurationFile = fileHolding(directory, "file_format: [\"1.0\"\n");
 
-    assertThat(parseTheDefaultConfigurationFile(null, defaultConfigurationFile))
+    assertThat(parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile))
         .as(
             "throwing here aborts autoconfiguration and takes the whole agent with it, so one"
                 + " broken file would stop every JVM on the host from being instrumented")
@@ -137,7 +169,7 @@ class Dash0DefaultConfigurationFileProviderTest {
                 + "      value: ${A_VARIABLE_NOTHING_SETS:-from-the-fallback}\n");
 
     OpenTelemetryConfigurationModel model =
-        parseTheDefaultConfigurationFile(null, defaultConfigurationFile);
+        parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile);
 
     assertThat(serviceNameIn(model))
         .as(

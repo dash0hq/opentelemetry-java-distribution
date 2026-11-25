@@ -29,6 +29,8 @@ public final class Dash0DefaultConfigurationFileProvider
   static final String DEFAULT_CONFIGURATION_FILE = "/etc/opentelemetry/java/otel-config.yaml";
   static final String CONFIGURATION_FILE_PROPERTY = "otel.config.file";
   static final String CONFIGURATION_FILE_VARIABLE = "OTEL_CONFIG_FILE";
+  static final String SDK_DISABLED_PROPERTY = "otel.sdk.disabled";
+  static final String SDK_DISABLED_VARIABLE = "OTEL_SDK_DISABLED";
 
   private static final Logger logger =
       Logger.getLogger(Dash0DefaultConfigurationFileProvider.class.getName());
@@ -38,21 +40,28 @@ public final class Dash0DefaultConfigurationFileProvider
     return parseTheDefaultConfigurationFile(
         Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
             CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
+        Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+            SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
         Paths.get(DEFAULT_CONFIGURATION_FILE));
   }
 
   /**
    * Returns the configuration model parsed from {@code defaultConfigurationFile}, or null when
    * {@code configuredConfigurationFile} is set to a value that is not blank, when {@code
-   * defaultConfigurationFile} is not a regular file, or when reading or parsing it fails.
+   * sdkDisabled} reads as true, when {@code defaultConfigurationFile} is not a regular file, or
+   * when reading or parsing it fails.
    *
    * @param configuredConfigurationFile the value of {@code OTEL_CONFIG_FILE}, or null when it is
    *     not set
+   * @param sdkDisabled the value of {@code OTEL_SDK_DISABLED}, or null when it is not set
    * @param defaultConfigurationFile the path a Dash0 Linux package installs
    */
   static OpenTelemetryConfigurationModel parseTheDefaultConfigurationFile(
-      String configuredConfigurationFile, Path defaultConfigurationFile) {
+      String configuredConfigurationFile, String sdkDisabled, Path defaultConfigurationFile) {
     if (configuredConfigurationFile != null && !configuredConfigurationFile.trim().isEmpty()) {
+      return null;
+    }
+    if (Boolean.parseBoolean(sdkDisabled)) {
       return null;
     }
     if (!Files.isRegularFile(defaultConfigurationFile)) {

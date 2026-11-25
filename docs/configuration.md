@@ -276,6 +276,16 @@ reports the error and starts no telemetry, which is what makes a typo in the
 path visible rather than silently replaced by step 2. The step is skipped for a
 value that is empty or only whitespace.
 
+`OTEL_SDK_DISABLED=true` also skips step 2, and that is the one place where a
+standard variable survives the switch. A declaratively configured SDK reads no
+`OTEL_SDK_DISABLED`, so a host-wide default file that loaded anyway would
+restart a workload whose operator had silenced it. The value is compared with
+`Boolean.parseBoolean` on the raw string, which is what
+`DefaultConfigProperties.getBoolean` does, so the file loads for exactly the
+values that leave the SDK enabled under environment configuration. An explicit
+`OTEL_CONFIG_FILE` is unaffected: step 1 is an opt-in, and the SDK has ignored
+`OTEL_SDK_DISABLED` under one since declarative configuration existed.
+
 The SDK consults a different set of SPIs in this mode.
 `AutoConfigurationCustomizerProvider` and `ResourceProvider`, which carry
 everything this distribution contributes under environment configuration, are

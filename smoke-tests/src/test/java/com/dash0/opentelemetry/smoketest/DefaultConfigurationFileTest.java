@@ -87,6 +87,24 @@ class DefaultConfigurationFileTest {
   }
 
   @Test
+  void otelSdkDisabledStillSwitchesTheSdkOffUnderTheDefaultFile() throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .withEnvironmentVariable("OTEL_SDK_DISABLED", "true"));
+
+    assertThat(exported)
+        .as(
+            "a declaratively configured SDK reads no OTEL_SDK_DISABLED, so the provider stands"
+                + " aside and the environment path honours it. A host-wide default file that"
+                + " loaded anyway would restart a workload an operator silenced. The application"
+                + " still ran to completion, which InstrumentedJvm.run checks, so this is a"
+                + " silenced SDK and not a dead agent. The JVM's output was:%n%s",
+            exported)
+        .doesNotContain("service.name=\"default-config-file-smoke-test\"");
+  }
+
+  @Test
   void theEnvironmentConfiguresTheSdkWhenTheDefaultFileIsAbsent() throws Exception {
     assumeFalse(
         Files.exists(DEFAULT_CONFIGURATION_PATH),
