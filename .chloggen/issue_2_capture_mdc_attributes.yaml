@@ -1,0 +1,52 @@
+change_type: enhancement
+
+component: docs
+
+note: Document how to capture MDC attributes on exported log records, with a deny list of credential-shaped keys to start from
+
+issues: [2]
+
+subtext: |
+  MDC is where an application puts the identifiers people filter logs by:
+  request id, tenant, customer, user, job id. Neither the upstream agent nor
+  this distribution captures them, so those values reach Dash0 only as a
+  substring of the message body, if the log pattern includes them at all.
+  Capture stays off until the operator turns it on, and
+  ``docs/configuration.md`` now says how. Each of the three appender
+  instrumentations that read an MDC selector has its own property, and the
+  JBoss Log Manager one carries no ``_APPENDER_`` where the other two do:
+  ``OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED``,
+  ``OTEL_INSTRUMENTATION_LOG4J_APPENDER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED``
+  and
+  ``OTEL_INSTRUMENTATION_JBOSS_LOGMANAGER_EXPERIMENTAL_MDC_ATTRIBUTES_EXCLUDED``.
+  An excluded selector with no included selector beside it captures every key
+  that does not match it, so one value both turns capture on and keeps the
+  denied keys out.
+  The deny list the documentation gives is twelve case-sensitive glob
+  patterns, four stems in three spellings: ``*token*``, ``*Token*``,
+  ``*TOKEN*``, ``*secret*``, ``*Secret*``, ``*SECRET*``, ``*password*``,
+  ``*Password*``, ``*PASSWORD*``, ``*authorization*``, ``*Authorization*`` and
+  ``*AUTHORIZATION*``. Matching is case-sensitive upstream, so the spellings
+  are not redundant: ``*token*`` alone matches ``session-token`` and misses
+  both ``authToken`` and ``AUTH_TOKEN``. It is a starting point rather than a
+  guarantee, since it matches four stems and three spellings of each, and
+  nothing inspects values.
+  Two costs are documented beside it. A large MDC can displace other
+  attributes, because ``OTEL_ATTRIBUTE_COUNT_LIMIT`` caps a record at 128 and
+  drops the excess with no warning; on Log4j 2.17 the thread context is
+  recorded before the exception, so a thread context at or over the limit
+  takes ``exception.type``, ``exception.message`` and ``exception.stacktrace``
+  off an error record. And these property names are marked experimental
+  upstream, which may rename or remove them in any minor release.
+  Under a configuration file the agent reads the selectors from the file alone
+  and never from a system property or an environment variable, so a host with
+  the Dash0 Java package installed opts in through an
+  ``instrumentation/development`` node instead. ``docs/configuration.md`` gives
+  the YAML, whose node names are not a mechanical translation of the property
+  names.
+  ``MdcAttributeCaptureTest`` pins all of this against a real JVM with the
+  built agent attached at 2.33.1: the three property names, the globs, the
+  included selector, the deprecated ``capture-mdc-attributes``, and that a
+  workload setting no selector exports no MDC entry at all.
+
+change_logs: [user]
