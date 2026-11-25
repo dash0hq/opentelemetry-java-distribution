@@ -486,6 +486,32 @@ That is what agent 2.33.1 printed for a file whose
 with no `dash0_` entry and the Dash0 attributes still arrive, since the
 customizer adds them to every parsed model.
 
+### What a configuration file does not reach
+
+Everything this distribution sets under environment configuration has a
+counterpart in the table above, and the counterpart is the only reason it
+arrives. `AutoConfigurationCustomizerProvider` and `ResourceProvider` are not
+loaded from a declaratively configured process, so a setting registered through
+either of those and nowhere else never runs in this mode. Whatever is added to
+`Dash0ConfigurationCustomizerProvider` from now on has to be added to
+`Dash0DeclarativeConfigurationCustomizerProvider` as well, or recorded here as
+environment-only.
+
+Two pull requests open against this repository are in that position today.
+https://github.com/dash0hq/opentelemetry-java-distribution/pull/11 sets the MDC
+capture defaults through `addPropertiesCustomizer`, and
+https://github.com/dash0hq/opentelemetry-java-distribution/pull/12 sets
+`otel.semconv-stability.opt-in` from the body of
+`Dash0ConfigurationCustomizerProvider.customize`. Neither has merged. Each
+registers under `AutoConfigurationCustomizerProvider` alone, so as written
+neither would apply under `OTEL_CONFIG_FILE`.
+
+The upstream resource providers are the other half. None of them is loaded
+here, so the five `otel.resource.providers.<group>.enabled` toggles,
+`otel.java.disabled.resource.providers` and
+`otel.java.enabled.resource.providers` all do nothing, whichever way they are
+set. [Resource detection](resource-detection) lists what does run.
+
 ### The file format warning
 
 The agent logs this for a file declaring `file_format: "1.0"`:
