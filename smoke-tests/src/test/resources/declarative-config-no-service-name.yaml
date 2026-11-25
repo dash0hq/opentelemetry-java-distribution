@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+file_format: "1.0"
+
+meter_provider:
+  readers:
+    - periodic:
+        interval: 500
+        exporter:
+          console: {}

@@ -18,6 +18,7 @@ dependencies {
   compileOnly(project(":bootstrap"))
   compileOnly(libs.opentelemetrySdk)
   compileOnly(libs.opentelemetrySdkAutoconfigureSpi)
+  compileOnly(libs.opentelemetrySdkDeclarativeConfig)
   compileOnly(libs.opentelemetryJavaagentExtensionApi)
   compileOnly(libs.opentelemetryInstrumentationApi)
 
@@ -26,6 +27,7 @@ dependencies {
 
   testImplementation(libs.opentelemetrySdk)
   testImplementation(libs.opentelemetrySdkAutoconfigureSpi)
+  testImplementation(libs.opentelemetrySdkDeclarativeConfig)
   testImplementation(libs.opentelemetrySdkTesting)
   // The agent already bundles the X-Ray propagator, so it is only a test dependency here.
   testImplementation(libs.opentelemetrySdkAutoconfigure)
@@ -51,4 +53,8 @@ sourceSets {
 
 tasks.named<ProcessResources>("processResources") {
   dependsOn(generateVersionResource)
+}
+
+tasks.withType<Test>().configureEach {
+  environment("DASH0_DISABLE", "false")
 }

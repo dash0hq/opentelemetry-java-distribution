@@ -20,6 +20,7 @@ opentelemetryJavaagentTooling = { group = "io.opentelemetry.javaagent", name = "
 opentelemetryInstrumentationApi = { group = "io.opentelemetry.instrumentation", name = "opentelemetry-instrumentation-api" }
 opentelemetrySdk = { group = "io.opentelemetry", name = "opentelemetry-sdk" }
 opentelemetrySdkAutoconfigureSpi = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-autoconfigure-spi" }
+opentelemetrySdkDeclarativeConfig = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-declarative-config" }
 opentelemetrySdkTesting = { group = "io.opentelemetry", name = "opentelemetry-sdk-testing" }
 opentelemetrySdkAutoconfigure = { group = "io.opentelemetry", name = "opentelemetry-sdk-extension-autoconfigure" }
 opentelemetryAwsXrayPropagator = { group = "io.opentelemetry.contrib", name = "opentelemetry-aws-xray-propagator", version.ref = "opentelemetryAwsXrayPropagator" }

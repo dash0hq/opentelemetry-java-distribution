@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright 2026 Dash0 Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+file_format: "1.0"
+
+resource:
+  attributes:
+    - name: service.name
+      value: declarative-smoke-test
+
+tracer_provider:
+  processors:
+    - simple:
+        exporter:
+          console: {}

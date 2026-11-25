@@ -74,6 +74,83 @@ class PackageResourceAttributesTest {
         .doesNotContain("from-the-package-file");
   }
 
+  @Test
+  void exportsThoseAttributesUnderTheConfigFileToo() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\ndash0.package.version=1.2.3\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported = exportingTheResourceUnderTheConfigFile(agentJar);
+
+    assertThat(exported)
+        .as(
+            "Dash0DeclarativeConfigurationCustomizerProvider merges Dash0PackageResource into the"
+                + " attributes it writes, and no other test holds it there. Exported resource"
+                + " attributes were:%n%s",
+            exported)
+        .contains("dash0.package.name=\"dash0-java-autoinstrumentation\"")
+        .contains("dash0.package.version=\"1.2.3\"");
+  }
+
+  @Test
+  void thePackageFileBeatsADetectorUnderTheConfigFile() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\nhost.name=from-the-package-file\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported = exportingTheResourceUnderTheConfigFile(agentJar);
+
+    assertThat(exported)
+        .as(
+            "the opposite of losesEveryKeyAnUpstreamDetectorAlsoSets, and not a second decision:"
+                + " resource.attributes is applied after every detector and the declarative model"
+                + " offers no node that loses to one. Recorded here so the difference between the"
+                + " two modes is known rather than discovered. Exported resource attributes"
+                + " were:%n%s",
+            exported)
+        .contains("host.name=\"from-the-package-file\"");
+  }
+
+  @Test
+  void theDistroAttributesBeatThePackageFileUnderTheConfigFileToo() throws Exception {
+    Path agentJar = copyAgentJar();
+    Files.write(
+        agentJar.resolveSibling("dash0-resource-attributes.properties"),
+        ("dash0.package.name=dash0-java-autoinstrumentation\n"
+                + "telemetry.distro.name=from-the-package-file\n")
+            .getBytes(StandardCharsets.UTF_8));
+
+    String exported = exportingTheResourceUnderTheConfigFile(agentJar);
+
+    assertThat(exported)
+        .as(
+            "Dash0DeclarativeConfigurationCustomizerProvider merges the two Dash0 resources into"
+                + " one block of resource.attributes, and Resource.merge gives its argument"
+                + " precedence, so the argument has to be the distro resource for the environment"
+                + " ordering to hold. Exported resource attributes were:%n%s",
+            exported)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .doesNotContain("from-the-package-file");
+  }
+
+  private static String exportingTheResourceUnderTheConfigFile(Path agentJar) throws Exception {
+    return InstrumentedJvm.runningTheTestApplication()
+        .attaching(agentJar)
+        .withEnvironmentVariable(
+            "OTEL_CONFIG_FILE",
+            Paths.get(
+                    PackageResourceAttributesTest.class
+                        .getResource("/declarative-config.yaml")
+                        .toURI())
+                .toString())
+        .exitingAfter(4000)
+        .run();
+  }
+
   private Path copyAgentJar() throws IOException {
     Path agentJar = installDirectory.resolve("opentelemetry-javaagent.jar");
     Files.copy(

@@ -13,12 +13,14 @@ published at https://github.com/dash0hq/opentelemetry-java-distribution/releases
 | `telemetry.distro.name`, set to `dash0-java` | `DistroResourceProvider` |
 | `telemetry.distro.version`, the version of this distribution | `DistroResourceProvider` |
 | whatever a Linux package writes beside the agent jar, such as `dash0.package.name` | `Dash0PackageResourceProvider` |
+| all of the above under `OTEL_CONFIG_FILE` | `Dash0DeclarativeConfigurationCustomizerProvider` |
 
 The first two replace the upstream agent's own values, which report
 `opentelemetry-java-instrumentation`.
 
 Two environment variables are read: `DASH0_OTEL_COLLECTOR_BASE_URL` sets the
-OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. See
+OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. Both of them,
+and both attributes above, apply under `OTEL_CONFIG_FILE` as well. See
 [configuration](configuration).
 
 Everything else is upstream behaviour, unchanged.
@@ -63,9 +65,12 @@ Python distributions, branding, and an independent support and upgrade policy.
 That is a product decision, tracked in OSS-41
 (https://linear.app/dash0/issue/OSS-41/dash0-java-distro-analyse-approaches-to-creating-our-own-distro).
 
-### Declarative configuration: deferred
+### Declarative configuration: decided
 
-`OTEL_CONFIG_FILE` disables every customisation listed above, because
-declarative configuration uses a different pair of SPIs. The measurement and
-the design that would fix it are in [configuration](configuration). It is
-planned as a separate release after v0.1.0.
+`OTEL_CONFIG_FILE` is supported. Declarative configuration consults a different
+pair of SPIs, so the distribution registers a
+`DeclarativeConfigurationCustomizerProvider` that writes the same settings and
+the same attributes into the parsed configuration model. One rule is worth
+knowing before writing a file: `DASH0_OTEL_COLLECTOR_BASE_URL` fills in the
+endpoint of an exporter the file declared and left without one, and never adds
+an exporter the file did not declare. See [configuration](configuration).

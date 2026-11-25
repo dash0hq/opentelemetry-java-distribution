@@ -50,10 +50,13 @@ Linux package attributes
    ``docs/resource-detection.md``.
 
 Declarative configuration
-   Not supported. Under ``OTEL_CONFIG_FILE`` neither the Dash0 resource
-   providers nor the Dash0 environment variables take effect, which is measured
-   rather than assumed in ``docs/configuration.md``. Supporting it needs a
-   different pair of SPIs and is planned as a separate release after v0.1.0.
+   Supported. Under ``OTEL_CONFIG_FILE`` the SDK consults a different pair of
+   SPIs, so the distribution registers a
+   ``DeclarativeConfigurationCustomizerProvider`` that writes the Dash0
+   settings and the Dash0 attributes into the parsed configuration model.
+   ``DASH0_OTEL_COLLECTOR_BASE_URL`` fills in the endpoint of an exporter the
+   file declared without one, and adds no exporter the file did not declare.
+   See ``docs/configuration.md``.
 
 Kubernetes detection
    No ``k8s.pod.uid`` detector, unlike Node.js and Python. The reasoning, and

@@ -63,6 +63,22 @@ below are ones nothing else sets, and `DistroResourceProvider` takes the
 opposite choice with an order of `200` precisely because its job is to overwrite
 the agent's own value.
 
+The rule that the package file loses to an unguarded provider is inverted under
+`OTEL_CONFIG_FILE`, and the inversion is a consequence of the declarative model
+rather than a second decision.
+`Dash0DeclarativeConfigurationCustomizerProvider` writes every key of the file
+into `resource.attributes`, which `ResourceFactory` applies after every
+detector, and the declarative model offers no node that loses to a detector.
+So the same install with `host.name=from-the-package-file` in
+`dash0-resource-attributes.properties` exports the real host name with
+`OTEL_CONFIG_FILE` unset and `from-the-package-file` with it set.
+`thePackageFileBeatsADetectorUnderTheConfigFile` in
+`PackageResourceAttributesTest` holds that, beside
+`losesEveryKeyAnUpstreamDetectorAlsoSets` which holds the environment rule.
+Only the two `dash0.package.*` keys below are written by any Dash0 package
+today, and nothing else sets either of them, so no package currently reaches
+the difference.
+
 Two different mechanisms produce the environment beating the package file and
 the package file losing to every unguarded detector, and the doc used to credit
 the wrong one for both. Providers are applied in ascending `Ordered.order()` and later ones
@@ -293,6 +309,42 @@ Gradle and Maven generate, and a container image whose `CMD` is
 `["java","-cp",…]` all land there. No shipped provider rescues that case, and
 agent 2.33.1 has no servlet or WAR service-name detector. Set
 `OTEL_SERVICE_NAME` on those workloads.
+
+### Under `OTEL_CONFIG_FILE`
+
+Every provider named on this page, in the table of 23 and in the `service.name`
+table alike, is loaded only under environment configuration. When
+`OTEL_CONFIG_FILE` is set the SDK loads no `ResourceProvider` at all, and the
+only detectors that run are the ones the file names under
+`resource.detection/development`, the `host`, `process` and `service` detectors
+the Dash0 customizer inserts, and `opentelemetry_javaagent_distribution`, which
+the agent's own `ResourceCustomizerProvider` inserts whatever the file says.
+That upstream detector contributes `telemetry.distro.name` and
+`telemetry.distro.version`, and the Dash0 values in `resource.attributes` are
+applied over it. A file that wants `container.id` has to name `container`
+itself. The declarative configuration section of
+[configuration](configuration) covers what else the customizer writes.
+
+The detectors carry the same names in both modes and not the same attributes,
+and three differences are worth knowing before a query is written against them.
+The declarative `host` detector supplies `host.id` as well as `host.name`, so
+`OTEL_CONFIG_FILE` turns on the one attribute the environment path deliberately
+leaves off, and there is no way to ask for `host.name` without it:
+`ExperimentalHostResourceDetectorModel` has no fields. The declarative
+`process` detector supplies no `process.command_args`, which the environment
+path has, and nothing in this repository can add it.
+
+The third difference is the one `OTEL_SERVICE_NAME` reaches.
+`ServiceResourceDetector` builds a `DefaultConfigProperties` over the real
+environment and reads `otel.service.name` from it, so naming the `service`
+detector makes that one variable take effect on a process whose configuration
+comes from a file. The stock upstream agent 2.33.1, which names no detector of
+its own beyond `opentelemetry_javaagent_distribution`, exports
+`unknown_service:java` for the same file and the same variable. The variable
+still loses to a `service.name` the file writes in `resource.attributes`, which
+is the reverse of the environment path, where `EnvironmentResourceProvider` at
+order `2147483646` beats every other provider. `OTEL_RESOURCE_ATTRIBUTES` is
+read by no detector at all and remains ignored in this mode.
 
 ## Cloud detectors
 
@@ -560,6 +612,8 @@ the operator the injector already supplies the attributes. The gap is real and
 is an inconsistency with Python rather than an oversight.
 
 Declarative configuration is a second reason to revisit this. When
-`OTEL_CONFIG_FILE` is set, `OTEL_RESOURCE_ATTRIBUTES` is ignored, so the
-injector's attributes disappear for every runtime including Java. See the
-measurement in `docs/configuration.md`.
+`OTEL_CONFIG_FILE` is set, `OTEL_RESOURCE_ATTRIBUTES` is ignored by the SDK, so
+the injector's attributes disappear for every runtime including Java. The Dash0
+customizer described in [configuration](configuration) restores the Dash0
+attributes and the host, process and service detectors in that mode, and does
+not restore `OTEL_RESOURCE_ATTRIBUTES`.
