@@ -286,9 +286,9 @@ reports the error and starts no telemetry, which is what makes a typo in the
 path visible rather than silently replaced by step 2. The step is skipped for a
 value that is empty or only whitespace.
 
-`OTEL_SDK_DISABLED=true` also skips step 2, and that is the one place where a
-standard variable survives the switch. A declaratively configured SDK reads no
-`OTEL_SDK_DISABLED`, so a host-wide default file that loaded anyway would
+`OTEL_SDK_DISABLED=true` also skips step 2, and it is the only variable that
+keeps the default file from loading at all. A declaratively configured SDK reads
+no `OTEL_SDK_DISABLED`, so a host-wide default file that loaded anyway would
 restart a workload whose operator had silenced it. The value is compared with
 `Boolean.parseBoolean` on the raw string, which is what
 `DefaultConfigProperties.getBoolean` does, so the file loads for exactly the
