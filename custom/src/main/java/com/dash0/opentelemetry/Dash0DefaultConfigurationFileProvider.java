@@ -13,6 +13,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,6 +34,8 @@ public final class Dash0DefaultConfigurationFileProvider
   static final String CONFIGURATION_FILE_VARIABLE = "OTEL_CONFIG_FILE";
   static final String SDK_DISABLED_PROPERTY = "otel.sdk.disabled";
   static final String SDK_DISABLED_VARIABLE = "OTEL_SDK_DISABLED";
+  static final String RESOURCE_ATTRIBUTES_PROPERTY = "otel.resource.attributes";
+  static final String RESOURCE_ATTRIBUTES_VARIABLE = "OTEL_RESOURCE_ATTRIBUTES";
 
   private static final Logger logger =
       Logger.getLogger(Dash0DefaultConfigurationFileProvider.class.getName());
@@ -51,10 +55,12 @@ public final class Dash0DefaultConfigurationFileProvider
                       DEFAULT_CONFIGURATION_FILE_PROPERTY, DEFAULT_CONFIGURATION_FILE)));
       if (model != null) {
         String warning =
-            warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(
+            warningAboutTheVariablesTheDefaultFileWillIgnore(
                 Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
                     Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_PROPERTY,
-                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE));
+                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE),
+                Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+                    RESOURCE_ATTRIBUTES_PROPERTY, RESOURCE_ATTRIBUTES_VARIABLE));
         if (warning != null) {
           logger.log(Level.WARNING, warning);
         }
@@ -115,23 +121,42 @@ public final class Dash0DefaultConfigurationFileProvider
   }
 
   /**
-   * Returns what to log when {@code configuredOtlpEndpoint} is set and the default configuration
-   * file is about to configure the SDK, or null when there is nothing to report.
+   * Returns what to log when the default configuration file is about to configure the SDK and the
+   * environment carries a setting it will ignore, or null when there is nothing to report.
    *
    * @param configuredOtlpEndpoint the value of {@code OTEL_EXPORTER_OTLP_ENDPOINT}, or null when it
    *     is not set
+   * @param configuredResourceAttributes the value of {@code OTEL_RESOURCE_ATTRIBUTES}, or null when
+   *     it is not set
    */
-  static String warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(String configuredOtlpEndpoint) {
-    if (configuredOtlpEndpoint == null || configuredOtlpEndpoint.trim().isEmpty()) {
+  static String warningAboutTheVariablesTheDefaultFileWillIgnore(
+      String configuredOtlpEndpoint, String configuredResourceAttributes) {
+    List<String> ignored = new ArrayList<>();
+    if (isSet(configuredOtlpEndpoint)) {
+      ignored.add(
+          Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE
+              + " is set to "
+              + configuredOtlpEndpoint.trim());
+    }
+    if (isSet(configuredResourceAttributes)) {
+      ignored.add(
+          RESOURCE_ATTRIBUTES_VARIABLE + " is set to " + configuredResourceAttributes.trim());
+    }
+    if (ignored.isEmpty()) {
       return null;
     }
-    return Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE
-        + " is set to "
-        + configuredOtlpEndpoint.trim()
-        + ", and a declaratively configured SDK reads no OTEL_EXPORTER_OTLP_* variable. "
+    return String.join(", ", ignored)
+        + ". A declaratively configured SDK reads no OTEL_EXPORTER_OTLP_* variable and no "
+        + RESOURCE_ATTRIBUTES_VARIABLE
+        + ". "
         + DEFAULT_CONFIGURATION_FILE
-        + " decides where this process exports. Name the endpoint in that file, or set "
+        + " decides where this process exports and what resource attributes it carries. Name them"
+        + " in that file, or set "
         + CONFIGURATION_FILE_VARIABLE
         + " to a file of your own.";
+  }
+
+  private static boolean isSet(String value) {
+    return value != null && !value.trim().isEmpty();
   }
 }

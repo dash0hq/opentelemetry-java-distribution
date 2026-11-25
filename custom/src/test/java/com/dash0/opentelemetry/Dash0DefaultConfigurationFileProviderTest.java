@@ -7,7 +7,7 @@ package com.dash0.opentelemetry;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.DEFAULT_CONFIGURATION_FILE_PROPERTY;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.parseTheDefaultConfigurationFile;
-import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.warningAboutAnOtlpEndpointTheDefaultFileWillIgnore;
+import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.warningAboutTheVariablesTheDefaultFileWillIgnore;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationProvider;
@@ -190,19 +190,41 @@ class Dash0DefaultConfigurationFileProviderTest {
   @ParameterizedTest
   @NullSource
   @ValueSource(strings = {"", "   "})
-  void reportsNothingAboutAnOtlpEndpointNobodySet(String configuredOtlpEndpoint) {
-    assertThat(warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(configuredOtlpEndpoint)).isNull();
+  void reportsNothingAboutVariablesNobodySet(String configured) {
+    assertThat(warningAboutTheVariablesTheDefaultFileWillIgnore(configured, configured)).isNull();
   }
 
   @Test
   void reportsThatTheDefaultFileWillIgnoreTheConfiguredOtlpEndpoint() {
     assertThat(
-            warningAboutAnOtlpEndpointTheDefaultFileWillIgnore(" http://collector.invalid:4318 "))
+            warningAboutTheVariablesTheDefaultFileWillIgnore(
+                " http://collector.invalid:4318 ", null))
         .as(
             "a workload that set the endpoint itself exported there until the host gained the"
                 + " default file, and the SDK reports nothing when a file takes the variable over")
-        .contains("set to http://collector.invalid:4318,")
+        .contains("OTEL_EXPORTER_OTLP_ENDPOINT is set to http://collector.invalid:4318.")
+        .doesNotContain("OTEL_RESOURCE_ATTRIBUTES is set to")
         .contains(DEFAULT_CONFIGURATION_FILE);
+  }
+
+  @Test
+  void reportsThatTheDefaultFileWillIgnoreTheConfiguredResourceAttributes() {
+    assertThat(warningAboutTheVariablesTheDefaultFileWillIgnore(null, " k8s.pod.name=checkout-0 "))
+        .as(
+            "the Kubernetes operator carries k8s.* through OTEL_RESOURCE_ATTRIBUTES, and nothing"
+                + " in this distribution restores it once a file configures the SDK")
+        .contains("OTEL_RESOURCE_ATTRIBUTES is set to k8s.pod.name=checkout-0.")
+        .doesNotContain("OTEL_EXPORTER_OTLP_ENDPOINT is set to");
+  }
+
+  @Test
+  void reportsEveryIgnoredVariableInOneWarning() {
+    assertThat(
+            warningAboutTheVariablesTheDefaultFileWillIgnore(
+                "http://collector.invalid:4318", "k8s.pod.name=checkout-0"))
+        .contains(
+            "OTEL_EXPORTER_OTLP_ENDPOINT is set to http://collector.invalid:4318,"
+                + " OTEL_RESOURCE_ATTRIBUTES is set to k8s.pod.name=checkout-0.");
   }
 
   private static OpenTelemetryConfigurationModel modelFromTheProviderReading(
