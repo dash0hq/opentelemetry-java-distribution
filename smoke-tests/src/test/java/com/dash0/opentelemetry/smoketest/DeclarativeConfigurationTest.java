@@ -70,6 +70,25 @@ class DeclarativeConfigurationTest {
   }
 
   @Test
+  void theDetectionFilterDropsWhatTheInsertedDetectorsContribute() throws Exception {
+    String exported = configuredFrom("/declarative-config-excluded-attributes.yaml").run();
+
+    assertThat(exported)
+        .as(
+            "the attributes filter under resource.detection/development is the only way a file"
+                + " has of refusing an attribute the customizer's detectors contribute, since"
+                + " OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS names classes no ResourceProvider SPI"
+                + " loads in this mode. os.type survives host.* because the filter matches"
+                + " attribute names and the host detector contributes it. The JVM's output"
+                + " was:%n%s",
+            exported)
+        .contains("service.instance.id=")
+        .contains("os.type=")
+        .doesNotContain("host.name=")
+        .doesNotContain("process.pid=");
+  }
+
+  @Test
   void dash0DisableSwitchesTheSdkOff() throws Exception {
     String exported =
         configuredFrom("/declarative-config.yaml")

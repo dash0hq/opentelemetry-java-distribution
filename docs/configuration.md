@@ -317,6 +317,50 @@ produce under environment configuration. A package file naming
 by this distribution. [Resource detection](resource-detection) gives the whole
 list of what runs in this mode and what each detector contributes.
 
+### Dropping an attribute a detector contributes
+
+`host`, `process` and `service` are inserted whenever the file does not name
+them, so a file that leaves one out on purpose gets it anyway.
+`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS` is not the way back: it names
+`ResourceProvider` classes, and no `ResourceProvider` is loaded in this mode. A
+JVM started with
+`OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS=io.opentelemetry.instrumentation.resources.HostResourceProvider`
+and a configuration file exported `host.name` regardless.
+
+The filter the file does have is `attributes` under
+`resource.detection/development`, which takes an `included` and an `excluded`
+list of glob patterns. `ResourceFactory` applies the resulting predicate to
+every attribute name the detectors produce, the three inserted ones included:
+
+```yaml
+resource:
+  detection/development:
+    attributes:
+      excluded:
+        - host.*
+        - process.*
+```
+
+A JVM started with that file exported `os.type`, `os.description`,
+`os.version`, `service.instance.id`, `service.name` and the `telemetry.*`
+attributes, and no name beginning with `host.` or `process.`.
+
+The filter matches attribute names and not detectors. `os.type`,
+`os.description` and `os.version` are contributed by the `host` detector, so
+excluding `host.*` leaves all three in place, and dropping them as well takes
+`os.*` in the list too.
+
+It reaches detected attributes alone. `resource.attributes` and
+`resource.attributes_list` are applied after the predicate has run, so the
+Dash0 attributes and every name the file writes by hand survive any pattern.
+
+The `process` detector of this mode contributes `process.pid`,
+`process.executable.path` and the three `process.runtime.*` names. It
+contributes no `process.command_args`, which is the name that carries a JVM's
+command line. The environment path does contribute it, with the value of a
+credential-shaped system property already replaced: a JVM started with
+`-Dpassword=hunter2` exported `-Dpassword=***`.
+
 ### What the endpoint mapping does and does not touch
 
 `DASH0_OTEL_COLLECTOR_BASE_URL` reaches an exporter node only when the file
