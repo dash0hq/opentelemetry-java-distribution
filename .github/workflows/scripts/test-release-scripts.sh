@@ -247,6 +247,47 @@ assert_rejects "next-snapshot-version rejects a v-prefixed released version" \
 assert_rejects "next-snapshot-version rejects an empty released version" \
   "does not match X.Y.Z" next_snapshot_after_releasing "" "subject"
 
+check_next_version="$scripts/check-next-version.sh"
+
+assert_prints "check-next-version accepts a newer -SNAPSHOT" \
+  "0.2.1-SNAPSHOT will be opened on main once 0.2.0 is published" \
+  "$check_next_version" "0.2.0" "0.2.1-SNAPSHOT"
+assert_prints "check-next-version accepts an empty request" \
+  "no next version was requested, so the next minor will be opened" \
+  "$check_next_version" "0.2.0" ""
+assert_prints "check-next-version accepts a missing request" \
+  "no next version was requested, so the next minor will be opened" \
+  "$check_next_version" "0.2.0"
+assert_rejects "check-next-version rejects a request with no -SNAPSHOT" \
+  "does not match X.Y.Z-SNAPSHOT" "$check_next_version" "0.2.0" "0.2.1"
+assert_rejects "check-next-version rejects a request that goes backwards" \
+  "is not newer than the released version" "$check_next_version" "0.2.0" "0.1.0-SNAPSHOT"
+assert_rejects "check-next-version rejects a v-prefixed request" \
+  "does not match X.Y.Z-SNAPSHOT" "$check_next_version" "0.2.0" "v0.3.0-SNAPSHOT"
+
+next_snapshot_read_back_from_a_real_commit() {
+  local released="$1" requested="$2"
+  local root="$sandbox/trailer"
+  rm -rf "$root"
+  mkdir -p "$root"
+  git init --quiet --initial-branch=main "$root"
+  git -C "$root" config user.name releasing-test
+  git -C "$root" config user.email releasing-test@example.invalid
+  git -C "$root" config commit.gpgsign false
+  : > "$root/seed"
+  git -C "$root" add seed
+  git -C "$root" commit --quiet \
+    -m "docs: update changelog to prepare release v$released" \
+    -m "Next-Version: $requested"
+  git -C "$root" log -1 --pretty=%B | "$next_snapshot_version" "$released"
+}
+
+assert_prints "a trailer written by git commit -m reads back as itself" \
+  "0.2.1-SNAPSHOT" next_snapshot_read_back_from_a_real_commit "0.2.0" "0.2.1-SNAPSHOT"
+assert_prints "a trailer on a real commit survives the subject match" \
+  "v0.2.0" tags_on_origin_after_create_tag_for_release \
+  "$(printf 'docs: update changelog to prepare release v0.2.0\n\nNext-Version: 0.2.1-SNAPSHOT\n')"
+
 check_pending_changelog_entries="$scripts/check-pending-changelog-entries.sh"
 
 in_a_tree_whose_chloggen_holds() {

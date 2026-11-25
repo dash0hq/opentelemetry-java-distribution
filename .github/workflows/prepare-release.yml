@@ -61,10 +61,7 @@ jobs:
           set -euo pipefail
           version="$(.github/workflows/scripts/check-release-version.sh "$RAW_VERSION")"
           date="$(.github/workflows/scripts/resolve-release-date.sh "$RAW_DATE")"
-          if [ -n "$RAW_NEXT_VERSION" ]; then
-            printf 'subject\n\nNext-Version: %s\n' "$RAW_NEXT_VERSION" \
-              | .github/workflows/scripts/next-snapshot-version.sh "$version" > /dev/null
-          fi
+          .github/workflows/scripts/check-next-version.sh "$version" "$RAW_NEXT_VERSION"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "date=$date" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
