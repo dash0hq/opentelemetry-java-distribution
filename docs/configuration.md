@@ -72,14 +72,18 @@ three and the third has no Java counterpart:
 
 ## Standard OpenTelemetry variables
 
-All standard `OTEL_*` configuration works as it does with the upstream agent.
-Two standard defaults are changed:
+Under environment configuration, all standard `OTEL_*` configuration works as it
+does with the upstream agent. Two standard defaults are changed:
 
 | Variable | This distribution | Upstream |
 |---|---|---|
 | `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
 | `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | `tracecontext,baggage` |
-| `OTEL_CONFIG_FILE` | falls back to `/etc/opentelemetry/java/otel-config.yaml` when that file exists | no fallback |
+
+Under a configuration file the SDK reads almost none of them, and that mode is now
+reached without setting `OTEL_CONFIG_FILE` at all. [Declarative
+configuration](#declarative-configuration) below gives the order the file is picked
+in and what a file leaves unread.
 
 Upstream's configuration reference:
 https://opentelemetry.io/docs/zero-code/java/agent/configuration/

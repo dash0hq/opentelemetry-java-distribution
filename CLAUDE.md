@@ -74,9 +74,10 @@ does less than it should.
    the agent loads from `inst/` as a `.classdata` entry rather than as an
    ordinary class file. When that resolution breaks the agent starts normally
    and the package attributes are simply absent.
-9. **Declarative configuration.** Setting `OTEL_CONFIG_FILE` makes the SDK
+9. **Declarative configuration.** A configuration file makes the SDK
    skip every `ResourceProvider` and every `AutoConfigurationCustomizerProvider`,
-   which is items 1, 6, 7 and 8 at once.
+   which is items 1, 6, 7 and 8 at once. Since hazard 10 below, a host reaches
+   that mode without setting `OTEL_CONFIG_FILE` at all.
    `Dash0DeclarativeConfigurationCustomizerProvider` puts them back through the
    SPI that mode does consult. Two traps live inside it.
    `ResourceModel.setExtensionProperty` stores a Jackson copy of the value, so
