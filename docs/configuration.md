@@ -73,12 +73,13 @@ three and the third has no Java counterpart:
 ## Standard OpenTelemetry variables
 
 Under environment configuration, all standard `OTEL_*` configuration works as it
-does with the upstream agent. Two standard defaults are changed:
+does with the upstream agent. Three standard defaults are changed:
 
 | Variable | This distribution | Upstream |
 |---|---|---|
 | `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
 | `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | `tracecontext,baggage` |
+| `OTEL_SEMCONV_STABILITY_OPT_IN` | `database,code,rpc,messaging` | unset |
 
 Under a configuration file the SDK reads almost none of them, and that mode is now
 reached without setting `OTEL_CONFIG_FILE` at all. [Declarative
@@ -255,7 +256,183 @@ well as `X-Amzn-Trace-Id`, and it appears wherever baggage is copied onto spans
 or logs.
 
 Declarative configuration applies this default too, as
-`propagator.composite_list`. The next section describes the mechanism.
+`propagator.composite_list`. [Declarative
+configuration](#declarative-configuration) below describes the mechanism.
+
+### `OTEL_SEMCONV_STABILITY_OPT_IN`
+
+The distribution sets `otel.semconv-stability.opt-in=database,code,rpc,messaging`,
+so your spans carry the newer attribute names from the first day you run them
+rather than the superseded ones. Setting `OTEL_SEMCONV_STABILITY_OPT_IN` or
+`-Dotel.semconv-stability.opt-in` on the workload replaces the whole value; a
+blank one is treated as unset.
+
+The value is a comma-separated list of domains. Agent 2.33.1 accepts five, and
+the two columns below differ in what the semantic conventions working group has
+settled:
+
+| Domain | Without the opt-in | With it |
+|---|---|---|
+| `database` | old | stable |
+| `code` | old | stable |
+| `rpc` | old | experimental |
+| `messaging` | old | experimental |
+| `service.peer` | old | experimental |
+
+`http` is not in the list. HTTP semantic conventions are stable, the flag that
+selected them is gone, and the agent emits the stable attribute names whatever
+this variable says.
+
+`service.peer` is not in the default either, because its experimental attributes
+are expected to change again and adopting them now buys a second rename later.
+`rpc` and `messaging` are in it even though they are experimental, because the
+working group considers the current shape close to final.
+
+The database attributes are the ones most people notice. Without the opt-in a
+JDBC span carries `db.statement`, `db.system`, `db.name`, `db.operation`,
+`db.sql.table`, `db.user` and `db.connection_string`. With it, it carries
+`db.query.text`, `db.system.name`, `db.namespace` and `db.query.summary`.
+
+Three of those seven have no replacement, so no rewritten query recovers them:
+`db.user` and `db.connection_string` are gone from the stable conventions, and
+`db.sql.table` is dropped without `db.collection.name` taking its place, since
+Cassandra is the only SQL client whose instrumentation asks for the operation
+and collection pair. On a JDBC span the operation survives inside
+`db.query.summary`, which holds `SELECT customers` for a query against one
+table, and not as `db.operation.name`.
+
+A non-SQL database span is the other way round. It carries `db.operation.name`
+with the opt-in, so a filter on `db.operation` becomes a filter on
+`db.operation.name` there. Whether it also carries `db.collection.name` is up to
+the instrumentation: MongoDB, Geode and HBase report a collection, and Redis and
+Elasticsearch report none.
+
+Attribute names are not the only thing that changes. Span names, span kinds,
+metric names and one metric unit change with them, and a dashboard, query or
+alert written against any of these stops matching with no error anywhere:
+
+| What changes | Without the opt-in | With it |
+|---|---|---|
+| Database span name, SQL clients | `<operation> <database>.<table>` | a summary of the query |
+| Database span name, everything else | `<operation> <database>` | `<operation> <collection>` |
+| RPC span name, except gRPC | `<service>/<method>` | `<method>` |
+| Messaging span name | `<destination> <operation>`, as in `orders publish` | `<operation> <destination>`, as in `send orders` |
+| Messaging receive span kind | `CONSUMER` | `CLIENT` |
+| Messaging send span kind, when the span context is not propagated | `PRODUCER` | `CLIENT` |
+| RabbitMQ `basicGet` receive span | not recorded | recorded |
+| Connection pool metrics | `db.client.connections.usage`, `db.client.connections.max` | `db.client.connection.count`, `db.client.connection.limit` |
+| The other connection pool metrics | `db.client.connections.*` | `db.client.connection.*`, same suffix |
+| Connection pool metric attributes | `pool.name`, `state` | `db.client.connection.pool.name`, `db.client.connection.state` |
+| `create_time`, `wait_time`, `use_time` | milliseconds | **seconds** |
+| Database operation metrics | none | `db.client.operation.duration` |
+| Messaging metrics | none | `messaging.client.operation.duration`, `messaging.client.sent.messages`, `messaging.process.duration`, `messaging.client.consumed.messages` |
+
+The unit change is the one to check first. A threshold written against
+`db.client.connections.wait_time` in milliseconds carried over to
+`db.client.connection.wait_time` in seconds is a thousand times too high, so the
+alert stops firing rather than failing.
+
+The first database row covers every SQL client the agent instruments: JDBC,
+Cassandra, R2DBC, the Vert.x SQL client and ClickHouse among them. The second
+covers the rest, MongoDB and Redis and Elasticsearch among them, and its
+right-hand cell has two fallbacks. An instrumentation reporting no collection is
+named after its namespace, and one reporting neither after `<host>:<port>`,
+which is where Redis and Elasticsearch land: a Redis span named `GET` today is
+named `GET redis.example:6379` after the upgrade, one name per node rather than
+one for the cluster. MongoDB is the other way round. Its name already carries
+the collection, as `insert mydb.mycollection`, so the rename drops the database
+and leaves `insert mycollection`. The messaging row covers every messaging
+instrumentation, Kafka, JMS, RabbitMQ, SQS, Pulsar, RocketMQ and NATS among
+them.
+
+On a messaging span the operation word changes as well as its position: a Kafka
+producer span named `orders publish` becomes `send orders`, and a consumer span
+named `orders process` becomes `process orders`. Kafka's `poll` span is the one
+to leave out while sizing the work: a default agent never records it, as the
+Kafka bullet below explains.
+
+Log records change too, in one case. The Logback and Log4j appenders write
+`code` attributes on a log record only when the appender's experimental
+code-attribute capture is turned on, which is off by default. Where it is on,
+those records carry `code.file.path`, `code.function.name` and
+`code.line.number` in place of `code.filepath`, `code.namespace`,
+`code.function` and `code.lineno`.
+
+Four instrumentations differ from the table:
+
+- The AWS SDK names most of its client spans itself, as
+  `<service>.<operation>`, and reads none of this setting to do it, so a
+  DynamoDB or an S3 span keeps the name it has. Two parts of it do move: its SQS
+  messaging spans are renamed like every other messaging span, and its RDS Data
+  API spans take the query summary of the first database row.
+- gRPC span names never change. gRPC does not use the shared RPC span name
+  extractor, and its spans carry the full method name whatever this setting
+  says.
+- Pulsar loses metrics rather than gaining them. It is the one instrumentation
+  in agent 2.33.1 still emitting the pre-1.43 `messaging.publish.duration`,
+  `messaging.receive.duration` and `messaging.receive.messages`, and the opt-in
+  stops all three. Every other messaging instrumentation records none of them
+  either way, so the stable instruments are purely an addition there.
+- Kafka receive spans are unaffected in a default agent. That instrumentation
+  stays off until
+  `otel.instrumentation.common.messaging.experimental.receive-telemetry.enabled`
+  turns it on. RabbitMQ is the opposite case: its receive instrumenter is
+  enabled by this opt-in on its own, so an application polling a queue with
+  `basicGet` starts producing one span per call.
+
+Append `/dup` to a domain to emit both sets at once, as in
+`database/dup,code,rpc,messaging`. That doubles the attributes on every affected
+span and is a migration aid rather than a resting state. `messaging/dup` covers
+metrics too: it keeps Pulsar's three pre-1.43 instruments alongside the new
+ones. The connection pool instruments are the exception, because the agent picks
+one name for each of them rather than recording both, so `database/dup` still
+renames them and still moves the three histograms to seconds.
+
+To keep the superseded names everywhere, set the variable to a value that names
+no domain:
+
+```bash
+export OTEL_SEMCONV_STABILITY_OPT_IN=none
+```
+
+`none` is not a domain and selects nothing, which is what leaves every domain on
+its upstream default. Two other ways of saying it do not work. Clearing the
+variable does not, because a blank value is treated as unset and the default
+applies again. Writing the setting in the properties file named by
+`otel.javaagent.configuration-file` does not either: that file reaches
+`ConfigProperties`, which is not where the agent reads this setting from, so the
+line is ignored and the default applies over it. Use the environment variable or
+`-Dotel.semconv-stability.opt-in`.
+
+Unlike every other setting on this page, this one is applied by calling
+`System.setProperty` during agent startup, not by returning it from an
+autoconfiguration hook. The agent resolves it in `SemconvSelectionResolver`
+through `SystemProperty.getString`, which reads `System.getProperty` and then
+`System.getenv` and consults the SDK's resolved configuration for it in no other
+way. A value returned from `addPropertiesSupplier` or `addPropertiesCustomizer`
+reaches `ConfigProperties` and stops there, so the agent never sees it, the old
+attribute names keep arriving, and nothing in the log says why. Upstream
+documents the same restriction for the sibling setting
+`otel.semconv-stability.preview`.
+
+The guard reads both sources before setting anything: the system property is
+left alone when it already has a value, and nothing is set at all when
+`OTEL_SEMCONV_STABILITY_OPT_IN` is in the environment, since a system property
+would shadow the variable the agent reads next.
+
+The sampler and the propagators defaults reach a declaratively configured SDK
+through `Dash0DeclarativeConfigurationCustomizerProvider`, and this one does
+not. `System.setProperty` is called from
+`Dash0ConfigurationCustomizerProvider.customize`, and
+`AutoConfiguredOpenTelemetrySdkBuilder.buildImpl` returns from
+`maybeConfigureFromFile` before it loads any
+`AutoConfigurationCustomizerProvider`, so on a host configured from a file the
+superseded names keep arriving. A file expresses the same choice as
+`stability_opt_in_list` under `general`, which `general.db.semconv.version` and
+its siblings then beat per domain. A system property set by anything else is
+still read in that mode: `SemconvSelectionResolver` evaluates
+`SystemProperty.getString` whatever the configuration source, and gives the file
+precedence only where the file names the key.
 
 ## Declarative configuration
 
@@ -614,14 +791,16 @@ either of those and nowhere else never runs in this mode. Whatever is added to
 `Dash0DeclarativeConfigurationCustomizerProvider` as well, or recorded here as
 environment-only.
 
-Two pull requests open against this repository are in that position today.
-https://github.com/dash0hq/opentelemetry-java-distribution/pull/11 sets the MDC
-capture defaults through `addPropertiesCustomizer`, and
-https://github.com/dash0hq/opentelemetry-java-distribution/pull/12 sets
-`otel.semconv-stability.opt-in` from the body of
-`Dash0ConfigurationCustomizerProvider.customize`. Neither has merged. Each
-registers under `AutoConfigurationCustomizerProvider` alone, so as written
-neither would apply under `OTEL_CONFIG_FILE`.
+One setting is recorded here as environment-only. The
+`otel.semconv-stability.opt-in` default is set from the body of
+`Dash0ConfigurationCustomizerProvider.customize`, which registers under
+`AutoConfigurationCustomizerProvider` alone, so it never runs under
+`OTEL_CONFIG_FILE`. The `OTEL_SEMCONV_STABILITY_OPT_IN` section above gives the
+spelling a file uses for the same choice.
+
+https://github.com/dash0hq/opentelemetry-java-distribution/pull/11 is in the
+same position and has not merged. It sets the MDC capture defaults through
+`addPropertiesCustomizer`.
 
 The upstream resource providers are the other half. None of them is loaded
 here, so the five `otel.resource.providers.<group>.enabled` toggles,

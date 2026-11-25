@@ -24,7 +24,12 @@ OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. Both of them,
 and both attributes above, apply under `OTEL_CONFIG_FILE` as well. With
 `OTEL_CONFIG_FILE` unset, the SDK is configured from
 `/etc/opentelemetry/java/otel-config.yaml` when that file exists, which is where
-a Dash0 Linux package installs it. See [configuration](configuration).
+a Dash0 Linux package installs it. Three standard defaults are changed:
+`OTEL_TRACES_SAMPLER` is `always_on`, `OTEL_PROPAGATORS` is
+`tracecontext,baggage,xray`, which adds an `X-Amzn-Trace-Id` header to every
+outgoing request, and `OTEL_SEMCONV_STABILITY_OPT_IN` is
+`database,code,rpc,messaging`, which renames attributes on database, code, RPC
+and messaging spans. See [configuration](configuration).
 
 Everything else is upstream behaviour, unchanged.
 

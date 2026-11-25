@@ -116,9 +116,17 @@ instrumented JVM:
        which is how ``dash0.package.name`` and ``dash0.package.version`` reach
        the resource.
    * - ``Dash0ConfigurationCustomizerProvider``
-     - Applies ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE``.
+     - Applies ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE``, and
+       changes three standard defaults: ``OTEL_TRACES_SAMPLER`` is
+       ``always_on``, ``OTEL_SEMCONV_STABILITY_OPT_IN`` is
+       ``database,code,rpc,messaging`` and ``OTEL_PROPAGATORS`` is
+       ``tracecontext,baggage,xray``.
 
-Everything else is upstream behaviour, unchanged.
+Everything else is upstream behaviour, unchanged. The three changed defaults
+are the reason to read ``docs/configuration.md`` before deploying this rather
+than the upstream agent: the semantic convention opt-in renames attributes on
+database, code, RPC and messaging spans, and the propagator list adds an
+``X-Amzn-Trace-Id`` header to every outgoing request.
 
 Each of the three fails silently when it is wired up wrongly, which is why the
 smoke tests exist. ``DistroResourceProvider`` has to sort *after* the agent's
@@ -190,7 +198,9 @@ The same Dash0 code as an extension on the stock upstream agent:
 
 ``DASH0_OTEL_COLLECTOR_BASE_URL`` and ``DASH0_DISABLE`` are honoured, and all
 standard ``OTEL_*`` configuration works because the upstream agent handles it
-unchanged. See ``docs/configuration.md``.
+unchanged. The extension changes the same three standard defaults the agent jar
+does, ``OTEL_TRACES_SAMPLER``, ``OTEL_SEMCONV_STABILITY_OPT_IN`` and
+``OTEL_PROPAGATORS``. See ``docs/configuration.md``.
 
 
 Relationship to the other Dash0 distributions
