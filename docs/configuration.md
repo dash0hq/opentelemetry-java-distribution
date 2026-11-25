@@ -291,12 +291,11 @@ keeps the default file from loading at all. The provider reads it from the
 system property `otel.sdk.disabled`, then from the environment variable, and
 then from the properties file `otel.javaagent.configuration-file` names, which
 is the same set of three the SDK resolves it from under environment
-configuration. `DASH0_DISABLE` is read from those three as well. Neither of the
-two reaches a declaratively configured SDK on its own: the properties file is
-fed in by `ConfigurationPropertiesSupplier`, an
+configuration. The properties file reaches a declaratively configured SDK
+through nothing of its own: `ConfigurationPropertiesSupplier` is an
 `AutoConfigurationCustomizerProvider`, and the early return in
-`maybeConfigureFromFile` happens first, so each provider reads the file
-itself. A declaratively configured SDK reads
+`maybeConfigureFromFile` happens first, so the provider reads that file itself.
+The section on the customizer below lists every setting read that way. A declaratively configured SDK reads
 no `OTEL_SDK_DISABLED`, so a host-wide default file that loaded anyway would
 restart a workload whose operator had silenced it. The value is compared with
 `Boolean.parseBoolean` on the raw string, which is what
@@ -328,10 +327,20 @@ from whatever it returns.
 | `dash0.package.*`, read from beside the agent jar | `resource.attributes`, unless the file declares that name |
 | the upstream `host`, `process` and `service` detectors | `resource.detection/development`, unless the file names them |
 
-Both Dash0 settings are read from the system property first and the environment
-variable second, which is the precedence `DefaultConfigProperties` gives the
-same two names under environment configuration. There is no `ConfigProperties`
-instance in this mode. `DASH0_DISABLE` is compared against the string `true`
+Every setting the customizer reads comes from the system property first, the
+environment variable second, and the properties file
+`otel.javaagent.configuration-file` names third, which is the order
+`DefaultConfigProperties` resolves the same names in under environment
+configuration. There is no `ConfigProperties` instance in this mode, so each
+provider reads all three itself. `DASH0_DISABLE`,
+`DASH0_OTEL_COLLECTOR_BASE_URL` and `OTEL_EXPORTER_OTLP_ENDPOINT` are read that
+way here, and `OTEL_SDK_DISABLED` and `OTEL_RESOURCE_ATTRIBUTES` are read that
+way in `Dash0DefaultConfigurationFileProvider`. `OTEL_CONFIG_FILE` is the one
+exception, read from the system property and the environment variable alone,
+which is what upstream does with it: `ConfigurationFile` is loaded by an
+`AutoConfigurationCustomizerProvider`, and `maybeConfigureFromFile` reads
+`otel.config.file` before any of those are loaded, so a path put in the
+properties file reaches neither upstream nor this distribution. `DASH0_DISABLE` is compared against the string `true`
 case-insensitively and after trimming, exactly as it is under environment
 configuration, so `1`, `yes` and `on` still leave the SDK enabled.
 

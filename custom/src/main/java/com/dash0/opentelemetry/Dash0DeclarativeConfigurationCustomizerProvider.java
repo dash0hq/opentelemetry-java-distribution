@@ -82,9 +82,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
                 model,
                 systemPropertyEnvironmentVariableOrAgentConfigurationFile(
                     DISABLE_PROPERTY, DISABLE_VARIABLE),
-                systemPropertyOrEnvironmentVariable(
+                systemPropertyEnvironmentVariableOrAgentConfigurationFile(
                     COLLECTOR_BASE_URL_PROPERTY, COLLECTOR_BASE_URL_VARIABLE),
-                systemPropertyOrEnvironmentVariable(
+                systemPropertyEnvironmentVariableOrAgentConfigurationFile(
                     OTLP_ENDPOINT_PROPERTY, OTLP_ENDPOINT_VARIABLE)));
   }
 

@@ -57,11 +57,13 @@ public final class Dash0DefaultConfigurationFileProvider
       if (model != null) {
         String warning =
             warningAboutTheVariablesTheDefaultFileWillIgnore(
-                Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_PROPERTY,
-                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE),
-                Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-                    RESOURCE_ATTRIBUTES_PROPERTY, RESOURCE_ATTRIBUTES_VARIABLE));
+                Dash0DeclarativeConfigurationCustomizerProvider
+                    .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                        Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_PROPERTY,
+                        Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE),
+                Dash0DeclarativeConfigurationCustomizerProvider
+                    .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                        RESOURCE_ATTRIBUTES_PROPERTY, RESOURCE_ATTRIBUTES_VARIABLE));
         if (warning != null) {
           logger.log(Level.WARNING, warning);
         }

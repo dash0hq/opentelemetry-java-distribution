@@ -30,6 +30,8 @@ class DefaultConfigurationFileTest {
 
   private static final Path DEFAULT_CONFIGURATION_PATH = Paths.get(DEFAULT_CONFIGURATION_FILE);
 
+  private static final String DASH0_HOST = "default-file-collector-base-url.invalid";
+
   @Test
   void theAgentConfiguresItselfFromTheDefaultFileWhenOtelConfigFileIsUnset() throws Exception {
     String exported = withTheDefaultConfigurationFile(InstrumentedJvm.runningTheTestApplication());
@@ -162,6 +164,27 @@ class DefaultConfigurationFileTest {
   }
 
   @Test
+  void theCollectorBaseUrlInAnAgentConfigurationFileReachesTheDefaultFilesExporter(
+      @TempDir Path directory) throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .withJvmArguments(
+                    "-Dotel.javaagent.configuration-file="
+                        + propertiesFileHolding(
+                            directory, "dash0.otel.collector.base.url=http://" + DASH0_HOST)),
+            "/default-config-file-otlp.yaml");
+
+    assertThat(exported)
+        .as(
+            "the export failure names the host the exporter was pointed at, and the default file"
+                + " declares an OTLP exporter with no endpoint of its own. The JVM's output"
+                + " was:%n%s",
+            exported)
+        .contains(DASH0_HOST);
+  }
+
+  @Test
   void theEnvironmentConfiguresTheSdkWhenTheDefaultFileIsAbsent() throws Exception {
     String exported =
         InstrumentedJvm.runningTheTestApplication()
@@ -221,17 +244,23 @@ class DefaultConfigurationFileTest {
         .doesNotContain("default-config-file-smoke-test");
   }
 
-  /**
-   * Runs {@code jvm} with the smoke-test fixture installed at {@value #DEFAULT_CONFIGURATION_FILE},
-   * and removes the file again, or skips the test where this host will not have it written.
-   */
+  /** Runs {@code jvm} with the default smoke-test fixture installed, and removes it again. */
   private static String withTheDefaultConfigurationFile(InstrumentedJvm jvm) throws Exception {
+    return withTheDefaultConfigurationFile(jvm, "/default-config-file.yaml");
+  }
+
+  /**
+   * Runs {@code jvm} with the fixture {@code fixtureName} installed at {@value
+   * #DEFAULT_CONFIGURATION_FILE}, and removes the file again.
+   */
+  private static String withTheDefaultConfigurationFile(InstrumentedJvm jvm, String fixtureName)
+      throws Exception {
     if (Files.exists(DEFAULT_CONFIGURATION_PATH)) {
       failInCiAndSkipElsewhere(DEFAULT_CONFIGURATION_FILE + " already exists on this host");
     }
     try {
       Files.createDirectories(DEFAULT_CONFIGURATION_PATH.getParent());
-      Files.copy(Paths.get(fixture("/default-config-file.yaml")), DEFAULT_CONFIGURATION_PATH);
+      Files.copy(Paths.get(fixture(fixtureName)), DEFAULT_CONFIGURATION_PATH);
     } catch (IOException e) {
       failInCiAndSkipElsewhere(
           DEFAULT_CONFIGURATION_FILE + " cannot be written on this host: " + e);
