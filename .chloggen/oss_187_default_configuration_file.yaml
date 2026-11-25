@@ -1,0 +1,42 @@
+change_type: breaking
+
+component: custom
+
+note: Configure the SDK from /etc/opentelemetry/java/otel-config.yaml when OTEL_CONFIG_FILE is unset
+
+issues: [21]
+
+subtext: |
+  A Dash0 Linux package installs an OpenTelemetry configuration file at
+  ``/etc/opentelemetry/java/otel-config.yaml``, and nothing read it. The file
+  stayed inert until a host administrator also set ``OTEL_CONFIG_FILE``.
+  The order is now ``OTEL_CONFIG_FILE`` when it is set to anything that is not
+  blank, then ``/etc/opentelemetry/java/otel-config.yaml`` when that file
+  exists, then the environment variables, which is what a host without the file
+  keeps doing. An ``OTEL_CONFIG_FILE`` that names a file which does not exist
+  counts as set, so the SDK reports the error instead of this distribution
+  quietly loading a different file.
+  A host leaves the default file behind by removing or renaming it, which puts
+  the next JVM back on environment configuration, or by setting
+  ``OTEL_CONFIG_FILE`` for a single workload. No variable selects environment
+  configuration while the file is there.
+  ``OTEL_SDK_DISABLED=true`` keeps the default file from loading at all, read
+  from the system property, the environment variable and the properties file
+  ``otel.javaagent.configuration-file`` names, which is the same set of three
+  the SDK resolves it from under environment configuration. ``DASH0_DISABLE``
+  is now read from those three as well. An explicit ``OTEL_CONFIG_FILE`` is
+  unaffected by either, since naming a file is an opt-in.
+  A default file that cannot be read or parsed stops autoconfiguration, as does
+  one that parses to no document at all. The agent reports that it failed to
+  start and the JVM runs uninstrumented, with no fallback to environment
+  configuration, which is what the Dash0 Python and Node.js distributions do
+  with their own default file.
+  A host that has the Dash0 Java package installed and sets neither variable
+  changes behaviour without changing its configuration, because the shipped file
+  now configures the SDK. Every standard ``OTEL_*`` variable other than
+  ``OTEL_SDK_DISABLED`` stops configuring the SDK directly, and the shipped file
+  answers for them by interpolating the ones you set, including
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` and ``OTEL_RESOURCE_ATTRIBUTES``. The
+  repackaged agent jar and the standalone extension jar both do this.
+  ``docs/configuration.md`` describes the SPI the provider registers under and
+  what the Dash0 customizer still contributes in this mode.

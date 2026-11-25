@@ -4,6 +4,7 @@
  */
 package com.dash0.opentelemetry;
 
+import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.AGENT_CONFIGURATION_FILE_PROPERTY;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.DISABLE_PROPERTY;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.DISABLE_VARIABLE;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.addResourceAttributesTheFileDoesNotDeclare;
@@ -12,6 +13,7 @@ import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerPro
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.defaultThePropagatorsToTracecontextBaggageXray;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.defaultTheSamplerToAlwaysOn;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.enableTheHostProcessAndServiceDetectors;
+import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyEnvironmentVariableOrAgentConfigurationFile;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable;
 import static com.dash0.opentelemetry.Dash0DeclarativeConfigurationCustomizerProvider.useTheCollectorBaseUrlForEveryDeclaredOtlpExporter;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +53,10 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.Exper
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalResourceDetectorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ResourceModelAccessor;
 import io.opentelemetry.sdk.resources.Resource;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -63,6 +69,7 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -645,6 +652,78 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
     assertThat(
             systemPropertyOrEnvironmentVariable("dash0.no.such.setting", "DASH0_NO_SUCH_SETTING"))
         .isNull();
+  }
+
+  @Test
+  void readsASettingOutOfTheFileOtelJavaagentConfigurationFileNames(@TempDir Path directory)
+      throws IOException {
+    Path agentConfigurationFile = agentConfigurationFileHolding(directory, "dash0.disable=true\n");
+    System.setProperty(AGENT_CONFIGURATION_FILE_PROPERTY, agentConfigurationFile.toString());
+
+    try {
+      assertThat(
+              systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                  "dash0.disable", "DASH0_NO_SUCH_SETTING"))
+          .as(
+              "the agent feeds that file into DefaultConfigProperties through"
+                  + " ConfigurationPropertiesSupplier, which no SPI of a declaratively configured"
+                  + " SDK reaches")
+          .isEqualTo("true");
+    } finally {
+      System.clearProperty(AGENT_CONFIGURATION_FILE_PROPERTY);
+    }
+  }
+
+  @Test
+  void prefersTheSystemPropertyOverTheFileOtelJavaagentConfigurationFileNames(
+      @TempDir Path directory) throws IOException {
+    Path agentConfigurationFile =
+        agentConfigurationFileHolding(directory, "dash0.no.such.setting=from-the-file\n");
+    System.setProperty(AGENT_CONFIGURATION_FILE_PROPERTY, agentConfigurationFile.toString());
+    System.setProperty("dash0.no.such.setting", "from-the-system-property");
+
+    try {
+      assertThat(
+              systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                  "dash0.no.such.setting", "DASH0_NO_SUCH_SETTING"))
+          .as("the agent reads that file at the lowest precedence of the three")
+          .isEqualTo("from-the-system-property");
+    } finally {
+      System.clearProperty("dash0.no.such.setting");
+      System.clearProperty(AGENT_CONFIGURATION_FILE_PROPERTY);
+    }
+  }
+
+  @Test
+  void readsNothingWhenOtelJavaagentConfigurationFileNamesNoFileThatExists(
+      @TempDir Path directory) {
+    System.setProperty(
+        AGENT_CONFIGURATION_FILE_PROPERTY, directory.resolve("absent.properties").toString());
+
+    try {
+      assertThat(
+              systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                  "dash0.no.such.setting", "DASH0_NO_SUCH_SETTING"))
+          .as("the agent reports that file itself, and throwing here would stop the whole JVM")
+          .isNull();
+    } finally {
+      System.clearProperty(AGENT_CONFIGURATION_FILE_PROPERTY);
+    }
+  }
+
+  @Test
+  void readsNothingWhenOtelJavaagentConfigurationFileIsNotSet() {
+    assertThat(
+            systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                "dash0.no.such.setting", "DASH0_NO_SUCH_SETTING"))
+        .isNull();
+  }
+
+  private static Path agentConfigurationFileHolding(Path directory, String content)
+      throws IOException {
+    Path file = directory.resolve("otel.properties");
+    Files.write(file, content.getBytes(StandardCharsets.UTF_8));
+    return file;
   }
 
   private static List<LogRecord> whileCapturingTheCustomizersLog(Runnable action) {

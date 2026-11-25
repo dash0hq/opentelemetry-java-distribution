@@ -72,13 +72,18 @@ three and the third has no Java counterpart:
 
 ## Standard OpenTelemetry variables
 
-All standard `OTEL_*` configuration works as it does with the upstream agent.
-Two standard defaults are changed:
+Under environment configuration, all standard `OTEL_*` configuration works as it
+does with the upstream agent. Two standard defaults are changed:
 
 | Variable | This distribution | Upstream |
 |---|---|---|
 | `OTEL_TRACES_SAMPLER` | `always_on` | `parentbased_always_on` |
 | `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | `tracecontext,baggage` |
+
+Under a configuration file the SDK reads almost none of them, and that mode is now
+reached without setting `OTEL_CONFIG_FILE` at all. [Declarative
+configuration](#declarative-configuration) below gives the order the file is picked
+in and what a file leaves unread.
 
 Upstream's configuration reference:
 https://opentelemetry.io/docs/zero-code/java/agent/configuration/
@@ -254,21 +259,61 @@ Declarative configuration applies this default too, as
 
 ## Declarative configuration
 
-`OTEL_CONFIG_FILE` points the agent at a YAML file that replaces environment
-configuration entirely. This distribution does not ship one, and works when one
-is supplied. The variable is named `OTEL_CONFIG_FILE`;
+A declarative configuration file is a YAML file that replaces environment
+configuration entirely. The variable that names one is `OTEL_CONFIG_FILE`;
 `OTEL_EXPERIMENTAL_CONFIG_FILE` is read by nothing in agent 2.33.1.
 
-The SDK consults a different pair of SPIs in this mode.
+The distribution picks the file in this order:
+
+1. `OTEL_CONFIG_FILE`, when it is set to anything that is not blank.
+2. `/etc/opentelemetry/java/otel-config.yaml`, when that file exists.
+3. Neither, in which case the SDK configures itself from the environment, as
+   described in every section above.
+
+A Dash0 Linux package installs the file at the path in step 2, so a host with
+that package and no `OTEL_CONFIG_FILE` runs in declarative-configuration mode
+from the file the package ships. A host or container without that file is
+unaffected.
+
+A host leaves step 2 by changing the file, not by setting a variable. Removing
+or renaming `/etc/opentelemetry/java/otel-config.yaml` puts the next JVM back on
+step 3, and a package upgrade that reinstalls the file puts it back on step 2.
+Setting `OTEL_CONFIG_FILE` moves a single workload to step 1 without touching
+the host. No variable selects step 3 while the file is there.
+
+An `OTEL_CONFIG_FILE` naming a file that does not exist still wins. The SDK
+reports the error and starts no telemetry, which is what makes a typo in the
+path visible rather than silently replaced by step 2. The step is skipped for a
+value that is empty or only whitespace.
+
+`OTEL_SDK_DISABLED=true` also skips step 2, and it is the only variable that
+keeps the default file from loading at all. The provider reads it from the
+system property `otel.sdk.disabled`, then from the environment variable, and
+then from the properties file `otel.javaagent.configuration-file` names, which
+is the same set of three the SDK resolves it from under environment
+configuration. The properties file reaches a declaratively configured SDK
+through nothing of its own: `ConfigurationPropertiesSupplier` is an
+`AutoConfigurationCustomizerProvider`, and the early return in
+`maybeConfigureFromFile` happens first, so the provider reads that file itself.
+The section on the customizer below lists every setting read that way. A declaratively configured SDK reads
+no `OTEL_SDK_DISABLED`, so a host-wide default file that loaded anyway would
+restart a workload whose operator had silenced it. The value is compared with
+`Boolean.parseBoolean` on the raw string, which is what
+`DefaultConfigProperties.getBoolean` does, so the file loads for exactly the
+values that leave the SDK enabled under environment configuration. An explicit
+`OTEL_CONFIG_FILE` is unaffected: step 1 is an opt-in, and the SDK has ignored
+`OTEL_SDK_DISABLED` under one since declarative configuration existed.
+
+The SDK consults a different set of SPIs in this mode.
 `AutoConfigurationCustomizerProvider` and `ResourceProvider`, which carry
 everything this distribution contributes under environment configuration, are
 never loaded: `AutoConfiguredOpenTelemetrySdkBuilder.buildImpl` returns from
-`maybeConfigureFromFile` before it reaches either. The two that are loaded are
-`DeclarativeConfigurationCustomizerProvider` and
-`io.opentelemetry.sdk.autoconfigure.spi.internal.ComponentProvider`.
+`maybeConfigureFromFile` before it reaches either. The three that are loaded are
+`DeclarativeConfigurationProvider`, `DeclarativeConfigurationCustomizerProvider`
+and `io.opentelemetry.sdk.autoconfigure.spi.internal.ComponentProvider`.
 
 `Dash0DeclarativeConfigurationCustomizerProvider` in `custom/` registers under
-the first of those. Its `addModelCustomizer` function receives the parsed
+the second of those. Its `addModelCustomizer` function receives the parsed
 `OpenTelemetryConfigurationModel`, a mutable bean tree, and the SDK is built
 from whatever it returns.
 
@@ -282,10 +327,20 @@ from whatever it returns.
 | `dash0.package.*`, read from beside the agent jar | `resource.attributes`, unless the file declares that name |
 | the upstream `host`, `process` and `service` detectors | `resource.detection/development`, unless the file names them |
 
-Both Dash0 settings are read from the system property first and the environment
-variable second, which is the precedence `DefaultConfigProperties` gives the
-same two names under environment configuration. There is no `ConfigProperties`
-instance in this mode. `DASH0_DISABLE` is compared against the string `true`
+Every setting the customizer reads comes from the system property first, the
+environment variable second, and the properties file
+`otel.javaagent.configuration-file` names third, which is the order
+`DefaultConfigProperties` resolves the same names in under environment
+configuration. There is no `ConfigProperties` instance in this mode, so each
+provider reads all three itself. `DASH0_DISABLE`,
+`DASH0_OTEL_COLLECTOR_BASE_URL` and `OTEL_EXPORTER_OTLP_ENDPOINT` are read that
+way here, and `OTEL_SDK_DISABLED` and `OTEL_RESOURCE_ATTRIBUTES` are read that
+way in `Dash0DefaultConfigurationFileProvider`. `OTEL_CONFIG_FILE` is the one
+exception, read from the system property and the environment variable alone,
+which is what upstream does with it: `ConfigurationFile` is loaded by an
+`AutoConfigurationCustomizerProvider`, and `maybeConfigureFromFile` reads
+`otel.config.file` before any of those are loaded, so a path put in the
+properties file reaches neither upstream nor this distribution. `DASH0_DISABLE` is compared against the string `true`
 case-insensitively and after trimming, exactly as it is under environment
 configuration, so `1`, `yes` and `on` still leave the SDK enabled.
 
@@ -316,6 +371,68 @@ produce under environment configuration. A package file naming
 `OTEL_RESOURCE_ATTRIBUTES` is still ignored in this mode, by the SDK rather than
 by this distribution. [Resource detection](resource-detection) gives the whole
 list of what runs in this mode and what each detector contributes.
+
+### The default configuration file
+
+`Dash0DefaultConfigurationFileProvider` in `custom/` registers under
+`DeclarativeConfigurationProvider`, the one SPI that runs early enough to
+supply the file: `maybeConfigureFromFile` calls
+`DeclarativeConfigUtil.configureFromSpi` before it reads `otel.config.file`,
+and takes the first provider that answers with a model.
+
+Running before `otel.config.file` is read is also what the provider has to
+defend against. A provider that answered unconditionally would override an
+`OTEL_CONFIG_FILE` an operator set, which is the reverse of the order above, so
+the provider reads `otel.config.file` itself, from the system property first and
+the environment variable second, and stands aside when it holds a value that is
+not blank. That is the same pair of names, in the same order, that
+`DefaultConfigProperties` would have given `maybeConfigureFromFile`. A path put
+in an `otel.javaagent.configuration-file` properties file does not reach either,
+upstream or here, because that file is read by an
+`AutoConfigurationCustomizerProvider` and the early return happens first.
+
+The file is parsed with `DeclarativeConfiguration.parse`, which is the call
+`DeclarativeConfigUtil.configureFromFile` makes for the file `OTEL_CONFIG_FILE`
+names, so `${VARIABLE}` substitution and the model are identical either way.
+
+A default file that cannot be read or parsed stops autoconfiguration. The agent
+prints `OpenTelemetry Javaagent failed to start` with the parse error under it,
+the JVM then runs with no instrumentation, exports nothing and still exits zero.
+There is no fallback to environment configuration, which is also what the Dash0
+Python and Node.js distributions do with their own default file. A file that
+parses to no document at all is treated the same way: `DeclarativeConfiguration.parse`
+answers null rather than throwing for an empty file, a file of whitespace, a
+file of comments and a bare `---`, which `touch` on the path, a truncated write
+and a template that rendered nothing all produce, and the provider raises a
+`ConfigurationException` naming the path.
+
+A file that is valid YAML and then names an exporter, sampler or detector the
+agent has no `ComponentProvider` for fails the same way one step later, in
+`DeclarativeConfigUtil.create`, after `getConfigurationModel` has returned.
+Under `OTEL_CONFIG_FILE` any of these mistakes reaches the one process whose
+operator set the variable; under the default file it reaches every JVM on the
+host, and the file belongs to a package rather than to the operator. Whatever
+ships `/etc/opentelemetry/java/otel-config.yaml` is where it has to be validated
+against the agent version the package carries.
+
+Every other standard `OTEL_*` variable stops configuring the SDK directly on a
+host that gains the default file, and the file is what answers for them, by
+interpolating the ones you set. The file a Dash0 Linux package installs
+interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` on each of its exporters and
+`OTEL_RESOURCE_ATTRIBUTES` as `resource.attributes_list`, among others, so both
+of those keep applying, and so do the `k8s.*` attributes the Dash0 Kubernetes
+operator carries through the second one. The substitution is
+`DeclarativeConfiguration.parse`'s own, the same call the file `OTEL_CONFIG_FILE`
+names goes through, which `substitutesAnEnvironmentReferenceTheDefaultFileMakes`
+asserts. A variable the file does not interpolate has no effect, and the way to
+restore it is to edit the file.
+
+`OTEL_SERVICE_NAME` is not reported, and does not need to be. The `service`
+detector the customizer inserts reads `otel.service.name` off the real
+environment, so the variable survives the switch unless the file names
+`service.name` itself. `theServiceDetectorMakesOtelServiceNameTakeEffect` and
+`theFilesServiceNameBeatsOtelServiceName` in `DeclarativeConfigurationTest`
+assert both halves of that.
 
 ### Dropping an attribute a detector contributes
 
@@ -531,6 +648,35 @@ and for the standalone extension jar.
 `Dash0DeclarativeConfigurationCustomizerProviderTest` in `custom/` runs the
 customizer over a model it builds by hand and asserts on the result, which is
 where the exporter shapes no fixture declares are covered.
+
+`DefaultConfigurationFileTest` in `smoke-tests/` covers the three steps of the
+order above, again in both delivery shapes. It installs the fixture at
+`/etc/opentelemetry/java/otel-config.yaml` and removes it again. Where the
+directory is not writable it skips on a developer machine and fails on CI,
+which it tells apart by the `CI` variable every GitHub Actions runner sets, so
+a workflow that stops preparing the directory turns the build red instead of
+dropping the only end-to-end coverage the feature has.
+`Dash0DefaultConfigurationFileProviderTest` in `custom/` points the same code at
+a temporary directory, which is where the unreadable and unparseable files are
+covered.
+
+The path in step 2 is the default of the `dash0.default.configuration.file`
+system property, and the build sets that property everywhere except in the JVMs
+`DefaultConfigurationFileTest` launches, to a path under `build/` that nothing
+creates. `custom/build.gradle.kts` sets it for the unit tests, and
+`InstrumentedJvm` passes it to every JVM a smoke test launches unless the test
+calls `readingTheHostDefaultConfigurationFile`.
+
+Without it, a host that has the Dash0 Java package installed runs a different
+test suite from a host that does not. The unit tests load the host's file into a
+plain SDK, where the agent's `ComponentProvider` implementations are absent, and
+`DefaultPropagatorsTest` fails with `No component provider detected for
+io.opentelemetry.sdk.resources.Resource with name "process"`. The smoke tests
+launch JVMs that take their configuration from the host's file instead of from
+the environment each test sets up, which is the same hole that stripping `OTEL_*`
+and `DASH0_*` from the launched environment exists to close. `gradle.properties`
+sets `org.gradle.parallel = true`, so `:custom:test` can also meet the fixture
+`DefaultConfigurationFileTest` installs while it is installed.
 
 The declarative model classes are marked internal and experimental upstream, and
 the path spelling `detection/development` is itself a version marker that will

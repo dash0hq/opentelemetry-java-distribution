@@ -33,6 +33,8 @@ final class InstrumentedJvm {
   private Integer millisecondsBeforeExit;
   private Path executableJar;
   private Path workingDirectory;
+  private boolean readsTheHostDefaultConfigurationFile;
+  private boolean agentIsExpectedToFailToStart;
 
   private InstrumentedJvm() {}
 
@@ -75,6 +77,22 @@ final class InstrumentedJvm {
     return this;
   }
 
+  /**
+   * Lets the JVM read the default configuration file at the path {@code
+   * Dash0DefaultConfigurationFileProvider} names, instead of the path under {@code build/} that
+   * nothing creates.
+   */
+  InstrumentedJvm readingTheHostDefaultConfigurationFile() {
+    readsTheHostDefaultConfigurationFile = true;
+    return this;
+  }
+
+  /** Requires the agent to report that it failed to start, instead of requiring that it did not. */
+  InstrumentedJvm expectingTheAgentToFailToStart() {
+    agentIsExpectedToFailToStart = true;
+    return this;
+  }
+
   /** Keeps the application alive this long, so that a periodic exporter runs at least once. */
   InstrumentedJvm exitingAfter(int milliseconds) {
     millisecondsBeforeExit = milliseconds;
@@ -84,14 +102,19 @@ final class InstrumentedJvm {
   /**
    * Starts the JVM, waits for it, and returns its combined standard output and standard error.
    *
-   * @throws AssertionError if the JVM did not exit within two minutes, if the agent reported that
-   *     it failed to start, if the exit code was not zero, or if the application did not reach the
-   *     end of {@code main}
+   * @throws AssertionError if the JVM did not exit within two minutes, if the agent's start
+   *     disagreed with {@link #expectingTheAgentToFailToStart()}, if the exit code was not zero, or
+   *     if the application did not reach the end of {@code main}
    */
   String run() throws IOException, InterruptedException {
     List<String> command = new ArrayList<>();
     command.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
     command.add("-javaagent:" + agentJar);
+    if (!readsTheHostDefaultConfigurationFile) {
+      command.add(
+          "-Ddash0.default.configuration.file="
+              + System.getProperty("dash0.absent.default.configuration.file"));
+    }
     command.addAll(jvmArguments);
     if (executableJar == null) {
       command.add("-cp");
@@ -125,9 +148,15 @@ final class InstrumentedJvm {
                 + contentOf(outputFile));
       }
       String output = contentOf(outputFile);
-      assertThat(output)
-          .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
-          .doesNotContain("OpenTelemetry Javaagent failed to start");
+      if (agentIsExpectedToFailToStart) {
+        assertThat(output)
+            .as("the agent started, so this JVM is not the uninstrumented one:%n%s", output)
+            .contains("OpenTelemetry Javaagent failed to start");
+      } else {
+        assertThat(output)
+            .as("the agent did not start, so nothing below this can mean anything:%n%s", output)
+            .doesNotContain("OpenTelemetry Javaagent failed to start");
+      }
       assertThat(process.exitValue())
           .as("the instrumented JVM exited non-zero, so its output was:%n%s", output)
           .isZero();

@@ -73,6 +73,12 @@ jobs:
         with:
           cache-disabled: true
 
+      - name: Let the smoke tests install the default configuration file
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /etc/opentelemetry/java
+          sudo chown "$(id -u):$(id -g)" /etc/opentelemetry/java
+
       - name: Build
         run: ./gradlew build --stacktrace
 

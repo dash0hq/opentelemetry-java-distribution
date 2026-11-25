@@ -64,14 +64,15 @@ opposite choice with an order of `200` precisely because its job is to overwrite
 the agent's own value.
 
 The rule that the package file loses to an unguarded provider is inverted under
-`OTEL_CONFIG_FILE`, and the inversion is a consequence of the declarative model
-rather than a second decision.
+a configuration file, and the inversion is a consequence of the declarative
+model rather than a second decision.
 `Dash0DeclarativeConfigurationCustomizerProvider` writes every key of the file
 into `resource.attributes`, which `ResourceFactory` applies after every
 detector, and the declarative model offers no node that loses to a detector.
 So the same install with `host.name=from-the-package-file` in
-`dash0-resource-attributes.properties` exports the real host name with
-`OTEL_CONFIG_FILE` unset and `from-the-package-file` with it set.
+`dash0-resource-attributes.properties` exports the real host name under
+environment configuration and `from-the-package-file` under a configuration
+file.
 `thePackageFileBeatsADetectorUnderTheConfigFile` in
 `PackageResourceAttributesTest` holds that, beside
 `losesEveryKeyAnUpstreamDetectorAlsoSets` which holds the environment rule.
@@ -310,12 +311,13 @@ Gradle and Maven generate, and a container image whose `CMD` is
 agent 2.33.1 has no servlet or WAR service-name detector. Set
 `OTEL_SERVICE_NAME` on those workloads.
 
-### Under `OTEL_CONFIG_FILE`
+### Under a configuration file
 
 Every provider named on this page, in the table of 23 and in the `service.name`
-table alike, is loaded only under environment configuration. When
-`OTEL_CONFIG_FILE` is set the SDK loads no `ResourceProvider` at all, and the
-only detectors that run are the ones the file names under
+table alike, is loaded only under environment configuration. When a
+configuration file configures the SDK, whether `OTEL_CONFIG_FILE` names it or it
+is the default file at `/etc/opentelemetry/java/otel-config.yaml`, the SDK loads
+no `ResourceProvider` at all, and the only detectors that run are the ones the file names under
 `resource.detection/development`, the `host`, `process` and `service` detectors
 the Dash0 customizer inserts, and `opentelemetry_javaagent_distribution`, which
 the agent's own `ResourceCustomizerProvider` inserts whatever the file says.
@@ -327,8 +329,8 @@ itself. The declarative configuration section of
 
 The detectors carry the same names in both modes and not the same attributes,
 and three differences are worth knowing before a query is written against them.
-The declarative `host` detector supplies `host.id` as well as `host.name`, so
-`OTEL_CONFIG_FILE` turns on the one attribute the environment path deliberately
+The declarative `host` detector supplies `host.id` as well as `host.name`, so a
+configuration file turns on the one attribute the environment path deliberately
 leaves off, and there is no way to ask for `host.name` without it:
 `ExperimentalHostResourceDetectorModel` has no fields. The declarative
 `process` detector supplies no `process.command_args`, which the environment
@@ -611,9 +613,9 @@ the Linux system package, which installs on hosts rather than in pods, and under
 the operator the injector already supplies the attributes. The gap is real and
 is an inconsistency with Python rather than an oversight.
 
-Declarative configuration is a second reason to revisit this. When
-`OTEL_CONFIG_FILE` is set, `OTEL_RESOURCE_ATTRIBUTES` is ignored by the SDK, so
-the injector's attributes disappear for every runtime including Java. The Dash0
+Declarative configuration is a second reason to revisit this. Under a
+configuration file, `OTEL_RESOURCE_ATTRIBUTES` is ignored by the SDK, so the
+injector's attributes disappear for every runtime including Java. The Dash0
 customizer described in [configuration](configuration) restores the Dash0
 attributes and the host, process and service detectors in that mode, and does
 not restore `OTEL_RESOURCE_ATTRIBUTES`.

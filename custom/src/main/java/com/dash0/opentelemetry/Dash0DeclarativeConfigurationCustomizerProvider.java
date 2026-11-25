@@ -30,11 +30,16 @@ import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.Exper
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ExperimentalServiceResourceDetectorModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.internal.ResourceModelAccessor;
 import io.opentelemetry.sdk.resources.Resource;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -56,6 +61,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   static final String COLLECTOR_BASE_URL_VARIABLE = "DASH0_OTEL_COLLECTOR_BASE_URL";
   static final String OTLP_ENDPOINT_PROPERTY = "otel.exporter.otlp.endpoint";
   static final String OTLP_ENDPOINT_VARIABLE = "OTEL_EXPORTER_OTLP_ENDPOINT";
+  static final String AGENT_CONFIGURATION_FILE_PROPERTY = "otel.javaagent.configuration-file";
+  static final String AGENT_CONFIGURATION_FILE_VARIABLE = "OTEL_JAVAAGENT_CONFIGURATION_FILE";
 
   static final String TRACES_PATH = "/v1/traces";
   static final String METRICS_PATH = "/v1/metrics";
@@ -73,10 +80,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
         model ->
             applyDash0Settings(
                 model,
-                systemPropertyOrEnvironmentVariable(DISABLE_PROPERTY, DISABLE_VARIABLE),
-                systemPropertyOrEnvironmentVariable(
+                systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                    DISABLE_PROPERTY, DISABLE_VARIABLE),
+                systemPropertyEnvironmentVariableOrAgentConfigurationFile(
                     COLLECTOR_BASE_URL_PROPERTY, COLLECTOR_BASE_URL_VARIABLE),
-                systemPropertyOrEnvironmentVariable(
+                systemPropertyEnvironmentVariableOrAgentConfigurationFile(
                     OTLP_ENDPOINT_PROPERTY, OTLP_ENDPOINT_VARIABLE)));
   }
 
@@ -431,5 +439,35 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       String systemProperty, String environmentVariable) {
     String value = System.getProperty(systemProperty);
     return value != null ? value : System.getenv(environmentVariable);
+  }
+
+  /**
+   * Returns the value of {@code systemProperty}, falling back to {@code environmentVariable}, then
+   * to {@code systemProperty} in the properties file {@code otel.javaagent.configuration-file}
+   * names, and then to null.
+   */
+  static String systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+      String systemProperty, String environmentVariable) {
+    String value = systemPropertyOrEnvironmentVariable(systemProperty, environmentVariable);
+    if (value != null) {
+      return value;
+    }
+    String agentConfigurationFile =
+        systemPropertyOrEnvironmentVariable(
+            AGENT_CONFIGURATION_FILE_PROPERTY, AGENT_CONFIGURATION_FILE_VARIABLE);
+    if (agentConfigurationFile == null || agentConfigurationFile.trim().isEmpty()) {
+      return null;
+    }
+    String path = agentConfigurationFile.trim();
+    if (path.startsWith("~")) {
+      path = System.getProperty("user.home") + path.substring(1);
+    }
+    Properties properties = new Properties();
+    try (InputStream stream = Files.newInputStream(Paths.get(path))) {
+      properties.load(stream);
+    } catch (IOException | RuntimeException e) {
+      return null;
+    }
+    return properties.getProperty(systemProperty);
   }
 }

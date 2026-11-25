@@ -74,9 +74,10 @@ does less than it should.
    the agent loads from `inst/` as a `.classdata` entry rather than as an
    ordinary class file. When that resolution breaks the agent starts normally
    and the package attributes are simply absent.
-9. **Declarative configuration.** Setting `OTEL_CONFIG_FILE` makes the SDK
+9. **Declarative configuration.** A configuration file makes the SDK
    skip every `ResourceProvider` and every `AutoConfigurationCustomizerProvider`,
-   which is items 1, 6, 7 and 8 at once.
+   which is items 1, 6, 7 and 8 at once. Since hazard 10 below, a host reaches
+   that mode without setting `OTEL_CONFIG_FILE` at all.
    `Dash0DeclarativeConfigurationCustomizerProvider` puts them back through the
    SPI that mode does consult. Two traps live inside it.
    `ResourceModel.setExtensionProperty` stores a Jackson copy of the value, so
@@ -85,8 +86,22 @@ does less than it should.
    match a registered `ComponentProvider`, or the SDK fails to build.
    `DeclarativeConfigurationTest` and
    `Dash0DeclarativeConfigurationCustomizerProviderTest` guard this one.
+10. **The order the default configuration file is picked in.**
+    `maybeConfigureFromFile` calls `DeclarativeConfigUtil.configureFromSpi`
+    before it reads `otel.config.file`, so a `DeclarativeConfigurationProvider`
+    that answers with a model unconditionally replaces the file an operator
+    named in `OTEL_CONFIG_FILE`, which is the reverse of what this distribution
+    promises. `Dash0DefaultConfigurationFileProvider` reads `otel.config.file`
+    itself and stands aside when it holds a value that is not blank. Nothing
+    reports the inversion: the agent starts and exports from the wrong file.
+    `DefaultConfigurationFileTest` guards this one in a real JVM. It skips
+    itself where `/etc/opentelemetry/java` is not writable on a developer
+    machine and fails there on CI, which is why the workflows make the
+    directory writable for the runner user.
+    `Dash0DefaultConfigurationFileProviderTest` guards it too, against a
+    temporary directory, and runs on every host.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all nine. They
+The smoke tests in `smoke-tests/` exist specifically to catch all ten. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
@@ -101,7 +116,8 @@ What guards what:
 | 6 and 7, the Dash0 settings | `Dash0ConfigurationTest`, and the `supported-jvms` matrix across Java 8 to 27 |
 | 8, locating a file beside the jar | `PackageResourceAttributesTest` |
 | 9, declarative configuration | `DeclarativeConfigurationTest`, `Dash0DeclarativeConfigurationCustomizerProviderTest` |
-| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest` |
+| 10, the order the default configuration file is picked in | `DefaultConfigurationFileTest`, `Dash0DefaultConfigurationFileProviderTest` |
+| Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest`, `DefaultConfigurationFileTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
 
 Two habits these tests encode, both learned the hard way. Assert a presence

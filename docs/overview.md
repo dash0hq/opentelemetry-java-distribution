@@ -14,14 +14,17 @@ published at https://github.com/dash0hq/opentelemetry-java-distribution/releases
 | `telemetry.distro.version`, the version of this distribution | `DistroResourceProvider` |
 | whatever a Linux package writes beside the agent jar, such as `dash0.package.name` | `Dash0PackageResourceProvider` |
 | all of the above under `OTEL_CONFIG_FILE` | `Dash0DeclarativeConfigurationCustomizerProvider` |
+| the configuration file a Dash0 Linux package installs, when `OTEL_CONFIG_FILE` is unset | `Dash0DefaultConfigurationFileProvider` |
 
 The first two replace the upstream agent's own values, which report
 `opentelemetry-java-instrumentation`.
 
 Two environment variables are read: `DASH0_OTEL_COLLECTOR_BASE_URL` sets the
 OTLP endpoint and `DASH0_DISABLE=true` turns the SDK into a no-op. Both of them,
-and both attributes above, apply under `OTEL_CONFIG_FILE` as well. See
-[configuration](configuration).
+and both attributes above, apply under `OTEL_CONFIG_FILE` as well. With
+`OTEL_CONFIG_FILE` unset, the SDK is configured from
+`/etc/opentelemetry/java/otel-config.yaml` when that file exists, which is where
+a Dash0 Linux package installs it. See [configuration](configuration).
 
 Everything else is upstream behaviour, unchanged.
 
@@ -67,10 +70,14 @@ That is a product decision, tracked in OSS-41
 
 ### Declarative configuration: decided
 
-`OTEL_CONFIG_FILE` is supported. Declarative configuration consults a different
-pair of SPIs, so the distribution registers a
+`OTEL_CONFIG_FILE` is supported, and so is the file a Dash0 Linux package
+installs at `/etc/opentelemetry/java/otel-config.yaml`, which configures the SDK
+when `OTEL_CONFIG_FILE` is unset. Declarative configuration consults a different
+set of SPIs, so the distribution registers a
 `DeclarativeConfigurationCustomizerProvider` that writes the same settings and
-the same attributes into the parsed configuration model. One rule is worth
-knowing before writing a file: `DASH0_OTEL_COLLECTOR_BASE_URL` fills in the
-endpoint of an exporter the file declared and left without one, and never adds
-an exporter the file did not declare. See [configuration](configuration).
+the same attributes into the parsed configuration model, and a
+`DeclarativeConfigurationProvider` that supplies the default file. One rule is
+worth knowing before writing a file: `DASH0_OTEL_COLLECTOR_BASE_URL` fills in
+the endpoint of an exporter the file declared and left without one, and never
+adds an exporter the file did not declare. See
+[configuration](configuration).
