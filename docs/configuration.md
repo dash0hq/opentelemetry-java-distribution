@@ -442,7 +442,10 @@ Neither the upstream agent nor this distribution captures them, so those values
 reach Dash0 only as a substring of the message body, if the log pattern includes
 them at all.
 
-Capture is opt-in, and it is turned on per appender instrumentation. Three
+Capture is opt-in, and it is turned on per appender instrumentation. Every
+property named in this section is environment-only: a host configured from a
+declarative configuration file opts in through the file instead, as the
+Opting in under a configuration file subsection below describes. Three
 instrumentations read an MDC selector, and each one has its own property:
 
 | Property | Appender |
@@ -1035,6 +1038,11 @@ here, so the five `otel.resource.providers.<group>.enabled` toggles,
 `otel.java.disabled.resource.providers` and
 `otel.java.enabled.resource.providers` all do nothing, whichever way they are
 set. [Resource detection](resource-detection) lists what does run.
+
+The upstream MDC selectors are in that position as well. `SelectorConfig` reads
+them from the file alone and never from a system property, so the MDC capture
+section above gives the `instrumentation/development` node that turns capture
+on in this mode.
 
 ### The file format warning
 
