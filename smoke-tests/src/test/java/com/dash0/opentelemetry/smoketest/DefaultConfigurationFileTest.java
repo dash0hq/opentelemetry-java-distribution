@@ -87,6 +87,23 @@ class DefaultConfigurationFileTest {
   }
 
   @Test
+  void theOtelConfigFileSystemPropertyBeatsTheDefaultFileToo() throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .withJvmArguments("-Dotel.config.file=" + fixture("/declarative-config.yaml")));
+
+    assertThat(exported)
+        .as(
+            "the provider reads the system property as well as the environment variable, which is"
+                + " the pair DefaultConfigProperties would have given maybeConfigureFromFile. The"
+                + " JVM's output was:%n%s",
+            exported)
+        .contains("service.name=\"declarative-smoke-test\"")
+        .doesNotContain("default-config-file-smoke-test");
+  }
+
+  @Test
   void otelSdkDisabledStillSwitchesTheSdkOffUnderTheDefaultFile() throws Exception {
     String exported =
         withTheDefaultConfigurationFile(
@@ -147,6 +164,25 @@ class DefaultConfigurationFileTest {
             exported)
         .contains("service.name=\"default-config-file-smoke-test\"")
         .contains("telemetry.distro.name=\"dash0-java\"");
+  }
+
+  @Test
+  void anExplicitOtelConfigFileBeatsTheDefaultFileThroughTheExtensionJarToo() throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .attaching(Paths.get(System.getProperty("dash0.upstream.agent.jar")))
+                .withJvmArguments(
+                    "-Dotel.javaagent.extensions=" + System.getProperty("dash0.extension.jar"))
+                .withEnvironmentVariable("OTEL_CONFIG_FILE", fixture("/declarative-config.yaml")));
+
+    assertThat(exported)
+        .as(
+            "the extension jar reaches the same provider through a different class loader, so the"
+                + " precedence is asserted in both delivery shapes. The JVM's output was:%n%s",
+            exported)
+        .contains("service.name=\"declarative-smoke-test\"")
+        .doesNotContain("default-config-file-smoke-test");
   }
 
   /**
