@@ -94,10 +94,12 @@ does less than it should.
     promises. `Dash0DefaultConfigurationFileProvider` reads `otel.config.file`
     itself and stands aside when it holds a value that is not blank. Nothing
     reports the inversion: the agent starts and exports from the wrong file.
-    `DefaultConfigurationFileTest` and
-    `Dash0DefaultConfigurationFileProviderTest` guard this one, and both skip
-    themselves where `/etc/opentelemetry/java` is not writable, which is why CI
-    makes it writable for the runner user.
+    `DefaultConfigurationFileTest` guards this one in a real JVM. It skips
+    itself where `/etc/opentelemetry/java` is not writable on a developer
+    machine and fails there on CI, which is why the workflows make the
+    directory writable for the runner user.
+    `Dash0DefaultConfigurationFileProviderTest` guards it too, against a
+    temporary directory, and runs on every host.
 
 The smoke tests in `smoke-tests/` exist specifically to catch all ten. They
 assert on the shape of the built jars and on what a real instrumented JVM
