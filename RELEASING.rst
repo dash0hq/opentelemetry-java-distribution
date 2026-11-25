@@ -136,7 +136,7 @@ Every push the automation makes uses the
 ``GITHUB_TOKEN``. GitHub starts no workflow from an event caused by
 ``GITHUB_TOKEN``, so a commit pushed with it would never reach
 ``create-tag-for-release.yml`` and a tag pushed with it would never reach
-``release.yml``. The chain would stop at its first link.
+``release.yml``. Nothing after the first workflow would run.
 
 That secret is an organisation secret in ``dash0hq``, and this repository
 cannot see it. The organization-secrets API lists only
