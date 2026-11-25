@@ -9,10 +9,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: release-tag
-  cancel-in-progress: false
-
 jobs:
   create-tag-for-release:
     name: Tag a prepared release
