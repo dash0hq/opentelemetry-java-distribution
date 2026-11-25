@@ -75,7 +75,8 @@ jobs:
           TAG: ${{ steps.inputs.outputs.tag }}
         run: |
           set -euo pipefail
-          if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG")" ]; then
+          existing="$(git ls-remote --tags origin "refs/tags/$TAG")"
+          if [ -n "$existing" ]; then
             echo "::error::$TAG already exists. Pick a higher version; a published" \
               "version is never re-cut."
             exit 1

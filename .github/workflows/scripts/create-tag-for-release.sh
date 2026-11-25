@@ -15,7 +15,9 @@ fi
 
 tag="${BASH_REMATCH[1]}"
 
-if [ -n "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
+existing="$(git ls-remote --tags origin "refs/tags/$tag")"
+
+if [ -n "$existing" ]; then
   echo "::error::$tag already exists on origin, so HEAD prepares a release that" \
     "has already been cut. Nothing was tagged." >&2
   exit 1

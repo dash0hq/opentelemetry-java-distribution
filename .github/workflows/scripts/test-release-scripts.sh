@@ -189,6 +189,23 @@ assert_rejects "create-tag-for-release refuses to retag a published version" \
   "already exists on origin" run_create_tag_for_release \
   "docs: update changelog to prepare release v0.2.0" "v0.2.0"
 
+create_tag_for_release_against_an_unreachable_origin() {
+  build_a_repository_whose_head_message_is \
+    "docs: update changelog to prepare release v0.2.0" > /dev/null 2>&1
+  git -C "$sandbox/tagging/work" remote set-url origin "$sandbox/tagging/absent.git"
+  (cd "$sandbox/tagging/work" && "$create_tag_for_release")
+}
+
+tags_left_after_an_unreachable_origin() {
+  create_tag_for_release_against_an_unreachable_origin > /dev/null 2>&1 || true
+  git -C "$sandbox/tagging/work" tag --list | tr '\n' ' ' | sed 's/ *$//'
+}
+
+assert_rejects "create-tag-for-release fails when origin cannot be reached" \
+  "" create_tag_for_release_against_an_unreachable_origin
+assert_prints "create-tag-for-release tags nothing when origin cannot be reached" \
+  "" tags_left_after_an_unreachable_origin
+
 next_snapshot_version="$scripts/next-snapshot-version.sh"
 
 next_snapshot_after_releasing() {
