@@ -79,6 +79,11 @@ jobs:
       - name: Refuse a release with no pending changelog entries
         run: .github/workflows/scripts/check-pending-changelog-entries.sh
 
+      - name: Refuse a version main is already prepared for
+        env:
+          VERSION: ${{ steps.inputs.outputs.version }}
+        run: .github/workflows/scripts/check-changelog-has-no-section.sh "$VERSION"
+
       - uses: actions/setup-go@v7
         with:
           go-version: stable

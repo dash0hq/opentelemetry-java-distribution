@@ -291,6 +291,48 @@ assert_rejects "check-release-version-is-newest rejects a lower major" \
 assert_rejects "check-release-version-is-newest rejects a malformed version" \
   "does not match X.Y.Z" newest_check_against "0.2" "v0.1.0"
 
+check_changelog_has_no_section="$scripts/check-changelog-has-no-section.sh"
+
+in_a_tree_whose_changelog_is() {
+  local contents="$1"
+  shift
+  rm -rf "${sandbox:?}/changelog"
+  mkdir -p "$sandbox/changelog"
+  if [ "$contents" != "<absent>" ]; then
+    printf '%s\n' "$contents" > "$sandbox/changelog/CHANGELOG.rst"
+  fi
+  (cd "$sandbox/changelog" && "$@")
+}
+
+released_sections="$(printf '0.2.0 - 2026-11-25\n==================\n\n0.1.0 - 2026-11-09\n==================')"
+
+assert_prints "check-changelog-has-no-section accepts an unreleased version" \
+  "CHANGELOG.rst has no section for 0.3.0 yet" \
+  in_a_tree_whose_changelog_is "$released_sections" \
+  "$check_changelog_has_no_section" "0.3.0"
+assert_prints "check-changelog-has-no-section does not confuse 0.2.1 with 0.2.10" \
+  "CHANGELOG.rst has no section for 0.2.1 yet" \
+  in_a_tree_whose_changelog_is "$(printf '0.2.10 - 2026-11-25\n===================')" \
+  "$check_changelog_has_no_section" "0.2.1"
+assert_prints "check-changelog-has-no-section treats the version as literal text" \
+  "CHANGELOG.rst has no section for 0.2.0 yet" \
+  in_a_tree_whose_changelog_is "$(printf '09280 - 2026-11-25\n==================')" \
+  "$check_changelog_has_no_section" "0.2.0"
+assert_rejects "check-changelog-has-no-section rejects a version already prepared" \
+  "already has a section for 0.2.0" \
+  in_a_tree_whose_changelog_is "$released_sections" \
+  "$check_changelog_has_no_section" "0.2.0"
+assert_rejects "check-changelog-has-no-section rejects an older prepared version" \
+  "already has a section for 0.1.0" \
+  in_a_tree_whose_changelog_is "$released_sections" \
+  "$check_changelog_has_no_section" "0.1.0"
+assert_rejects "check-changelog-has-no-section rejects a tree with no CHANGELOG.rst" \
+  "no CHANGELOG.rst" \
+  in_a_tree_whose_changelog_is "<absent>" "$check_changelog_has_no_section" "0.3.0"
+assert_rejects "check-changelog-has-no-section rejects an empty version" \
+  "no version was given" \
+  in_a_tree_whose_changelog_is "$released_sections" "$check_changelog_has_no_section" ""
+
 check_next_version="$scripts/check-next-version.sh"
 
 assert_prints "check-next-version accepts a newer -SNAPSHOT" \
