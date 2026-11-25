@@ -64,7 +64,6 @@ jobs:
           .github/workflows/scripts/check-next-version.sh "$version" "$RAW_NEXT_VERSION"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "date=$date" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "Preparing $version dated $date."
 
       - name: Refuse a version that is not newer than the last release
