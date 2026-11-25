@@ -9,10 +9,12 @@ import static org.junit.jupiter.api.Assumptions.abort;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Asserts that a real instrumented JVM configures itself from {@value #DEFAULT_CONFIGURATION_FILE}
@@ -122,6 +124,44 @@ class DefaultConfigurationFileTest {
   }
 
   @Test
+  void otelSdkDisabledInAnAgentConfigurationFileStillSwitchesTheSdkOff(@TempDir Path directory)
+      throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .withJvmArguments(
+                    "-Dotel.javaagent.configuration-file="
+                        + propertiesFileHolding(directory, "otel.sdk.disabled=true")));
+
+    assertThat(exported)
+        .as(
+            "the agent reads that file into the properties the SDK resolves otel.sdk.disabled"
+                + " from, and no SPI of a declaratively configured SDK ever sees it, so the"
+                + " provider reads the file itself. The JVM's output was:%n%s",
+            exported)
+        .doesNotContain("service.name=\"default-config-file-smoke-test\"");
+  }
+
+  @Test
+  void dash0DisableInAnAgentConfigurationFileStillSwitchesTheSdkOff(@TempDir Path directory)
+      throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .withJvmArguments(
+                    "-Dotel.javaagent.configuration-file="
+                        + propertiesFileHolding(directory, "dash0.disable=true")));
+
+    assertThat(exported)
+        .as(
+            "DASH0_DISABLE is the kill switch this distribution promises, and the spelling an"
+                + " operator picks for it cannot decide whether it works. The JVM's output"
+                + " was:%n%s",
+            exported)
+        .doesNotContain("service.name=\"default-config-file-smoke-test\"");
+  }
+
+  @Test
   void theEnvironmentConfiguresTheSdkWhenTheDefaultFileIsAbsent() throws Exception {
     String exported =
         InstrumentedJvm.runningTheTestApplication()
@@ -212,6 +252,12 @@ class DefaultConfigurationFileTest {
       throw new AssertionError(reason);
     }
     abort(reason);
+  }
+
+  private static String propertiesFileHolding(Path directory, String content) throws IOException {
+    Path file = directory.resolve("otel.properties");
+    Files.write(file, (content + "\n").getBytes(StandardCharsets.UTF_8));
+    return file.toString();
   }
 
   private static String fixture(String name) throws URISyntaxException {

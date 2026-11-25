@@ -33,7 +33,11 @@ subtext: |
   propagator defaults and the ``host``, ``process`` and ``service`` detectors
   apply to the default file exactly as they apply to a file named by
   ``OTEL_CONFIG_FILE``.
-  ``OTEL_SDK_DISABLED=true`` keeps the default file from loading at all. A
+  ``OTEL_SDK_DISABLED=true`` keeps the default file from loading at all, read
+  from the system property, the environment variable and the properties file
+  ``otel.javaagent.configuration-file`` names, which is the same set of three
+  the SDK resolves it from under environment configuration. ``DASH0_DISABLE``
+  is now read from those three as well. A
   declaratively configured SDK reads no ``OTEL_SDK_DISABLED``, so a host-wide
   file that loaded anyway would restart a workload whose operator had silenced
   it. An explicit ``OTEL_CONFIG_FILE`` is unaffected, since that is an opt-in.

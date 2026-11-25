@@ -287,7 +287,16 @@ path visible rather than silently replaced by step 2. The step is skipped for a
 value that is empty or only whitespace.
 
 `OTEL_SDK_DISABLED=true` also skips step 2, and it is the only variable that
-keeps the default file from loading at all. A declaratively configured SDK reads
+keeps the default file from loading at all. The provider reads it from the
+system property `otel.sdk.disabled`, then from the environment variable, and
+then from the properties file `otel.javaagent.configuration-file` names, which
+is the same set of three the SDK resolves it from under environment
+configuration. `DASH0_DISABLE` is read from those three as well. Neither of the
+two reaches a declaratively configured SDK on its own: the properties file is
+fed in by `ConfigurationPropertiesSupplier`, an
+`AutoConfigurationCustomizerProvider`, and the early return in
+`maybeConfigureFromFile` happens first, so each provider reads the file
+itself. A declaratively configured SDK reads
 no `OTEL_SDK_DISABLED`, so a host-wide default file that loaded anyway would
 restart a workload whose operator had silenced it. The value is compared with
 `Boolean.parseBoolean` on the raw string, which is what

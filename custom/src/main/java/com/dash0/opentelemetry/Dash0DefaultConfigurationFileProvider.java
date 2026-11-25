@@ -48,8 +48,9 @@ public final class Dash0DefaultConfigurationFileProvider
           parseTheDefaultConfigurationFile(
               Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
                   CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
-              Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-                  SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
+              Dash0DeclarativeConfigurationCustomizerProvider
+                  .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                      SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
               Paths.get(
                   System.getProperty(
                       DEFAULT_CONFIGURATION_FILE_PROPERTY, DEFAULT_CONFIGURATION_FILE)));
