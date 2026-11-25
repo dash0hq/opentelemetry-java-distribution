@@ -256,7 +256,8 @@ well as `X-Amzn-Trace-Id`, and it appears wherever baggage is copied onto spans
 or logs.
 
 Declarative configuration applies this default too, as
-`propagator.composite_list`. The next section describes the mechanism.
+`propagator.composite_list`. [Declarative
+configuration](#declarative-configuration) below describes the mechanism.
 
 ### `OTEL_SEMCONV_STABILITY_OPT_IN`
 
@@ -419,10 +420,19 @@ left alone when it already has a value, and nothing is set at all when
 `OTEL_SEMCONV_STABILITY_OPT_IN` is in the environment, since a system property
 would shadow the variable the agent reads next.
 
-Declarative configuration does not apply this default either, for the reason the
-Declarative configuration section below gives. A file expresses the same choice
-as `stability_opt_in_list` under `general`, which `general.db.semconv.version`
-and its siblings then beat per domain.
+The sampler and the propagators defaults reach a declaratively configured SDK
+through `Dash0DeclarativeConfigurationCustomizerProvider`, and this one does
+not. `System.setProperty` is called from
+`Dash0ConfigurationCustomizerProvider.customize`, and
+`AutoConfiguredOpenTelemetrySdkBuilder.buildImpl` returns from
+`maybeConfigureFromFile` before it loads any
+`AutoConfigurationCustomizerProvider`, so on a host configured from a file the
+superseded names keep arriving. A file expresses the same choice as
+`stability_opt_in_list` under `general`, which `general.db.semconv.version` and
+its siblings then beat per domain. A system property set by anything else is
+still read in that mode: `SemconvSelectionResolver` evaluates
+`SystemProperty.getString` whatever the configuration source, and gives the file
+precedence only where the file names the key.
 
 ## Declarative configuration
 
@@ -781,14 +791,16 @@ either of those and nowhere else never runs in this mode. Whatever is added to
 `Dash0DeclarativeConfigurationCustomizerProvider` as well, or recorded here as
 environment-only.
 
-Two pull requests open against this repository are in that position today.
-https://github.com/dash0hq/opentelemetry-java-distribution/pull/11 sets the MDC
-capture defaults through `addPropertiesCustomizer`, and
-https://github.com/dash0hq/opentelemetry-java-distribution/pull/12 sets
-`otel.semconv-stability.opt-in` from the body of
-`Dash0ConfigurationCustomizerProvider.customize`. Neither has merged. Each
-registers under `AutoConfigurationCustomizerProvider` alone, so as written
-neither would apply under `OTEL_CONFIG_FILE`.
+One setting is recorded here as environment-only. The
+`otel.semconv-stability.opt-in` default is set from the body of
+`Dash0ConfigurationCustomizerProvider.customize`, which registers under
+`AutoConfigurationCustomizerProvider` alone, so it never runs under
+`OTEL_CONFIG_FILE`. The `OTEL_SEMCONV_STABILITY_OPT_IN` section above gives the
+spelling a file uses for the same choice.
+
+https://github.com/dash0hq/opentelemetry-java-distribution/pull/11 is in the
+same position and has not merged. It sets the MDC capture defaults through
+`addPropertiesCustomizer`.
 
 The upstream resource providers are the other half. None of them is loaded
 here, so the five `otel.resource.providers.<group>.enabled` toggles,
