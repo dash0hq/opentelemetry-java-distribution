@@ -28,6 +28,12 @@ dependencies {
   agentJar(project(path = ":agent", configuration = "shadow"))
   extensionJar(project(path = ":agentextension", configuration = "shadow"))
   upstreamAgentJar(libs.opentelemetryJavaagent)
+
+  implementation(libs.slf4jApi)
+  runtimeOnly(libs.logbackClassic)
+  implementation(libs.log4jApi)
+  runtimeOnly(libs.log4jCore)
+  implementation(libs.jbossLogmanager)
 }
 
 tasks.withType<Test>().configureEach {
