@@ -10,10 +10,13 @@ import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.RESO
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.parseTheDefaultConfigurationFile;
 import static com.dash0.opentelemetry.Dash0DefaultConfigurationFileProvider.warningAboutTheVariablesTheDefaultFileWillIgnore;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.opentelemetry.api.incubator.config.DeclarativeConfigException;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationProvider;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.AttributeNameValueModel;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OpenTelemetryConfigurationModel;
+import io.opentelemetry.sdk.autoconfigure.spi.ConfigurationException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -164,31 +167,18 @@ class Dash0DefaultConfigurationFileProviderTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"", "   \n", "# nothing to see here\n", "---\n"})
-  void standsAsideWhenTheDefaultFileHoldsNoConfiguration(String content, @TempDir Path directory)
+  void failsWhenTheDefaultFileHoldsNoConfiguration(String content, @TempDir Path directory)
       throws IOException {
     Path defaultConfigurationFile = fileHolding(directory, content);
 
-    assertThat(parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile))
+    assertThatThrownBy(() -> parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile))
         .as(
             "DeclarativeConfiguration.parse answers null for a file that holds no document, which"
-                + " a truncated write and a template that rendered nothing both produce")
-        .isNull();
-  }
-
-  @Test
-  void reportsThatAnEmptyDefaultFileConfiguredNothing(@TempDir Path directory) throws IOException {
-    Path defaultConfigurationFile = fileHolding(directory, "");
-
-    List<LogRecord> logged =
-        whileCapturingTheProvidersLog(
-            () -> parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile));
-
-    assertThat(messagesIn(logged, Level.WARNING))
-        .as("an operator debugging a file with no effect is otherwise told it is in effect")
-        .hasSize(1)
-        .allSatisfy(
-            message -> assertThat(message).contains("holds no OpenTelemetry configuration"));
-    assertThat(messagesIn(logged, Level.INFO)).isEmpty();
+                + " a truncated write and a template that rendered nothing both produce, and the"
+                + " Python and Node.js distributions surface that instead of degrading to the"
+                + " environment")
+        .isInstanceOf(ConfigurationException.class)
+        .hasMessageContaining("holds no OpenTelemetry configuration");
   }
 
   @Test
@@ -218,14 +208,14 @@ class Dash0DefaultConfigurationFileProviderTest {
   }
 
   @Test
-  void standsAsideWhenTheDefaultFileCannotBeParsed(@TempDir Path directory) throws IOException {
+  void failsWhenTheDefaultFileCannotBeParsed(@TempDir Path directory) throws IOException {
     Path defaultConfigurationFile = fileHolding(directory, "file_format: [\"1.0\"\n");
 
-    assertThat(parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile))
+    assertThatThrownBy(() -> parseTheDefaultConfigurationFile(null, null, defaultConfigurationFile))
         .as(
-            "throwing here aborts autoconfiguration and takes the whole agent with it, so one"
-                + " broken file would stop every JVM on the host from being instrumented")
-        .isNull();
+            "a broken file aborts autoconfiguration and the JVM then runs uninstrumented, which is"
+                + " what the Python and Node.js distributions do with the same file")
+        .isInstanceOf(DeclarativeConfigException.class);
   }
 
   @Test

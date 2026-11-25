@@ -185,6 +185,23 @@ class DefaultConfigurationFileTest {
   }
 
   @Test
+  void aDefaultFileThatCannotBeParsedStopsTheAgentAndLeavesTheApplicationRunning()
+      throws Exception {
+    String printed =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication().expectingTheAgentToFailToStart(),
+            "/default-config-file-malformed.yaml");
+
+    assertThat(printed)
+        .as(
+            "the Python and Node.js distributions surface a broken file rather than degrading to"
+                + " the environment, and InstrumentedJvm.run checks that the application still"
+                + " reached the end of main. The JVM's output was:%n%s",
+            printed)
+        .doesNotContain("service.name=");
+  }
+
+  @Test
   void theEnvironmentConfiguresTheSdkWhenTheDefaultFileIsAbsent() throws Exception {
     String exported =
         InstrumentedJvm.runningTheTestApplication()

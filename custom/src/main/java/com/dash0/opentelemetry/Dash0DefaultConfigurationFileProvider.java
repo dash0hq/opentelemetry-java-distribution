@@ -8,6 +8,7 @@ import com.google.auto.service.AutoService;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfiguration;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.DeclarativeConfigurationProvider;
 import io.opentelemetry.sdk.autoconfigure.declarativeconfig.model.OpenTelemetryConfigurationModel;
+import io.opentelemetry.sdk.autoconfigure.spi.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -40,56 +41,47 @@ public final class Dash0DefaultConfigurationFileProvider
   private static final Logger logger =
       Logger.getLogger(Dash0DefaultConfigurationFileProvider.class.getName());
 
-  /** Returns the model parsed from the default configuration file. Never throws. */
+  /** Returns the model parsed from the default configuration file. */
   @Override
   public OpenTelemetryConfigurationModel getConfigurationModel() {
-    try {
-      OpenTelemetryConfigurationModel model =
-          parseTheDefaultConfigurationFile(
-              Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
-                  CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
+    OpenTelemetryConfigurationModel model =
+        parseTheDefaultConfigurationFile(
+            Dash0DeclarativeConfigurationCustomizerProvider.systemPropertyOrEnvironmentVariable(
+                CONFIGURATION_FILE_PROPERTY, CONFIGURATION_FILE_VARIABLE),
+            Dash0DeclarativeConfigurationCustomizerProvider
+                .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                    SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
+            Paths.get(
+                System.getProperty(
+                    DEFAULT_CONFIGURATION_FILE_PROPERTY, DEFAULT_CONFIGURATION_FILE)));
+    if (model != null) {
+      String warning =
+          warningAboutTheVariablesTheDefaultFileWillIgnore(
               Dash0DeclarativeConfigurationCustomizerProvider
                   .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
-                      SDK_DISABLED_PROPERTY, SDK_DISABLED_VARIABLE),
-              Paths.get(
-                  System.getProperty(
-                      DEFAULT_CONFIGURATION_FILE_PROPERTY, DEFAULT_CONFIGURATION_FILE)));
-      if (model != null) {
-        String warning =
-            warningAboutTheVariablesTheDefaultFileWillIgnore(
-                Dash0DeclarativeConfigurationCustomizerProvider
-                    .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
-                        Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_PROPERTY,
-                        Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE),
-                Dash0DeclarativeConfigurationCustomizerProvider
-                    .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
-                        RESOURCE_ATTRIBUTES_PROPERTY, RESOURCE_ATTRIBUTES_VARIABLE));
-        if (warning != null) {
-          logger.log(Level.WARNING, warning);
-        }
+                      Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_PROPERTY,
+                      Dash0DeclarativeConfigurationCustomizerProvider.OTLP_ENDPOINT_VARIABLE),
+              Dash0DeclarativeConfigurationCustomizerProvider
+                  .systemPropertyEnvironmentVariableOrAgentConfigurationFile(
+                      RESOURCE_ATTRIBUTES_PROPERTY, RESOURCE_ATTRIBUTES_VARIABLE));
+      if (warning != null) {
+        logger.log(Level.WARNING, warning);
       }
-      return model;
-    } catch (RuntimeException e) {
-      logger.log(
-          Level.WARNING,
-          "Could not look for "
-              + DEFAULT_CONFIGURATION_FILE
-              + "; the OpenTelemetry SDK is configured from the environment instead",
-          e);
-      return null;
     }
+    return model;
   }
 
   /**
    * Returns the configuration model parsed from {@code defaultConfigurationFile}, or null when
    * {@code configuredConfigurationFile} is set to a value that is not blank, when {@code
-   * sdkDisabled} reads as true, when {@code defaultConfigurationFile} is not a regular file, when
-   * it holds no configuration, or when reading or parsing it fails.
+   * sdkDisabled} reads as true, or when {@code defaultConfigurationFile} is not a regular file.
    *
    * @param configuredConfigurationFile the value of {@code OTEL_CONFIG_FILE}, or null when it is
    *     not set
    * @param sdkDisabled the value of {@code OTEL_SDK_DISABLED}, or null when it is not set
    * @param defaultConfigurationFile the path a Dash0 Linux package installs
+   * @throws ConfigurationException if {@code defaultConfigurationFile} cannot be read or holds no
+   *     configuration
    */
   static OpenTelemetryConfigurationModel parseTheDefaultConfigurationFile(
       String configuredConfigurationFile, String sdkDisabled, Path defaultConfigurationFile) {
@@ -105,12 +97,8 @@ public final class Dash0DefaultConfigurationFileProvider
     try (InputStream configurationFile = Files.newInputStream(defaultConfigurationFile)) {
       OpenTelemetryConfigurationModel model = DeclarativeConfiguration.parse(configurationFile);
       if (model == null) {
-        logger.log(
-            Level.WARNING,
-            "{0} holds no OpenTelemetry configuration. The OpenTelemetry SDK is configured from"
-                + " the environment instead.",
-            defaultConfigurationFile);
-        return null;
+        throw new ConfigurationException(
+            defaultConfigurationFile + " holds no OpenTelemetry configuration");
       }
       logger.log(
           Level.INFO,
@@ -118,16 +106,10 @@ public final class Dash0DefaultConfigurationFileProvider
               + " environment.",
           new Object[] {CONFIGURATION_FILE_VARIABLE, defaultConfigurationFile});
       return model;
-    } catch (IOException | RuntimeException e) {
-      logger.log(
-          Level.WARNING,
-          defaultConfigurationFile
-              + " could not be read as an OpenTelemetry configuration file. The OpenTelemetry SDK"
-              + " is configured from the environment instead. Set "
-              + CONFIGURATION_FILE_VARIABLE
-              + " to configure it from a file.",
+    } catch (IOException e) {
+      throw new ConfigurationException(
+          defaultConfigurationFile + " could not be read as an OpenTelemetry configuration file",
           e);
-      return null;
     }
   }
 

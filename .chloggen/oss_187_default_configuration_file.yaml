@@ -41,16 +41,13 @@ subtext: |
   declaratively configured SDK reads no ``OTEL_SDK_DISABLED``, so a host-wide
   file that loaded anyway would restart a workload whose operator had silenced
   it. An explicit ``OTEL_CONFIG_FILE`` is unaffected, since that is an opt-in.
-  A default file that cannot be read or parsed is reported at ``WARNING`` and
-  the process configures itself from the environment instead. So is a file that
-  parses to no document at all, which an empty file, a file of whitespace, a
-  file of comments and a bare ``---`` all do. Throwing there
-  aborts autoconfiguration and stops the agent, so one broken file would take
-  every JVM on the host with it. That covers reading and parsing only: a file
-  that is valid YAML and then names a component the agent cannot build fails in
-  ``DeclarativeConfigUtil.create``, after the provider has returned, and leaves
-  every JVM on the host uninstrumented. Whatever ships the file is where it has
-  to be validated.
+  A default file that cannot be read or parsed stops autoconfiguration, as does
+  one that parses to no document at all, which an empty file, a file of
+  whitespace, a file of comments and a bare ``---`` all do. The agent reports
+  that it failed to start, and the JVM then runs uninstrumented and exports
+  nothing. There is no fallback to environment configuration, which is what the
+  Dash0 Python and Node.js distributions do with their own default file.
+  Whatever ships the file is where it has to be validated.
   A host leaves the default file behind by removing or renaming it, which puts
   the next JVM back on environment configuration, or by setting
   ``OTEL_CONFIG_FILE`` for a single workload. No variable selects environment

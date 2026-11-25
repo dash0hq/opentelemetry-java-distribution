@@ -395,27 +395,24 @@ The file is parsed with `DeclarativeConfiguration.parse`, which is the call
 `DeclarativeConfigUtil.configureFromFile` makes for the file `OTEL_CONFIG_FILE`
 names, so `${VARIABLE}` substitution and the model are identical either way.
 
-A default file that cannot be read or parsed is logged at `WARNING` and the
-process configures itself from the environment instead. A file that parses to
-no document at all gets a `WARNING` of its own saying it holds no
-configuration. `DeclarativeConfiguration.parse` answers null rather than
-throwing for an empty file, a file of whitespace, a file of comments and a bare
-`---`, which `touch` on the path, a truncated write and a template that
-rendered nothing all produce. `getConfigurationModel`
-catches every `RuntimeException` for the same reason the resource providers do:
-throwing there aborts autoconfiguration and stops the agent, so one broken file
-would take every JVM on the host with it.
+A default file that cannot be read or parsed stops autoconfiguration. The agent
+prints `OpenTelemetry Javaagent failed to start` with the parse error under it,
+the JVM then runs with no instrumentation, exports nothing and still exits zero.
+There is no fallback to environment configuration, which is also what the Dash0
+Python and Node.js distributions do with their own default file. A file that
+parses to no document at all is treated the same way: `DeclarativeConfiguration.parse`
+answers null rather than throwing for an empty file, a file of whitespace, a
+file of comments and a bare `---`, which `touch` on the path, a truncated write
+and a template that rendered nothing all produce, and the provider raises a
+`ConfigurationException` naming the path.
 
-That fallback covers reading and parsing, and stops there. Turning the parsed
-model into an SDK happens in `DeclarativeConfigUtil.create`, after
-`getConfigurationModel` has returned, so a file that is valid YAML and then
-names an exporter, sampler or detector the agent has no `ComponentProvider` for
-throws out of autoconfiguration and leaves every JVM on the host
-uninstrumented. No code in the provider can catch that one. Under
-`OTEL_CONFIG_FILE` the same mistake reaches the one process whose operator set
-the variable; under the default file it reaches the host, and the file belongs
-to a package rather than to the operator. Whatever ships
-`/etc/opentelemetry/java/otel-config.yaml` is where it has to be validated
+A file that is valid YAML and then names an exporter, sampler or detector the
+agent has no `ComponentProvider` for fails the same way one step later, in
+`DeclarativeConfigUtil.create`, after `getConfigurationModel` has returned.
+Under `OTEL_CONFIG_FILE` any of these mistakes reaches the one process whose
+operator set the variable; under the default file it reaches every JVM on the
+host, and the file belongs to a package rather than to the operator. Whatever
+ships `/etc/opentelemetry/java/otel-config.yaml` is where it has to be validated
 against the agent version the package carries.
 
 Every other standard `OTEL_*` variable stops taking effect on a host that gains
