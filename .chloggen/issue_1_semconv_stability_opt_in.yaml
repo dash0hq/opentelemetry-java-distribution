@@ -2,102 +2,59 @@ change_type: breaking
 
 component: custom
 
-note: Default otel.semconv-stability.opt-in to database,code,rpc,messaging, so spans carry the newer semantic convention attribute names
+note: Default otel.semconv-stability.opt-in to database,code,rpc,messaging, so database, code, RPC and messaging telemetry carries the newer semantic conventions
 
 issues: [12]
 
 subtext: |
-  The distribution set nothing and inherited the upstream agent's default, which
-  is the superseded convention in every domain. A JDBC span carried
-  ``db.statement``, ``db.system``, ``db.name``, ``db.operation``,
-  ``db.sql.table``, ``db.user`` and ``db.connection_string`` rather than
-  ``db.query.text``, ``db.system.name``, ``db.namespace`` and
-  ``db.query.summary``. Three of the seven have no replacement: ``db.user`` and
-  ``db.connection_string`` are gone from the stable conventions, and
-  ``db.sql.table`` is dropped without ``db.collection.name`` taking its place,
-  since Cassandra is the only SQL client whose instrumentation asks for the
-  operation and collection pair. On a JDBC span the operation survives inside
-  ``db.query.summary`` and not as ``db.operation.name``. A non-SQL database span
-  is the other way round: it carries ``db.operation.name``, and it carries
-  ``db.collection.name`` only where the instrumentation reports a collection,
-  which MongoDB, Geode and HBase do and Redis and Elasticsearch do not.
-  ``database`` and ``code`` select conventions the semantic conventions working
-  group has declared stable. ``rpc`` and ``messaging`` select experimental ones,
-  included because the working group considers their current shape close to
-  final; a future agent version may still rename those attributes.
-  ``service.peer`` is left out, because its attributes are expected to change
-  again. ``http`` is not a value at all: HTTP semantic conventions are stable and
-  the agent emits them whatever this setting says.
-  Attribute names are not the only thing that changes. A JDBC span is named after
-  a summary of the query rather than ``<operation> <database>.<table>``, and so
-  is every other SQL client's span: Cassandra, R2DBC, the Vert.x SQL client and
-  ClickHouse among them. Every other database instrumentation, MongoDB and Redis
-  and Elasticsearch among them, is named after the operation and the collection
-  rather than the operation and the database, falling back to the namespace and
-  then to ``<host>:<port>`` where there is no collection. Redis and
-  Elasticsearch land on that last form, which is one span name per node rather
-  than one for the cluster. MongoDB goes the other way: its name already carries
-  the collection, as ``insert mydb.mycollection``, so the rename drops the
-  database and leaves ``insert mycollection``.
-  The AWS SDK names most of its client spans itself
-  and reads none of this setting, so a DynamoDB or an S3 span is unaffected;
-  its SQS messaging spans and its RDS Data API spans do move. A messaging
-  span is named after the operation and
-  the destination rather than the destination and the operation, and the
-  operation word changes with the order: a Kafka producer span named
-  ``orders publish`` becomes ``send orders`` and a consumer span named
-  ``orders process`` becomes ``process orders``. An RPC
-  span is named ``<method>`` rather than ``<service>/<method>``, except under
-  gRPC, which always uses the full method name. A messaging receive span has kind
-  ``CLIENT`` rather than ``CONSUMER``, and a send span whose context is not
-  propagated has kind ``CLIENT`` rather than ``PRODUCER``. RabbitMQ starts
-  recording a receive span for every ``basicGet``, which it did not record at
-  all before. A log record carrying ``code`` attributes, which the Logback and
-  Log4j appenders write only where their experimental code-attribute capture is
-  turned on, carries ``code.file.path``, ``code.function.name`` and
-  ``code.line.number`` rather than ``code.filepath``, ``code.namespace``,
-  ``code.function`` and ``code.lineno``.
-  The metrics change too. The agent starts recording
-  ``db.client.operation.duration``, ``messaging.client.operation.duration``,
-  ``messaging.client.sent.messages``, ``messaging.process.duration`` and
-  ``messaging.client.consumed.messages``. Pulsar, the one instrumentation still
-  emitting the pre-1.43 ``messaging.publish.duration``,
-  ``messaging.receive.duration`` and ``messaging.receive.messages``, stops
-  emitting all three. Every connection pool instrument is renamed from
-  ``db.client.connections.*`` to ``db.client.connection.*``, two of them by more
-  than the prefix: ``db.client.connections.usage`` becomes
-  ``db.client.connection.count`` and ``db.client.connections.max`` becomes
-  ``db.client.connection.limit``. The ``pool.name``
-  and ``state`` attributes become ``db.client.connection.pool.name`` and
-  ``db.client.connection.state``, and ``create_time``, ``wait_time`` and
-  ``use_time`` are recorded in seconds rather than milliseconds. A threshold
-  written in milliseconds is then a thousand times too high and the alert stops
-  firing rather than failing.
-  Existing dashboards, alerting rules and saved queries written against any of
-  the old names stop matching, and none of them reports an error. Set
-  ``OTEL_SEMCONV_STABILITY_OPT_IN`` or ``-Dotel.semconv-stability.opt-in`` on the
-  workload to choose your own domains, or append ``/dup`` to a domain, as in
-  ``database/dup,code,rpc,messaging``, to emit both sets while you migrate.
-  ``messaging/dup`` covers metrics too and keeps Pulsar's three pre-1.43
-  instruments alongside the new ones. The connection pool instruments are the
-  exception, because the agent picks one name for each of them rather than
-  recording both, so ``database/dup`` still renames them and still moves those
-  three histograms to seconds. To keep the old
-  names everywhere, set the variable to a value that names no domain, such as
-  ``none``. Clearing the variable does not work, because a blank value is
-  treated as unset, and neither does writing the setting in the file named by
-  ``otel.javaagent.configuration-file``, which reaches ``ConfigProperties``
-  rather than the place the agent reads this setting from.
-  The value is applied with ``System.setProperty`` during agent startup rather
-  than through an autoconfiguration hook. The agent resolves it in
-  ``SemconvSelectionResolver`` with ``SystemProperty.getString``, which reads
-  only ``System.getProperty`` and ``System.getenv``, so a value returned from
-  ``addPropertiesSupplier`` or ``addPropertiesCustomizer`` would reach
-  ``ConfigProperties`` and change no attribute. Nothing is set when the system
-  property or the environment variable already carries a value.
-  Declarative configuration is unaffected and remains unsupported. Under
-  ``OTEL_CONFIG_FILE`` the SDK never consults the autoconfigure SPI, so this
-  default does not apply there any more than ``DASH0_DISABLE`` and the
-  ``always_on`` sampler do; see ``docs/configuration.md``.
+  The distribution set nothing and inherited the upstream agent's default,
+  which is the superseded convention in every domain.
+  On a JDBC span, ``db.statement`` becomes ``db.query.text``, ``db.system``
+  becomes ``db.system.name``, ``db.name`` becomes ``db.namespace``, and
+  ``db.query.summary`` is new. Five attributes go away with nothing taking
+  their place: ``db.sql.table``, ``db.operation``, ``db.connection_string``,
+  ``db.user`` and ``code.namespace``. ``db.system.name`` reports a new value as
+  well as a new key for fifteen systems, H2 as ``h2database`` where
+  ``db.system`` said ``h2`` and SQL Server as ``microsoft.sql_server`` where it
+  said ``mssql``. On a manually instrumented method, ``code.function`` and
+  ``code.namespace`` are replaced by one ``code.function.name`` holding the
+  class and the method together, ``TestApplication.doWork`` where
+  ``code.function`` held ``doWork``. A SQL span is named after a summary of the
+  query, so a span named ``SELECT testdb.widgets`` is named ``SELECT widgets``.
+  The JDBC connection pool metrics are the part that fails without reporting an
+  error. Every instrument is renamed from ``db.client.connections.*`` to
+  ``db.client.connection.*``, with ``db.client.connections.usage`` becoming
+  ``db.client.connection.count`` and ``db.client.connections.max`` becoming
+  ``db.client.connection.limit``. The ``pool.name`` and ``state`` attributes
+  become ``db.client.connection.pool.name`` and ``db.client.connection.state``.
+  ``create_time``, ``wait_time`` and ``use_time`` are recorded in seconds
+  instead of milliseconds. A renamed instrument empties a dashboard, which
+  somebody notices. A threshold alert written against a duration in
+  milliseconds and pointed at a series now reported in seconds keeps evaluating
+  and stops firing, which nobody notices.
+  ``/dup`` does not cover the connection pool metrics. The agent picks one
+  name, one attribute set and one unit per instrument instead of recording
+  both, so ``database/dup`` still renames them and still moves those three
+  histograms to seconds. Dual emit covers attributes on spans, not the identity
+  of an instrument.
+  HTTP is untouched. ``http`` is not a domain this setting accepts, the HTTP
+  semantic conventions are stable already, and the agent emits the stable
+  attribute names whatever this setting says.
+  Two of the four domains are experimental. ``database`` and ``code`` select
+  conventions the semantic conventions working group has declared stable, while
+  ``rpc`` and ``messaging`` select experimental ones that a later agent version
+  may rename again.
+  To keep the superseded names, set ``OTEL_SEMCONV_STABILITY_OPT_IN`` or
+  ``-Dotel.semconv-stability.opt-in`` to a non-blank value naming no domain,
+  such as ``none``. Clearing the variable does not work: a blank value is read
+  as unset and the default applies again.
+  This default is environment-only. A host configured from a declarative
+  configuration file, which is every host where
+  ``/etc/opentelemetry/java/otel-config.yaml`` exists, keeps the superseded
+  names until the file says otherwise.
+  ``docs/configuration.md`` has the rest: the RPC and messaging span names and
+  span kinds that change, the metrics that start and stop being recorded, the
+  four instrumentations that behave differently from the table, and the
+  spelling a configuration file uses for the same choice.
 
 change_logs: [user]
