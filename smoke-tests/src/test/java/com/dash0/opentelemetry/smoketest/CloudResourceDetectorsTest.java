@@ -36,6 +36,12 @@ class CloudResourceDetectorsTest {
 
   private static final String SERVICE_NAME = "smoke-test-service";
 
+  private static final String FUNCTION_NAME = "smoke-test-function";
+
+  private static final String AWS_PROBING_PROVIDERS =
+      "io.opentelemetry.contrib.aws.resource.Ec2ResourceProvider,"
+          + "io.opentelemetry.contrib.aws.resource.EksResourceProvider";
+
   @Test
   void contributesNoCloudAttributeAndNoHostIdWhileNoGroupToggleIsSet() throws Exception {
     String exported = exportingTheResourceToTheLog(appServiceEnvironment());
@@ -92,6 +98,23 @@ class CloudResourceDetectorsTest {
         .as("exported resource attributes were:%n%s", exported)
         .contains("telemetry.distro.name=\"dash0-java\"")
         .contains("host.id=");
+  }
+
+  @Test
+  void contributesTheLambdaAttributesOnceTheAwsToggleIsSetAndTheProbesAreNamedOff()
+      throws Exception {
+    Map<String, String> environment = appServiceEnvironment();
+    environment.put("OTEL_RESOURCE_PROVIDERS_AWS_ENABLED", "true");
+    environment.put("OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS", AWS_PROBING_PROVIDERS);
+
+    String exported = exportingTheResourceToTheLog(environment);
+
+    assertThat(exported)
+        .as("exported resource attributes were:%n%s", exported)
+        .contains("telemetry.distro.name=\"dash0-java\"")
+        .contains("cloud.provider=\"aws\"")
+        .contains("cloud.platform=\"aws_lambda\"")
+        .contains("faas.name=\"" + FUNCTION_NAME + "\"");
   }
 
   @Test
@@ -173,7 +196,7 @@ class CloudResourceDetectorsTest {
     environment.put("WEBSITE_SITE_NAME", SITE_NAME);
     environment.put(
         "VCAP_APPLICATION", "{\"application_name\":\"" + APPLICATION_NAME + "\",\"index\":\"0\"}");
-    environment.put("AWS_LAMBDA_FUNCTION_NAME", "smoke-test-function");
+    environment.put("AWS_LAMBDA_FUNCTION_NAME", FUNCTION_NAME);
     environment.put("AWS_LAMBDA_FUNCTION_VERSION", "$LATEST");
     return environment;
   }
