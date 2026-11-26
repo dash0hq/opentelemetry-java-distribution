@@ -25,13 +25,26 @@ Releasing
    ``release.yml`` have never run on a runner at all. Their scripts are
    exercised by ``.github/workflows/scripts/test-release-scripts.sh``, which
    ``ci.yml`` runs on every pull request, and that is a different claim from
-   having cut a release with them. The 2026-10-23 approach is not available a
-   second time. That run deleted its throwaway tag, and the tag ruleset created
-   on 2026-11-09 forbids deleting ``refs/tags/v*``, while
-   ``check-release-version-is-newest.sh`` refuses any version at or below the
-   highest published one. So the first exercise of the automation is the next
-   real release. Watch that one, and delete this paragraph once it has gone
-   through.
+   having cut a release with them.
+
+   ``v0.2.0`` was cut on 2026-11-25 down the five manual steps under `Cutting a
+   release by hand`_, and it exercised none of the three. Its hand-pushed tag
+   started ``release.yml``, whose **Build and publish** job succeeded on a
+   runner in 12m05s and published the two jars and ``SHA256SUMS``. The
+   **Synchronize the docs** job failed on its App-token step, for the two
+   missing secrets named under `The documentation sync`_, and the release was
+   already complete when it did. Step 5 was skipped, so ``main`` still declares
+   ``version = 0.2.0``. ``./gradlew build`` on ``main`` today writes
+   ``dash0-opentelemetry-javaagent-0.2.0.jar``, carrying the version number of
+   a release that is already published. The ``open-next-snapshot`` job is what
+   keeps that from happening again.
+
+   The 2026-10-23 approach is not available a second time. That run deleted its
+   throwaway tag, and the tag ruleset created on 2026-11-09 forbids deleting
+   ``refs/tags/v*``, while ``check-release-version-is-newest.sh`` refuses any
+   version at or below the highest published one. So the first exercise of the
+   automation is the release after ``v0.2.0``. Watch that one, and delete this
+   paragraph once it has gone through.
 
 
 Where the artifacts go
@@ -115,9 +128,14 @@ Getting ``next-version`` wrong costs little. ``prepare-release.yml`` writes
 whatever version it is given, so the next release overwrites the snapshot
 regardless of what it was. The refusals below compare the tag against the
 ``gradle.properties`` of the tagged commit, so they neither catch nor are
-confused by a wrong snapshot on ``main``. What they do catch is the snapshot
-never being restored at all, which is why the restore is a workflow step
-rather than a reminder.
+confused by a wrong snapshot on ``main``. They do not catch the snapshot never
+being restored either. ``prepare-release.yml`` rewrites the version line
+whatever it held, so the tagged commit always agrees with its tag, and the
+``v0.2.0`` release is the live demonstration: ``main`` declares the published
+``0.2.0`` today and the next correct tag would still be accepted. What an
+unrestored snapshot costs is every build off ``main`` until the next release
+carrying a version number that is already published. The restore is a workflow
+step for that, not a reminder in a document.
 
 
 What the release workflow refuses
