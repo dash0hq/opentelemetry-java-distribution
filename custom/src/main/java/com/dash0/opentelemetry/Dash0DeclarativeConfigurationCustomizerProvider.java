@@ -269,8 +269,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   }
 
   /**
-   * Points every OTLP exporter the file declares without an {@code endpoint} at {@code
-   * collectorBaseUrl}, leaving the file alone when {@code configuredOtlpEndpoint} is set.
+   * Points at {@code collectorBaseUrl} every OTLP exporter the file declares without an {@code
+   * endpoint} or with the specification default for its signal and protocol, leaving the file alone
+   * when {@code configuredOtlpEndpoint} is set.
    *
    * @param collectorBaseUrl the value of {@code DASH0_OTEL_COLLECTOR_BASE_URL}, whose trailing
    *     slashes are stripped
@@ -335,9 +336,9 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
           Level.WARNING,
           "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
               + " unapplied. A declaratively configured SDK reads no OTEL_EXPORTER_OTLP_*"
-              + " variable, so every OTLP exporter the configuration file left without an"
-              + " endpoint falls back to its specification default, {1}. Name the endpoint in"
-              + " the configuration file instead.",
+              + " variable, so every OTLP exporter the configuration file leaves at the"
+              + " specification default keeps exporting to {1}. Name the endpoint in the"
+              + " configuration file instead.",
           new Object[] {configuredOtlpEndpoint.trim(), String.join(" and ", defaultsLeftInPlace)});
     }
   }
@@ -352,14 +353,18 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (exporter == null) {
       return;
     }
-    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+    if (exporter.getOtlpHttp() != null
+        && endpointIsAbsentOrTheSpecificationDefault(
+            exporter.getOtlpHttp().getEndpoint(), OTLP_HTTP_DEFAULT_ENDPOINT + TRACES_PATH)) {
       if (baseUrl == null) {
         defaultsLeftInPlace.add(OTLP_HTTP_DEFAULT_ENDPOINT);
       } else {
         exporter.getOtlpHttp().setEndpoint(baseUrl + TRACES_PATH);
       }
     }
-    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+    if (exporter.getOtlpGrpc() != null
+        && endpointIsAbsentOrTheSpecificationDefault(
+            exporter.getOtlpGrpc().getEndpoint(), OTLP_GRPC_DEFAULT_ENDPOINT)) {
       if (baseUrl == null) {
         defaultsLeftInPlace.add(OTLP_GRPC_DEFAULT_ENDPOINT);
       } else {
@@ -378,14 +383,18 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (exporter == null) {
       return;
     }
-    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+    if (exporter.getOtlpHttp() != null
+        && endpointIsAbsentOrTheSpecificationDefault(
+            exporter.getOtlpHttp().getEndpoint(), OTLP_HTTP_DEFAULT_ENDPOINT + METRICS_PATH)) {
       if (baseUrl == null) {
         defaultsLeftInPlace.add(OTLP_HTTP_DEFAULT_ENDPOINT);
       } else {
         exporter.getOtlpHttp().setEndpoint(baseUrl + METRICS_PATH);
       }
     }
-    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+    if (exporter.getOtlpGrpc() != null
+        && endpointIsAbsentOrTheSpecificationDefault(
+            exporter.getOtlpGrpc().getEndpoint(), OTLP_GRPC_DEFAULT_ENDPOINT)) {
       if (baseUrl == null) {
         defaultsLeftInPlace.add(OTLP_GRPC_DEFAULT_ENDPOINT);
       } else {
@@ -404,20 +413,37 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (exporter == null) {
       return;
     }
-    if (exporter.getOtlpHttp() != null && exporter.getOtlpHttp().getEndpoint() == null) {
+    if (exporter.getOtlpHttp() != null
+        && endpointIsAbsentOrTheSpecificationDefault(
+            exporter.getOtlpHttp().getEndpoint(), OTLP_HTTP_DEFAULT_ENDPOINT + LOGS_PATH)) {
       if (baseUrl == null) {
         defaultsLeftInPlace.add(OTLP_HTTP_DEFAULT_ENDPOINT);
       } else {
         exporter.getOtlpHttp().setEndpoint(baseUrl + LOGS_PATH);
       }
     }
-    if (exporter.getOtlpGrpc() != null && exporter.getOtlpGrpc().getEndpoint() == null) {
+    if (exporter.getOtlpGrpc() != null
+        && endpointIsAbsentOrTheSpecificationDefault(
+            exporter.getOtlpGrpc().getEndpoint(), OTLP_GRPC_DEFAULT_ENDPOINT)) {
       if (baseUrl == null) {
         defaultsLeftInPlace.add(OTLP_GRPC_DEFAULT_ENDPOINT);
       } else {
         exporter.getOtlpGrpc().setEndpoint(baseUrl);
       }
     }
+  }
+
+  /**
+   * Whether {@code endpoint} is absent, or is {@code specificationDefault}, the endpoint the SDK
+   * gives an OTLP exporter that declares none.
+   *
+   * @param endpoint the {@code endpoint} the configuration file declares, after environment
+   *     variable interpolation, or null when it declares none
+   * @param specificationDefault the default for the exporter's signal and protocol
+   */
+  static boolean endpointIsAbsentOrTheSpecificationDefault(
+      String endpoint, String specificationDefault) {
+    return endpoint == null || specificationDefault.equals(endpoint.trim());
   }
 
   /** Returns {@code model}'s resource, attaching an empty one when the file declares none. */
