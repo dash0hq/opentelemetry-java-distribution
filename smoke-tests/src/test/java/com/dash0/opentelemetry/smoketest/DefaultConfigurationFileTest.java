@@ -188,6 +188,27 @@ class DefaultConfigurationFileTest {
   }
 
   @Test
+  void theCollectorBaseUrlReachesAnEndpointLeftAtTheInterpolationDefault() throws Exception {
+    String exported =
+        withTheDefaultConfigurationFile(
+            InstrumentedJvm.runningTheTestApplication()
+                .withEnvironmentVariable(
+                    "DASH0_OTEL_COLLECTOR_BASE_URL", "http://" + DASH0_HOST + ":4318"),
+            "/default-config-file-interpolated-otlp.yaml");
+
+    assertThat(exported)
+        .as(
+            "the file the Dash0 Linux package installs interpolates"
+                + " ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318} into every endpoint, and"
+                + " the SDK substitutes that before any customizer runs, so with"
+                + " OTEL_EXPORTER_OTLP_ENDPOINT unset the model carries the specification default"
+                + " rather than no endpoint at all. The JVM's output was:%n%s",
+            exported)
+        .contains(DASH0_HOST)
+        .doesNotContain("localhost:4318");
+  }
+
+  @Test
   void aDefaultFileThatCannotBeParsedStopsTheAgentAndLeavesTheApplicationRunning()
       throws Exception {
     String printed =
