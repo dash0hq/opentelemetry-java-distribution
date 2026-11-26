@@ -22,3 +22,7 @@ subtext: |
   where telemetry goes rather than marking a host that lost a collector.
   An endpoint that differs from the specification default in any way, including
   a trailing slash or a different port, is untouched.
+  A ``DASH0_OTEL_COLLECTOR_BASE_URL`` the OTLP exporter cannot parse, such as
+  one written without a scheme, now stops the agent on such a host as well. It
+  already did so on a host configured from the environment, and under a
+  configuration file whose exporter declares no ``endpoint``.

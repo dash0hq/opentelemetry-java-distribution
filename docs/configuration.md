@@ -956,11 +956,20 @@ packaged file with `DASH0_OTEL_COLLECTOR_BASE_URL` set logs the line, since
 that file resolves every endpoint to the specification default, so it reports
 where telemetry goes rather than marking an unusual configuration.
 
-Filling in an `endpoint` the file left absent is logged at `FINE` instead,
-since nothing the file asked for was overridden, and so is rewriting an
-`endpoint` to the value it already held, which is what a
-`DASH0_OTEL_COLLECTOR_BASE_URL` of `http://localhost:4318` does to the packaged
-file.
+Nothing else the mapping does produces a line of its own. Filling in an
+`endpoint` the file left absent is silent, since nothing the file asked for was
+overridden, and so is rewriting an `endpoint` to the value it already held,
+which is what a `DASH0_OTEL_COLLECTOR_BASE_URL` of `http://localhost:4318` does
+to the packaged file. One `FINE` line reports the base URL the customizer
+resolved, before any exporter is read, on every JVM where
+`DASH0_OTEL_COLLECTOR_BASE_URL` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is
+not, whether or not an exporter ends up being changed.
+
+A `DASH0_OTEL_COLLECTOR_BASE_URL` the OTLP exporter cannot parse, such as one
+written without a scheme, now stops the agent under a file that resolves to the
+specification default, since the mapping writes the value into an endpoint the
+exporter then rejects. The environment path and a file that declares no
+`endpoint` already failed that way on the same value.
 
 Setting both variables on one workload sends its telemetry to neither host,
 unless the file interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` into its endpoints
