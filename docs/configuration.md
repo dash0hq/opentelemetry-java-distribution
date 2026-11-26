@@ -948,10 +948,13 @@ A set `OTEL_EXPORTER_OTLP_ENDPOINT` suppresses the mapping. The file is left
 exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 
 Replacing an `endpoint` the file carries is logged at `INFO`, naming the
-specification default that was there and the base URL that took its place,
-followed by the `OTEL_EXPORTER_OTLP_ENDPOINT` that would keep the file's
-endpoint. Filling in an `endpoint` the file left absent is logged at `FINE`
-instead, since nothing the file asked for was overridden.
+specification default endpoint the exporter resolved to and the base URL that
+took its place, and saying that `OTEL_EXPORTER_OTLP_ENDPOINT` keeps the former.
+The endpoint it names is the base, `http://localhost:4318` or
+`http://localhost:4317`, which is the form `OTEL_EXPORTER_OTLP_ENDPOINT` takes,
+rather than the per-signal URL the exporter carried. Filling in an `endpoint`
+the file left absent is logged at `FINE` instead, since nothing the file asked
+for was overridden.
 
 Setting both variables on one workload sends its telemetry to neither host,
 unless the file interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` into its endpoints
