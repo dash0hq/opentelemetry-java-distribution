@@ -322,6 +322,10 @@ assert_rejects "check-changelog-has-no-section rejects a version already prepare
   "already has a section for 0.2.0" \
   in_a_tree_whose_changelog_is "$released_sections" \
   "$check_changelog_has_no_section" "0.2.0"
+assert_rejects "check-changelog-has-no-section offers the published remedy for a released version" \
+  "If v0.2.0 is already published, pick a higher version" \
+  in_a_tree_whose_changelog_is "$released_sections" \
+  "$check_changelog_has_no_section" "0.2.0"
 assert_rejects "check-changelog-has-no-section rejects an older prepared version" \
   "already has a section for 0.1.0" \
   in_a_tree_whose_changelog_is "$released_sections" \
