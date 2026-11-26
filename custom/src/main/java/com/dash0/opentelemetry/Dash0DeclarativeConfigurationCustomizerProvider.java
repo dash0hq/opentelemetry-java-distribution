@@ -351,9 +351,10 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     logger.log(
         Level.INFO,
         "An OTLP exporter of the configuration file resolved to {0}, the OpenTelemetry"
-            + " specification default endpoint, so DASH0_OTEL_COLLECTOR_BASE_URL replaced it"
-            + " with {1}. Set OTEL_EXPORTER_OTLP_ENDPOINT on this workload to keep the endpoint"
-            + " the configuration file resolved to.",
+            + " specification default endpoint, so DASH0_OTEL_COLLECTOR_BASE_URL set it to {1}"
+            + " instead. DASH0_OTEL_COLLECTOR_BASE_URL is not applied at all on a workload that"
+            + " sets OTEL_EXPORTER_OTLP_ENDPOINT, which hands the endpoint back to the"
+            + " configuration file.",
         new Object[] {String.join(" and ", specificationDefaults), baseUrl});
   }
 

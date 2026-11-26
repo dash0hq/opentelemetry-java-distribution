@@ -949,12 +949,18 @@ exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 
 Replacing an `endpoint` the file carries is logged at `INFO`, naming the
 specification default endpoint the exporter resolved to and the base URL that
-took its place, and saying that `OTEL_EXPORTER_OTLP_ENDPOINT` keeps the former.
-The endpoint it names is the base, `http://localhost:4318` or
+took its place. The endpoint it names is the base, `http://localhost:4318` or
 `http://localhost:4317`, which is the form `OTEL_EXPORTER_OTLP_ENDPOINT` takes,
-rather than the per-signal URL the exporter carried. Filling in an `endpoint`
-the file left absent is logged at `FINE` instead, since nothing the file asked
-for was overridden.
+rather than the per-signal URL the exporter carried. Every host running the
+packaged file with `DASH0_OTEL_COLLECTOR_BASE_URL` set logs the line, since
+that file resolves every endpoint to the specification default, so it reports
+where telemetry goes rather than marking an unusual configuration.
+
+Filling in an `endpoint` the file left absent is logged at `FINE` instead,
+since nothing the file asked for was overridden, and so is rewriting an
+`endpoint` to the value it already held, which is what a
+`DASH0_OTEL_COLLECTOR_BASE_URL` of `http://localhost:4318` does to the packaged
+file.
 
 Setting both variables on one workload sends its telemetry to neither host,
 unless the file interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` into its endpoints
