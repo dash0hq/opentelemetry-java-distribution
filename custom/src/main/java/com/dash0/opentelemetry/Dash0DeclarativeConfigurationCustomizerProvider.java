@@ -332,7 +332,10 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       }
     }
 
-    if (suppressed && !specificationDefaults.isEmpty()) {
+    if (specificationDefaults.isEmpty()) {
+      return;
+    }
+    if (suppressed) {
       logger.log(
           Level.WARNING,
           "OTEL_EXPORTER_OTLP_ENDPOINT is set to {0}, so DASH0_OTEL_COLLECTOR_BASE_URL is left"
@@ -343,14 +346,22 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
           new Object[] {
             configuredOtlpEndpoint.trim(), String.join(" and ", specificationDefaults)
           });
+      return;
     }
+    logger.log(
+        Level.INFO,
+        "An OTLP exporter of the configuration file names {0}, the OpenTelemetry specification"
+            + " default, so DASH0_OTEL_COLLECTOR_BASE_URL replaced it with {1}. Set"
+            + " OTEL_EXPORTER_OTLP_ENDPOINT on this workload to keep the endpoint the file"
+            + " names.",
+        new Object[] {String.join(" and ", specificationDefaults), baseUrl});
   }
 
   /**
    * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #TRACES_PATH} for the HTTP
    * exporter and to {@code baseUrl} alone for the gRPC one, under the rule {@link
-   * #theEndpointForAnOtlpExporter} applies, or, when {@code baseUrl} is null, adds to {@code
-   * specificationDefaults} the specification default each one keeps.
+   * #theEndpointForAnOtlpExporter} applies, and records in {@code specificationDefaults} what that
+   * rule found.
    */
   static void applyTheBaseUrlToASpanExporterOrRecordItsDefault(
       SpanExporterModel exporter, String baseUrl, Set<String> specificationDefaults) {
@@ -386,8 +397,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #METRICS_PATH} for the HTTP
    * exporter and to {@code baseUrl} alone for the gRPC one, under the rule {@link
-   * #theEndpointForAnOtlpExporter} applies, or, when {@code baseUrl} is null, adds to {@code
-   * specificationDefaults} the specification default each one keeps.
+   * #theEndpointForAnOtlpExporter} applies, and records in {@code specificationDefaults} what that
+   * rule found.
    */
   static void applyTheBaseUrlToAMetricExporterOrRecordItsDefault(
       PushMetricExporterModel exporter, String baseUrl, Set<String> specificationDefaults) {
@@ -423,8 +434,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #LOGS_PATH} for the HTTP
    * exporter and to {@code baseUrl} alone for the gRPC one, under the rule {@link
-   * #theEndpointForAnOtlpExporter} applies, or, when {@code baseUrl} is null, adds to {@code
-   * specificationDefaults} the specification default each one keeps.
+   * #theEndpointForAnOtlpExporter} applies, and records in {@code specificationDefaults} what that
+   * rule found.
    */
   static void applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
       LogRecordExporterModel exporter, String baseUrl, Set<String> specificationDefaults) {
@@ -468,8 +479,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
    *     for a gRPC exporter
    * @param baseUrl the value of {@code DASH0_OTEL_COLLECTOR_BASE_URL} with its trailing slashes
    *     stripped, or null when {@code OTEL_EXPORTER_OTLP_ENDPOINT} suppresses it
-   * @param specificationDefaults collects {@code defaultBase} for every exporter that keeps the
-   *     specification default
+   * @param specificationDefaults collects {@code defaultBase} for an exporter that keeps the
+   *     specification default and for one whose declared specification default is replaced
    */
   static String theEndpointForAnOtlpExporter(
       String declaredEndpoint,
@@ -481,8 +492,13 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       return null;
     }
     if (baseUrl == null) {
-      specificationDefaults.add(defaultBase);
+      if (declaredEndpoint == null) {
+        specificationDefaults.add(defaultBase);
+      }
       return null;
+    }
+    if (declaredEndpoint != null) {
+      specificationDefaults.add(defaultBase);
     }
     return baseUrl + signalPath;
   }

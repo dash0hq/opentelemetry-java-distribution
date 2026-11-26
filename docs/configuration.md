@@ -947,6 +947,12 @@ base URL unchanged.
 A set `OTEL_EXPORTER_OTLP_ENDPOINT` suppresses the mapping. The file is left
 exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 
+Replacing an `endpoint` the file carries is logged at `INFO`, naming the
+specification default that was there and the base URL that took its place,
+followed by the `OTEL_EXPORTER_OTLP_ENDPOINT` that would keep the file's
+endpoint. Filling in an `endpoint` the file left absent is logged at `FINE`
+instead, since nothing the file asked for was overridden.
+
 Setting both variables on one workload sends its telemetry to neither host,
 unless the file interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` into its endpoints
 the way the packaged file does. `OTEL_EXPORTER_OTLP_ENDPOINT` configures
@@ -958,10 +964,15 @@ an `endpoint` falls back to its own specification default:
 involved, so this is the SDK's rule and not a choice this distribution makes.
 
 The customizer logs that at `WARNING`, naming the defaults the exporters keep.
-It stays quiet when every exporter the file declares already names an
-`endpoint` of its own, and when the file declares no OTLP exporter at all, so a
-host that sets `DASH0_OTEL_COLLECTOR_BASE_URL` for every workload does not warn
-the workloads that are configured correctly. Name the endpoint in the file:
+It warns only about an exporter the file left without an `endpoint` at all. An
+exporter whose `endpoint` reads as the specification default is excluded,
+because that is what the packaged file produces for an
+`OTEL_EXPORTER_OTLP_ENDPOINT` of `http://localhost:4318`, where the operator's
+endpoint was honoured exactly. It also stays quiet when every exporter the file
+declares already names an `endpoint` of its own, and when the file declares no
+OTLP exporter at all, so a host that sets `DASH0_OTEL_COLLECTOR_BASE_URL` for
+every workload does not warn the workloads that are configured correctly. Name
+the endpoint in the file:
 
 ```yaml
 tracer_provider:
