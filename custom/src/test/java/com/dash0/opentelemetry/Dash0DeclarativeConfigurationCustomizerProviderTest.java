@@ -563,6 +563,31 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
   }
 
   @Test
+  void saysNothingAtInfoWhenTheBaseUrlIsTheEndpointTheFileAlreadyCarries() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/traces");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/logs");
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model,
+                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_HTTP_DEFAULT_ENDPOINT,
+                    null));
+
+    assertThat(infosIn(logged))
+        .as(
+            "a host whose collector base URL is the default host rewrites every endpoint to the"
+                + " string it already held, and reporting that as a replacement offers a remedy"
+                + " that changes nothing")
+        .isEmpty();
+    assertThat(spanExporterOf(model).getOtlpHttp().getEndpoint())
+        .isEqualTo("http://localhost:4318/v1/traces");
+  }
+
+  @Test
   void saysNothingAtInfoWhenItOnlyFillsInAnAbsentEndpoint() {
     OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
 

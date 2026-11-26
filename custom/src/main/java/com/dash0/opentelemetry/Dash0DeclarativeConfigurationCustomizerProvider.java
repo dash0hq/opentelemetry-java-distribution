@@ -480,7 +480,8 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
    * @param baseUrl the value of {@code DASH0_OTEL_COLLECTOR_BASE_URL} with its trailing slashes
    *     stripped, or null when {@code OTEL_EXPORTER_OTLP_ENDPOINT} suppresses it
    * @param specificationDefaults collects {@code defaultBase} for an exporter that keeps the
-   *     specification default and for one whose declared specification default is replaced
+   *     specification default and for one whose declared specification default is replaced by a
+   *     different endpoint
    */
   static String theEndpointForAnOtlpExporter(
       String declaredEndpoint,
@@ -497,10 +498,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
       }
       return null;
     }
-    if (declaredEndpoint != null) {
+    String endpoint = baseUrl + signalPath;
+    if (declaredEndpoint != null && !endpoint.equals(declaredEndpoint.trim())) {
       specificationDefaults.add(defaultBase);
     }
-    return baseUrl + signalPath;
+    return endpoint;
   }
 
   /** Returns {@code model}'s resource, attaching an empty one when the file declares none. */
