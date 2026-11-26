@@ -23,3 +23,8 @@ subtext: |
   in any way, including a trailing slash or a port, is kept, and a set
   ``OTEL_EXPORTER_OTLP_ENDPOINT`` still wins over
   ``DASH0_OTEL_COLLECTOR_BASE_URL``.
+  A file that pins the specification default on purpose, to reach a collector on
+  the same host, is now repointed at the collector base URL. That is logged at
+  ``INFO``, naming the endpoint that was replaced and the one that replaced it.
+  Set ``OTEL_EXPORTER_OTLP_ENDPOINT`` on such a workload to keep the file's
+  endpoint.
