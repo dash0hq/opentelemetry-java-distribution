@@ -114,6 +114,9 @@ assert_prints "set-gradle-version writes a -SNAPSHOT version" \
 assert_prints "set-gradle-version tolerates no spaces around the equals sign" \
   "version = 0.2.0" \
   set_version_and_show_the_file "$(printf 'version=0.1.0-SNAPSHOT\n')" "0.2.0"
+assert_prints "set-gradle-version moves off a published version a release left behind" \
+  "version = 0.3.0" \
+  set_version_and_show_the_file "$(printf 'version = 0.2.0\n')" "0.3.0"
 
 assert_rejects "set-gradle-version rejects a tree with no gradle.properties" \
   "no gradle.properties" \
@@ -242,6 +245,9 @@ assert_rejects "next-snapshot-version rejects a trailer that goes backwards" \
 assert_rejects "next-snapshot-version rejects a trailer equal to the release" \
   "is not newer than the released version" next_snapshot_after_releasing "0.2.0" \
   "$(printf 'subject\n\nNext-Version: 0.2.0-SNAPSHOT\n')"
+assert_prints "next-snapshot-version reads a release commit the automation did not write" \
+  "0.3.0-SNAPSHOT" next_snapshot_after_releasing "0.2.0" \
+  "$(printf 'release: prepare 0.2.0 (#20)\n\n* release: prepare 0.2.0\n\nThe awk at .github/workflows/release.yml:103-112 was run against the new\nfile and extracted 255 lines, stopping before the heading at CHANGELOG.rst:281.\n')"
 assert_rejects "next-snapshot-version rejects a v-prefixed released version" \
   "does not match X.Y.Z" next_snapshot_after_releasing "v0.2.0" "subject"
 assert_rejects "next-snapshot-version rejects an empty released version" \
