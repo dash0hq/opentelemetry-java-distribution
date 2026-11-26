@@ -21,6 +21,55 @@ than ordinary prose.
 
 .. <!-- next version -->
 
+0.3.0 - 2026-11-26
+========================================
+
+Breaking Changes
+----------------
+
+- ``custom``: A configuration file that pins the OTLP specification default endpoint is now repointed at DASH0_OTEL_COLLECTOR_BASE_URL
+
+  A host that sets ``DASH0_OTEL_COLLECTOR_BASE_URL`` and runs a configuration
+  file whose exporter names ``http://localhost:4318/v1/traces``, one of its two
+  siblings, or ``http://localhost:4317`` for gRPC, exported to that endpoint
+  before and exports to the collector base URL now. The case this takes away is
+  a collector running beside the JVM, reached on the default port, on a host
+  where the base URL points somewhere else.
+  Set ``OTEL_EXPORTER_OTLP_ENDPOINT`` on such a workload, which stops
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` being applied and hands the endpoint back to
+  the configuration file. The replacement is logged at ``INFO``, naming the
+  endpoint that was there and the one that took its place. Every host running
+  the packaged file with the base URL set logs that line, since the packaged
+  file resolves every endpoint to the specification default, so the line reports
+  where telemetry goes rather than marking a host that lost a collector.
+  An endpoint that differs from the specification default in any way, including
+  a trailing slash or a different port, is untouched.
+  
+
+Bug Fixes
+---------
+
+- ``custom``: Apply DASH0_OTEL_COLLECTOR_BASE_URL to an OTLP exporter the configuration file left at the specification default endpoint
+
+  On a host with the Dash0 Linux packages, ``DASH0_OTEL_COLLECTOR_BASE_URL``
+  had no effect on a Java process: it exported to ``http://localhost:4318``
+  unless ``OTEL_EXPORTER_OTLP_ENDPOINT`` was set as well, while Node.js, Python
+  and Ruby on the same host honoured the variable.
+  The file ``/etc/opentelemetry/java/otel-config.yaml`` that
+  ``dash0-java-autoinstrumentation`` installs writes every endpoint as
+  ``${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}/v1/traces`` and its
+  two siblings. The SDK substitutes environment variables while it parses the
+  file, so with ``OTEL_EXPORTER_OTLP_ENDPOINT`` unset the exporter already
+  carried the specification default, and the distribution applied the collector
+  base URL only to an exporter that declared no endpoint at all.
+  An endpoint equal to the specification default for its signal and protocol is
+  now treated as an exporter that named none. An endpoint that differs from it
+  in any way, including a trailing slash or a port, is kept, and a set
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` still wins over
+  ``DASH0_OTEL_COLLECTOR_BASE_URL``. The breaking change above covers what a
+  file that pins the specification default on purpose has to do now.
+  
+
 0.2.0 - 2026-11-25
 ========================================
 
