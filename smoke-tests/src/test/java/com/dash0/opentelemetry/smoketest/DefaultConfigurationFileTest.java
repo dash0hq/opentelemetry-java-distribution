@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 /**
  * Asserts that a real instrumented JVM configures itself from {@value #DEFAULT_CONFIGURATION_FILE}
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
  * JVMs read the path the provider's own constant names; every other smoke test reads a path under
  * {@code build/} that nothing creates.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 class DefaultConfigurationFileTest {
 
   static final String DEFAULT_CONFIGURATION_FILE = "/etc/opentelemetry/java/otel-config.yaml";
