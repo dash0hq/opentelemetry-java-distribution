@@ -298,11 +298,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (tracerProvider != null && tracerProvider.getProcessors() != null) {
       for (SpanProcessorModel processor : tracerProvider.getProcessors()) {
         if (processor.getBatch() != null) {
-          applyTheBaseUrlToASpanExporterOrRecordItsDefault(
+          applyTheBaseUrlToASpanExportersEndpoints(
               processor.getBatch().getExporter(), baseUrl, specificationDefaults);
         }
         if (processor.getSimple() != null) {
-          applyTheBaseUrlToASpanExporterOrRecordItsDefault(
+          applyTheBaseUrlToASpanExportersEndpoints(
               processor.getSimple().getExporter(), baseUrl, specificationDefaults);
         }
       }
@@ -312,7 +312,7 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (meterProvider != null && meterProvider.getReaders() != null) {
       for (MetricReaderModel reader : meterProvider.getReaders()) {
         if (reader.getPeriodic() != null) {
-          applyTheBaseUrlToAMetricExporterOrRecordItsDefault(
+          applyTheBaseUrlToAMetricExportersEndpoints(
               reader.getPeriodic().getExporter(), baseUrl, specificationDefaults);
         }
       }
@@ -322,11 +322,11 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
     if (loggerProvider != null && loggerProvider.getProcessors() != null) {
       for (LogRecordProcessorModel processor : loggerProvider.getProcessors()) {
         if (processor.getBatch() != null) {
-          applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
+          applyTheBaseUrlToALogRecordExportersEndpoints(
               processor.getBatch().getExporter(), baseUrl, specificationDefaults);
         }
         if (processor.getSimple() != null) {
-          applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
+          applyTheBaseUrlToALogRecordExportersEndpoints(
               processor.getSimple().getExporter(), baseUrl, specificationDefaults);
         }
       }
@@ -361,10 +361,10 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #TRACES_PATH} for the HTTP
    * exporter and to {@code baseUrl} alone for the gRPC one, under the rule {@link
-   * #theEndpointForAnOtlpExporter} applies, and records in {@code specificationDefaults} what that
-   * rule found.
+   * #theEndpointForAnOtlpExporter} applies, and collects in {@code specificationDefaults} the
+   * specification default endpoints that rule met.
    */
-  static void applyTheBaseUrlToASpanExporterOrRecordItsDefault(
+  static void applyTheBaseUrlToASpanExportersEndpoints(
       SpanExporterModel exporter, String baseUrl, Set<String> specificationDefaults) {
     if (exporter == null) {
       return;
@@ -398,10 +398,10 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #METRICS_PATH} for the HTTP
    * exporter and to {@code baseUrl} alone for the gRPC one, under the rule {@link
-   * #theEndpointForAnOtlpExporter} applies, and records in {@code specificationDefaults} what that
-   * rule found.
+   * #theEndpointForAnOtlpExporter} applies, and collects in {@code specificationDefaults} the
+   * specification default endpoints that rule met.
    */
-  static void applyTheBaseUrlToAMetricExporterOrRecordItsDefault(
+  static void applyTheBaseUrlToAMetricExportersEndpoints(
       PushMetricExporterModel exporter, String baseUrl, Set<String> specificationDefaults) {
     if (exporter == null) {
       return;
@@ -435,10 +435,10 @@ public final class Dash0DeclarativeConfigurationCustomizerProvider
   /**
    * Sets {@code exporter}'s endpoint to {@code baseUrl} plus {@value #LOGS_PATH} for the HTTP
    * exporter and to {@code baseUrl} alone for the gRPC one, under the rule {@link
-   * #theEndpointForAnOtlpExporter} applies, and records in {@code specificationDefaults} what that
-   * rule found.
+   * #theEndpointForAnOtlpExporter} applies, and collects in {@code specificationDefaults} the
+   * specification default endpoints that rule met.
    */
-  static void applyTheBaseUrlToALogRecordExporterOrRecordItsDefault(
+  static void applyTheBaseUrlToALogRecordExportersEndpoints(
       LogRecordExporterModel exporter, String baseUrl, Set<String> specificationDefaults) {
     if (exporter == null) {
       return;
