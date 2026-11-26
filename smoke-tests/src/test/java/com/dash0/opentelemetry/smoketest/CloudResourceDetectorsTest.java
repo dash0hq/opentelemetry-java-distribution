@@ -220,7 +220,7 @@ class CloudResourceDetectorsTest {
             "-Dotel.metrics.exporter=logging",
             "-Dotel.metric.export.interval=500")
         .withEnvironment(environment)
-        .exitingAfter(4000)
+        .exitingAfterTwoExportIntervals()
         .run();
   }
 }

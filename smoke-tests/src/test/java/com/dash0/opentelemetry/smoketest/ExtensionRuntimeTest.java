@@ -143,6 +143,6 @@ class ExtensionRuntimeTest {
             "-Dotel.metrics.exporter=" + metricsExporter,
             "-Dotel.metric.export.interval=500",
             "-Dotel.service.name=smoke-test")
-        .exitingAfter(4000);
+        .exitingAfterTwoExportIntervals();
   }
 }
