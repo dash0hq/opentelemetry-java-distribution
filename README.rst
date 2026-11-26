@@ -54,8 +54,10 @@ Declarative configuration
    SPIs, so the distribution registers a
    ``DeclarativeConfigurationCustomizerProvider`` that writes the Dash0
    settings and the Dash0 attributes into the parsed configuration model.
-   ``DASH0_OTEL_COLLECTOR_BASE_URL`` fills in the endpoint of an exporter the
-   file declared without one, and adds no exporter the file did not declare.
+   ``DASH0_OTEL_COLLECTOR_BASE_URL`` sets the endpoint of an exporter the file
+   declared either without one or at the OTLP specification default, adds no
+   exporter the file did not declare, and loses to an
+   ``OTEL_EXPORTER_OTLP_ENDPOINT`` set on the workload.
    With ``OTEL_CONFIG_FILE`` unset, a
    ``DeclarativeConfigurationProvider`` configures the SDK from
    ``/etc/opentelemetry/java/otel-config.yaml`` when that file exists, which is
