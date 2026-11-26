@@ -238,7 +238,7 @@ class DeclarativeConfigurationTest {
             .withJvmArguments(
                 "-Dotel.javaagent.extensions=" + System.getProperty("dash0.extension.jar"))
             .withEnvironmentVariable("OTEL_CONFIG_FILE", fixture("/declarative-config.yaml"))
-            .exitingAfter(4000)
+            .exitingAfterTwoExportIntervals()
             .run();
 
     assertThat(exported)
@@ -254,7 +254,7 @@ class DeclarativeConfigurationTest {
   private static InstrumentedJvm configuredFrom(String fixture) throws URISyntaxException {
     return InstrumentedJvm.runningTheTestApplication()
         .withEnvironmentVariable("OTEL_CONFIG_FILE", fixture(fixture))
-        .exitingAfter(3000);
+        .exitingAfterTwoExportIntervals();
   }
 
   private static InstrumentedJvm sendingARequestConfiguredFrom(String fixture)

@@ -147,7 +147,7 @@ class PackageResourceAttributesTest {
                         .getResource("/declarative-config.yaml")
                         .toURI())
                 .toString())
-        .exitingAfter(4000)
+        .exitingAfterTwoExportIntervals()
         .run();
   }
 
@@ -169,7 +169,7 @@ class PackageResourceAttributesTest {
             "-Dotel.metrics.exporter=logging",
             "-Dotel.metric.export.interval=500",
             "-Dotel.service.name=smoke-test")
-        .exitingAfter(4000)
+        .exitingAfterTwoExportIntervals()
         .run();
   }
 }

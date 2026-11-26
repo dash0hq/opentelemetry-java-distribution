@@ -214,7 +214,7 @@ class DefaultConfigurationFileTest {
                 "-Dotel.metrics.exporter=logging",
                 "-Dotel.metric.export.interval=500",
                 "-Dotel.service.name=environment-smoke-test")
-            .exitingAfter(4000)
+            .exitingAfterTwoExportIntervals()
             .run();
 
     assertThat(exported)
@@ -286,7 +286,7 @@ class DefaultConfigurationFileTest {
           DEFAULT_CONFIGURATION_FILE + " cannot be written on this host: " + e);
     }
     try {
-      return jvm.readingTheHostDefaultConfigurationFile().exitingAfter(4000).run();
+      return jvm.readingTheHostDefaultConfigurationFile().exitingAfterTwoExportIntervals().run();
     } finally {
       Files.delete(DEFAULT_CONFIGURATION_PATH);
     }

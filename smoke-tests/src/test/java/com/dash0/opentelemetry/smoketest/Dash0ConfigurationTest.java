@@ -262,6 +262,6 @@ class Dash0ConfigurationTest {
             "-Dotel.traces.exporter=none",
             "-Dotel.logs.exporter=none",
             "-Dotel.service.name=smoke-test")
-        .exitingAfter(3000);
+        .exitingAfterTwoExportIntervals();
   }
 }

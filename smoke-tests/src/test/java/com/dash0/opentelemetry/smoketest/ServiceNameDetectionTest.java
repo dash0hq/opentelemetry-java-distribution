@@ -177,7 +177,7 @@ class ServiceNameDetectionTest {
             "-Dotel.logs.exporter=none",
             "-Dotel.metrics.exporter=logging",
             "-Dotel.metric.export.interval=500")
-        .exitingAfter(4000);
+        .exitingAfterTwoExportIntervals();
   }
 
   private static Path executableJar(Path directory, String fileName, String implementationTitle)

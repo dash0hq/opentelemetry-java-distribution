@@ -28,6 +28,8 @@ final class InstrumentedJvm {
 
   private static final int TIMEOUT_MINUTES = 2;
 
+  private static final int EXPORT_INTERVAL_MILLISECONDS = 500;
+
   private String agentJar = System.getProperty("dash0.agent.jar");
   private final String mainClass;
   private final List<String> jvmArguments = new ArrayList<>();
@@ -102,9 +104,12 @@ final class InstrumentedJvm {
     return this;
   }
 
-  /** Keeps the application alive this long, so that a periodic exporter runs at least once. */
-  InstrumentedJvm exitingAfter(int milliseconds) {
-    millisecondsBeforeExit = milliseconds;
+  /**
+   * Keeps the application alive for two of the {@value #EXPORT_INTERVAL_MILLISECONDS} millisecond
+   * export intervals the smoke tests configure.
+   */
+  InstrumentedJvm exitingAfterTwoExportIntervals() {
+    millisecondsBeforeExit = 2 * EXPORT_INTERVAL_MILLISECONDS;
     return this;
   }
 

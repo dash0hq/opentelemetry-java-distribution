@@ -54,7 +54,7 @@ class DistroResourceAttributesTest {
             "-Dotel.metrics.exporter=logging",
             "-Dotel.metric.export.interval=500")
         .withJvmArguments(extraJvmArguments)
-        .exitingAfter(4000)
+        .exitingAfterTwoExportIntervals()
         .run();
   }
 }
