@@ -111,8 +111,9 @@ jobs:
             }
           ' CHANGELOG.rst > notes.rst
 
-          if [ ! -s notes.rst ]; then
-            echo "::error::CHANGELOG.rst has no section for $version"
+          if ! grep -q '[^[:space:]]' notes.rst; then
+            echo "::error::CHANGELOG.rst has no section for $version, or its" \
+              "section is empty"
             exit 1
           fi
 
@@ -140,6 +141,71 @@ jobs:
           done
 
           gh release edit "$TAG" --draft=false --latest
+
+  open-next-snapshot:
+    name: Open the next development version on main
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+    steps:
+      - name: Require the token that may push to main
+        env:
+          FULL_ACCESS_TOKEN: ${{ secrets.REPOSITORY_FULL_ACCESS_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FULL_ACCESS_TOKEN" ]; then
+            echo "::error::REPOSITORY_FULL_ACCESS_GITHUB_TOKEN is not available to" \
+              "this repository, so main cannot be moved off the published version." \
+              "$TAG is published; restore the -SNAPSHOT version by hand. See" \
+              "RELEASING.rst."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.REPOSITORY_FULL_ACCESS_GITHUB_TOKEN }}
+
+      - name: Work out the next development version
+        id: next
+        run: |
+          set -euo pipefail
+          next="$(git log -1 --pretty=%B "refs/tags/$TAG" \
+            | .github/workflows/scripts/next-snapshot-version.sh "${TAG#v}")"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "main moves from ${TAG#v} to $next."
+
+      - name: Skip a version that main has already moved past
+        id: state
+        run: |
+          set -euo pipefail
+          declared="$(sed -n 's/^version *= *//p' gradle.properties)"
+          if [ "$declared" = "${TAG#v}" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main declares $declared rather than the published" \
+              "${TAG#v}, so it is already off the released version."
+          fi
+
+      - name: Commit and push the next development version
+        if: steps.state.outputs.needed == 'true'
+        env:
+          NEXT_VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+          .github/workflows/scripts/set-gradle-version.sh "$NEXT_VERSION"
+          git config user.name d0etu
+          git config user.email d0etu@users.noreply.github.com
+          git add gradle.properties
+          git commit -m "release: open $NEXT_VERSION"
+          git push origin HEAD:main
 
   sync-docs:
     name: Synchronize the docs

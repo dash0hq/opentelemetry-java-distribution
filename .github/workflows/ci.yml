@@ -137,6 +137,18 @@ jobs:
       - name: Compare against upstream at the pinned agent version
         run: scripts/check-relocations.sh
 
+  release-scripts:
+    name: Release scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Exercise the release scripts
+        run: .github/workflows/scripts/test-release-scripts.sh
+
   changelog:
     name: Changelog entry
     runs-on: ubuntu-latest

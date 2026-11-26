@@ -19,6 +19,33 @@ Releasing
    made to reject on a runner. The same goes for the refusal to re-run against
    an already published tag.
 
+   That run also predates the automation. It covered the publish only, and it
+   covered the ``release.yml`` of the time. ``prepare-release.yml``,
+   ``create-tag-for-release.yml`` and the ``open-next-snapshot`` job of
+   ``release.yml`` have never run on a runner at all. Their scripts are
+   exercised by ``.github/workflows/scripts/test-release-scripts.sh``, which
+   ``ci.yml`` runs on every pull request, and that is a different claim from
+   having cut a release with them.
+
+   ``v0.2.0`` was cut on 2026-11-25 down the five manual steps under `Cutting a
+   release by hand`_, and it exercised none of the three. Its hand-pushed tag
+   started ``release.yml``, whose **Build and publish** job succeeded on a
+   runner in 12m05s and published the two jars and ``SHA256SUMS``. The
+   **Synchronize the docs** job failed on its App-token step, for the two
+   missing secrets named under `The documentation sync`_, and the release was
+   already complete when it did. Step 5 was skipped, so ``main`` still declares
+   ``version = 0.2.0``. ``./gradlew build`` on ``main`` today writes
+   ``dash0-opentelemetry-javaagent-0.2.0.jar``, carrying the version number of
+   a release that is already published. The ``open-next-snapshot`` job is what
+   keeps that from happening again.
+
+   The 2026-10-23 approach is not available a second time. That run deleted its
+   throwaway tag, and the tag ruleset created on 2026-11-09 forbids deleting
+   ``refs/tags/v*``, while ``check-release-version-is-newest.sh`` refuses any
+   version at or below the highest published one. So the first exercise of the
+   automation is the release after ``v0.2.0``. Watch that one, and delete this
+   paragraph once it has gone through.
+
 
 Where the artifacts go
 ======================
@@ -59,22 +86,63 @@ lives in ``gradle/libs.versions.toml``.
 Cutting a release
 =================
 
-1. Compile the pending changelog entries into a new section. The heading text
-   is what the release workflow searches CHANGELOG.rst for, so it has to start
-   with the version:
+Open the Actions tab, run **Prepare release**, and give it the version to
+publish with no leading ``v``. That is the whole procedure. No local git
+operation is involved and no tag is pushed by hand.
 
-   .. code-block:: bash
+Three workflows then run in sequence, each started by what the previous one
+pushed:
 
-       make chlog-update VERSION="0.2.0 - 2026-10-01"
+1. ``.github/workflows/prepare-release.yml`` checks the version, refuses one
+   that is already tagged, writes it into ``gradle.properties``, folds the
+   pending ``.chloggen/`` entries into a new ``CHANGELOG.rst`` section, and
+   commits to ``main`` as
+   ``docs: update changelog to prepare release v<version>``.
+2. ``.github/workflows/create-tag-for-release.yml`` matches that commit
+   subject and pushes the tag ``v<version>`` at that exact commit.
+3. ``.github/workflows/release.yml`` builds and publishes from the tag, then
+   moves ``main`` to the next development version.
 
-2. Set the new version in ``gradle.properties``, dropping ``-SNAPSHOT``.
-3. Open a pull request with those two changes. Merge it once CI is green.
-4. Tag the merge commit ``v<version>`` and push the tag.
-5. Set the next development version in ``gradle.properties``, restoring
-   ``-SNAPSHOT``.
 
-Pushing the tag in step 4 is what publishes. ``.github/workflows/release.yml``
-then runs, and refuses to continue unless three things hold:
+The inputs
+----------
+
+``version``
+  Required, ``X.Y.Z``, with no leading ``v``. A ``v`` is rejected: the
+  CHANGELOG.rst heading carries no prefix and the release finds the section by
+  matching the heading.
+
+``date``
+  Optional, ``YYYY-MM-DD``, defaulting to today in UTC. It is the date in the
+  CHANGELOG.rst heading.
+
+``next-version``
+  Optional, ``X.Y.Z-SNAPSHOT``. The version ``main`` returns to once the
+  release is published. It defaults to a minor bump with the patch reset, so
+  releasing ``0.2.0`` opens ``0.3.0-SNAPSHOT``. Set it when the release was a
+  patch and the next development line should stay on that patch line. The
+  value is recorded as a ``Next-Version`` trailer on the release commit, which
+  is how it reaches ``release.yml``: a tag push carries no workflow inputs.
+
+Getting ``next-version`` wrong costs little. ``prepare-release.yml`` writes
+whatever version it is given, so the next release overwrites the snapshot
+regardless of what it was. The refusals below compare the tag against the
+``gradle.properties`` of the tagged commit, so they neither catch nor are
+confused by a wrong snapshot on ``main``. They do not catch the snapshot never
+being restored either. ``prepare-release.yml`` rewrites the version line
+whatever it held, so the tagged commit always agrees with its tag, and the
+``v0.2.0`` release is the live demonstration: ``main`` declares the published
+``0.2.0`` today and the next correct tag would still be accepted. What an
+unrestored snapshot costs is every build off ``main`` until the next release
+carrying a version number that is already published. The restore is a workflow
+step for that, not a reminder in a document.
+
+
+What the release workflow refuses
+---------------------------------
+
+Pushing the tag is what publishes. ``.github/workflows/release.yml`` then runs,
+and refuses to continue unless three things hold:
 
 - The tag matches ``vX.Y.Z``.
 - The tagged commit is reachable from ``origin/main``. Without this, tag-push
@@ -90,6 +158,74 @@ re-tag instead.
 
 The release notes are the CHANGELOG.rst section for the version, converted to
 Markdown. A tag with no matching section fails the workflow.
+
+
+The token the automation needs
+------------------------------
+
+Every push the automation makes uses the
+``REPOSITORY_FULL_ACCESS_GITHUB_TOKEN`` secret rather than the workflow's own
+``GITHUB_TOKEN``. GitHub starts no workflow from an event caused by
+``GITHUB_TOKEN``, so a commit pushed with it would never reach
+``create-tag-for-release.yml`` and a tag pushed with it would never reach
+``release.yml``. Nothing after the first workflow would run.
+
+That secret is an organisation secret in ``dash0hq``, and this repository
+cannot see it. The organization-secrets API lists only
+``DOCS_SYNC_APP_PRIVATE_KEY`` here, while listing
+``REPOSITORY_FULL_ACCESS_GITHUB_TOKEN`` on the Python and .NET distributions,
+which both already run these workflows. Someone with organisation
+administrator access has to add this repository to that secret's selected
+repositories. The token itself needs ``Contents: write``, to push a commit to
+``main`` and to push a tag.
+
+The ``main`` ruleset has to let that token push as well. It currently requires
+a pull request with one approval, a linear history and signed commits, and it
+names no bypass actors, so a direct push to ``main`` is refused whoever makes
+it. The token's account has to be added to the ruleset's bypass list, which is
+what lets ``prepare-release.yml`` commit and what lets the publish restore the
+``-SNAPSHOT`` version. The tag ruleset needs no change: it forbids deleting and
+force-updating ``refs/tags/v*`` and permits creation.
+
+Until both are in place, **Prepare release** fails on its first step and says
+so. Ordinary pushes to ``main`` are unaffected, because the tagging workflow
+runs only on a commit whose subject begins with the release subject.
+
+One more administrator action is worth doing at the same time, though nothing
+here depends on it. ``ci.yml`` gained a **Release scripts** job that runs
+``.github/workflows/scripts/test-release-scripts.sh``, and the ``main`` ruleset
+does not list it among its required status checks, so a pull request that
+breaks one of those scripts is still mergeable with that check red. Add
+**Release scripts** to the ruleset's required checks, beside **Build and
+test** and **Relocations in sync with upstream**.
+
+
+Cutting a release by hand
+-------------------------
+
+These are the same five steps performed manually. They are the recovery route,
+for a run that stopped partway and for the case where the automation itself is
+broken.
+
+1. Compile the pending changelog entries into a new section. The heading text
+   is what the release workflow searches CHANGELOG.rst for, so it has to start
+   with the version:
+
+   .. code-block:: bash
+
+       make chlog-update VERSION="0.2.0 - 2026-10-01"
+
+2. Set the new version in ``gradle.properties``, dropping ``-SNAPSHOT``.
+3. Open a pull request with those two changes. Merge it once CI is green.
+4. Tag the merge commit ``v<version>`` and push the tag.
+5. Set the next development version in ``gradle.properties``, restoring
+   ``-SNAPSHOT``.
+
+A partly finished automated run is repaired from the same list. If it stopped
+after the commit reached ``main``, steps 1 to 3 are done and pushing the tag
+restarts everything downstream. If it stopped after the publish, only step 5 is
+left. A tag pushed by hand in step 4 does start ``release.yml``, because a
+person's push is not a ``GITHUB_TOKEN`` push.
 
 
 The documentation sync
