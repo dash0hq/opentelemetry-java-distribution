@@ -111,7 +111,19 @@ does less than it should.
     during startup. Check how a setting is read before defaulting it; upstream
     documents the same restriction for `otel.semconv-stability.preview`.
 
-The smoke tests in `smoke-tests/` exist specifically to catch all eleven. They
+12. **What a configuration file's endpoint looks like once it is parsed.**
+    `DeclarativeConfiguration.parse` substitutes environment variables while it
+    loads the YAML, so a customizer never sees the `${...}` text. The file the
+    Dash0 Linux package installs writes
+    `${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}/v1/traces`, which
+    reaches `Dash0DeclarativeConfigurationCustomizerProvider` as the literal
+    specification default rather than as an absent `endpoint`. A customizer
+    that only fills an absent one leaves every JVM on the host exporting to
+    localhost while `DASH0_OTEL_COLLECTOR_BASE_URL` is set and nothing is
+    logged. `default-config-file-interpolated-otlp.yaml` is the fixture that
+    writes an endpoint the way the packaged file writes it.
+
+The smoke tests in `smoke-tests/` exist specifically to catch all twelve. They
 assert on the shape of the built jars and on what a real instrumented JVM
 exports. Treat a smoke-test failure as a real defect, never as a flaky test.
 
@@ -128,6 +140,7 @@ What guards what:
 | 9, declarative configuration | `DeclarativeConfigurationTest`, `Dash0DeclarativeConfigurationCustomizerProviderTest` |
 | 10, the order the default configuration file is picked in | `DefaultConfigurationFileTest`, `Dash0DefaultConfigurationFileProviderTest` |
 | 11, a setting read outside `ConfigProperties` | `Dash0ConfigurationTest` |
+| 12, an endpoint the interpolation already resolved | `DefaultConfigurationFileTest`, `Dash0DeclarativeConfigurationCustomizerProviderTest` |
 | Any of them, through the extension rather than the agent | `ExtensionRuntimeTest`, `DeclarativeConfigurationTest`, `DefaultConfigurationFileTest` |
 | Export actually leaving the process | `examples/dash0-distro-java/verify.sh` |
 

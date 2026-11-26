@@ -82,7 +82,9 @@ set of SPIs, so the distribution registers a
 `DeclarativeConfigurationCustomizerProvider` that writes the same settings and
 the same attributes into the parsed configuration model, and a
 `DeclarativeConfigurationProvider` that supplies the default file. One rule is
-worth knowing before writing a file: `DASH0_OTEL_COLLECTOR_BASE_URL` fills in
-the endpoint of an exporter the file declared and left without one, and never
-adds an exporter the file did not declare. See
+worth knowing before writing a file: `DASH0_OTEL_COLLECTOR_BASE_URL` sets the
+endpoint of an exporter the file declared and left either without one or at the
+OTLP specification default, it never adds an exporter the file did not declare,
+and an `OTEL_EXPORTER_OTLP_ENDPOINT` set on the workload keeps the endpoint the
+file names. See
 [configuration](configuration).

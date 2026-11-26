@@ -732,7 +732,7 @@ from whatever it returns.
 | Setting | What the customizer writes into the model |
 |---|---|
 | `DASH0_DISABLE=true` | `disabled: true`, which builds an SDK with no providers at all |
-| `DASH0_OTEL_COLLECTOR_BASE_URL` | the `endpoint` of every OTLP exporter the file declared without one |
+| `DASH0_OTEL_COLLECTOR_BASE_URL` | the `endpoint` of every OTLP exporter the file declared without one, or at the specification default for its signal and protocol |
 | the `always_on` sampler default | `tracer_provider.sampler`, unless the file declares a sampler |
 | the `tracecontext,baggage,xray` propagators default | `propagator.composite_list`, unless the file declares a `composite` or a non-blank `composite_list` |
 | `telemetry.distro.name` and `telemetry.distro.version` | `resource.attributes`, unless the file declares that name |
@@ -893,10 +893,26 @@ credential-shaped system property already replaced: a JVM started with
 ### What the endpoint mapping does and does not touch
 
 `DASH0_OTEL_COLLECTOR_BASE_URL` reaches an exporter node only when the file
-declared that exporter and left its `endpoint` unset. The customizer walks
-`tracer_provider.processors`, `meter_provider.readers` and
-`logger_provider.processors`, and covers the `batch` and `simple` processors and
-both the `otlp_http` and `otlp_grpc` exporters.
+declared that exporter and the `endpoint` the parsed model carries is either
+absent or the specification default for that exporter's signal and protocol:
+`http://localhost:4318/v1/traces`, `http://localhost:4318/v1/metrics` and
+`http://localhost:4318/v1/logs` for `otlp_http`, and `http://localhost:4317`
+for `otlp_grpc`. The customizer walks `tracer_provider.processors`,
+`meter_provider.readers` and `logger_provider.processors`, and covers the
+`batch` and `simple` processors and both the `otlp_http` and `otlp_grpc`
+exporters.
+
+The second of those two cases is what the file the Dash0 Linux package installs
+produces. It writes every endpoint as
+`${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}/v1/traces` and its two
+siblings, and `DeclarativeConfiguration.parse` substitutes environment
+variables while it loads the YAML, before any
+`DeclarativeConfigurationCustomizerProvider` is consulted. With
+`OTEL_EXPORTER_OTLP_ENDPOINT` unset the model therefore carries the
+specification default as a literal string, and a customizer that only filled an
+absent `endpoint` would leave the whole host exporting to `localhost:4318`. An
+endpoint that differs from the default in any way, including a trailing slash
+or a port, is a choice the file made and is kept.
 
 The endpoint mapping invents nothing. A file that declares no tracer provider
 gets no processor and no exporter added to it, and a provider that declares no
@@ -931,20 +947,41 @@ base URL unchanged.
 A set `OTEL_EXPORTER_OTLP_ENDPOINT` suppresses the mapping. The file is left
 exactly as it was, and `DASH0_OTEL_COLLECTOR_BASE_URL` is not applied anywhere.
 
-Setting both variables on one workload sends its telemetry to neither host.
-`OTEL_EXPORTER_OTLP_ENDPOINT` configures nothing in this mode, since the SDK
-reads no `OTEL_EXPORTER_OTLP_*` variable from a declaratively configured
-process, so an exporter the file left without an `endpoint` falls back to its
-own specification default: `http://localhost:4318` for `otlp_http` and
-`http://localhost:4317` for `otlp_grpc`. The stock upstream agent 2.33.1 does
-the same with no Dash0 code involved, so this is the SDK's rule and not a
-choice this distribution makes.
+Replacing an `endpoint` the file carries is logged at `INFO`, naming the
+specification default endpoint the exporter resolved to and the base URL that
+took its place. The endpoint it names is the base, `http://localhost:4318` or
+`http://localhost:4317`, which is the form `OTEL_EXPORTER_OTLP_ENDPOINT` takes,
+rather than the per-signal URL the exporter carried. Every host running the
+packaged file with `DASH0_OTEL_COLLECTOR_BASE_URL` set logs the line, since
+that file resolves every endpoint to the specification default, so it reports
+where telemetry goes rather than marking an unusual configuration.
+
+Filling in an `endpoint` the file left absent is logged at `FINE` instead,
+since nothing the file asked for was overridden, and so is rewriting an
+`endpoint` to the value it already held, which is what a
+`DASH0_OTEL_COLLECTOR_BASE_URL` of `http://localhost:4318` does to the packaged
+file.
+
+Setting both variables on one workload sends its telemetry to neither host,
+unless the file interpolates `OTEL_EXPORTER_OTLP_ENDPOINT` into its endpoints
+the way the packaged file does. `OTEL_EXPORTER_OTLP_ENDPOINT` configures
+nothing in this mode, since the SDK reads no `OTEL_EXPORTER_OTLP_*` variable
+from a declaratively configured process, so an exporter the file left without
+an `endpoint` falls back to its own specification default:
+`http://localhost:4318` for `otlp_http` and `http://localhost:4317` for
+`otlp_grpc`. The stock upstream agent 2.33.1 does the same with no Dash0 code
+involved, so this is the SDK's rule and not a choice this distribution makes.
 
 The customizer logs that at `WARNING`, naming the defaults the exporters keep.
-It stays quiet when every exporter the file declares already names its
-`endpoint`, and when the file declares no OTLP exporter at all, so a host that
-sets `DASH0_OTEL_COLLECTOR_BASE_URL` for every workload does not warn the
-workloads that are configured correctly. Name the endpoint in the file:
+It warns only about an exporter the file left without an `endpoint` at all. An
+exporter whose `endpoint` reads as the specification default is excluded,
+because that is what the packaged file produces for an
+`OTEL_EXPORTER_OTLP_ENDPOINT` of `http://localhost:4318`, where the operator's
+endpoint was honoured exactly. It also stays quiet when every exporter the file
+declares already names an `endpoint` of its own, and when the file declares no
+OTLP exporter at all, so a host that sets `DASH0_OTEL_COLLECTOR_BASE_URL` for
+every workload does not warn the workloads that are configured correctly. Name
+the endpoint in the file:
 
 ```yaml
 tracer_provider:

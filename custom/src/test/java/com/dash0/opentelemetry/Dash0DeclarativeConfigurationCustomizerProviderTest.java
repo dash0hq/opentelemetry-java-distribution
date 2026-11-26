@@ -456,6 +456,152 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
         .isEqualTo(COLLECTOR_BASE_URL + "/v1/metrics");
   }
 
+  @Test
+  void replacesAnHttpEndpointLeftAtItsSpecificationDefault() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/traces");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/logs");
+
+    useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(model, COLLECTOR_BASE_URL, null);
+
+    assertThat(spanExporterOf(model).getOtlpHttp().getEndpoint())
+        .as(
+            "the file the Dash0 Linux package installs writes"
+                + " ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}/v1/traces, and the SDK"
+                + " interpolates that before any customizer runs, so an endpoint that reads as the"
+                + " specification default is what an unset OTEL_EXPORTER_OTLP_ENDPOINT looks like"
+                + " by the time the model exists")
+        .isEqualTo(COLLECTOR_BASE_URL + "/v1/traces");
+    assertThat(metricExporterOf(model).getOtlpHttp().getEndpoint())
+        .isEqualTo(COLLECTOR_BASE_URL + "/v1/metrics");
+    assertThat(logRecordExporterOf(model).getOtlpHttp().getEndpoint())
+        .isEqualTo(COLLECTOR_BASE_URL + "/v1/logs");
+  }
+
+  @Test
+  void replacesAGrpcEndpointLeftAtItsSpecificationDefault() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpGrpcExporterForEverySignal();
+    spanExporterOf(model).getOtlpGrpc().setEndpoint("http://localhost:4317");
+    metricExporterOf(model).getOtlpGrpc().setEndpoint("http://localhost:4317");
+    logRecordExporterOf(model).getOtlpGrpc().setEndpoint("http://localhost:4317");
+
+    useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+        model, "http://collector.internal:4317", null);
+
+    assertThat(spanExporterOf(model).getOtlpGrpc().getEndpoint())
+        .isEqualTo("http://collector.internal:4317");
+    assertThat(metricExporterOf(model).getOtlpGrpc().getEndpoint())
+        .isEqualTo("http://collector.internal:4317");
+    assertThat(logRecordExporterOf(model).getOtlpGrpc().getEndpoint())
+        .isEqualTo("http://collector.internal:4317");
+  }
+
+  @Test
+  void keepsALocalhostEndpointThatIsNotTheDefaultForItsSignal() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/metrics");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4319/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/logs/");
+
+    useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(model, COLLECTOR_BASE_URL, null);
+
+    assertThat(spanExporterOf(model).getOtlpHttp().getEndpoint())
+        .as("the wrong signal path on the default port is a choice, not a default")
+        .isEqualTo("http://localhost:4318/v1/metrics");
+    assertThat(metricExporterOf(model).getOtlpHttp().getEndpoint())
+        .isEqualTo("http://localhost:4319/v1/metrics");
+    assertThat(logRecordExporterOf(model).getOtlpHttp().getEndpoint())
+        .isEqualTo("http://localhost:4318/v1/logs/");
+  }
+
+  @Test
+  void saysNothingWhenTheOtlpEndpointIsTheSpecificationDefaultItself() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/traces");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/logs");
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model, COLLECTOR_BASE_URL, "http://localhost:4318"));
+
+    assertThat(warningsIn(logged))
+        .as(
+            "the packaged file interpolates OTEL_EXPORTER_OTLP_ENDPOINT, so an operator who"
+                + " points it at the default host gets exactly the endpoint asked for, and"
+                + " warning that the variable did nothing would be false")
+        .isEmpty();
+    assertThat(spanExporterOf(model).getOtlpHttp().getEndpoint())
+        .as("a set OTEL_EXPORTER_OTLP_ENDPOINT still suppresses the mapping")
+        .isEqualTo("http://localhost:4318/v1/traces");
+  }
+
+  @Test
+  void reportsAtInfoThatItReplacedAnEndpointTheFileNames() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/traces");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/logs");
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(model, COLLECTOR_BASE_URL, ""));
+
+    assertThat(infosIn(logged))
+        .as(
+            "a file that pins the default host on purpose is repointed at the collector base"
+                + " URL, and an operator reading the log has to be able to see that happen")
+        .hasSize(1);
+    assertThat(infosIn(logged).get(0).getParameters())
+        .containsExactly(
+            Dash0DeclarativeConfigurationCustomizerProvider.OTLP_HTTP_DEFAULT_ENDPOINT,
+            COLLECTOR_BASE_URL);
+  }
+
+  @Test
+  void saysNothingAtInfoWhenTheBaseUrlIsTheEndpointTheFileAlreadyCarries() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+    spanExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/traces");
+    metricExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/metrics");
+    logRecordExporterOf(model).getOtlpHttp().setEndpoint("http://localhost:4318/v1/logs");
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model,
+                    Dash0DeclarativeConfigurationCustomizerProvider.OTLP_HTTP_DEFAULT_ENDPOINT,
+                    null));
+
+    assertThat(infosIn(logged))
+        .as(
+            "a host whose collector base URL is the default host rewrites every endpoint to the"
+                + " string it already held, and reporting that as a replacement offers a remedy"
+                + " that changes nothing")
+        .isEmpty();
+    assertThat(spanExporterOf(model).getOtlpHttp().getEndpoint())
+        .isEqualTo("http://localhost:4318/v1/traces");
+  }
+
+  @Test
+  void saysNothingAtInfoWhenItOnlyFillsInAnAbsentEndpoint() {
+    OpenTelemetryConfigurationModel model = modelWithAnOtlpHttpExporterForEverySignal();
+
+    List<LogRecord> logged =
+        whileCapturingTheCustomizersLog(
+            () ->
+                useTheCollectorBaseUrlForEveryDeclaredOtlpExporter(
+                    model, COLLECTOR_BASE_URL, null));
+
+    assertThat(infosIn(logged))
+        .as("nothing was overridden, so there is nothing for an operator to reconcile")
+        .isEmpty();
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"https://ingress.dash0.com/", "https://ingress.dash0.com///"})
   void stripsTrailingSlashesFromTheCollectorBaseUrl(String value) {
@@ -763,6 +909,16 @@ class Dash0DeclarativeConfigurationCustomizerProviderTest {
       }
     }
     return warnings;
+  }
+
+  private static List<LogRecord> infosIn(List<LogRecord> records) {
+    List<LogRecord> infos = new ArrayList<>();
+    for (LogRecord record : records) {
+      if (Level.INFO.equals(record.getLevel())) {
+        infos.add(record);
+      }
+    }
+    return infos;
   }
 
   private static OpenTelemetryConfigurationModel modelDeclaring(
