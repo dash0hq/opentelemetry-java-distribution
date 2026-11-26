@@ -1,0 +1,21 @@
+change_type: breaking
+
+component: custom
+
+note: A configuration file that pins the OTLP specification default endpoint is now repointed at DASH0_OTEL_COLLECTOR_BASE_URL
+
+issues: [23]
+
+subtext: |
+  A host that sets ``DASH0_OTEL_COLLECTOR_BASE_URL`` and runs a configuration
+  file whose exporter names ``http://localhost:4318/v1/traces``, one of its two
+  siblings, or ``http://localhost:4317`` for gRPC, exported to that endpoint
+  before and exports to the collector base URL now. The case this takes away is
+  a collector running beside the JVM, reached on the default port, on a host
+  where the base URL points somewhere else.
+  Set ``OTEL_EXPORTER_OTLP_ENDPOINT`` on such a workload to keep the endpoint
+  the configuration file carries. The replacement is logged at ``INFO``, naming
+  the endpoint that was there and the one that replaced it, so a host that is
+  affected says so on every JVM start.
+  An endpoint that differs from the specification default in any way, including
+  a trailing slash or a different port, is untouched.
